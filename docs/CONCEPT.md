@@ -75,11 +75,12 @@ The Daemon does not merely *describe* permissions — it **enforces** them at th
 
 | Component | OS User | Neo4j User | Capabilities |
 |-----------|---------|------------|-------------|
-| **Hassaleh Daemon** | `hassaleh-svc` | `hassaleh_daemon` (read/write) | Full DB writes, shell execution (via SystemAction checks), rule evaluation, agent lifecycle |
+| **Hassaleh Daemon** | `hassaleh-svc` | `hassaleh_daemon` (read/write) | Full DB writes, rule evaluation, agent lifecycle, delegates system ops via `su` to action-specific users |
 | **AI Agents** | `hassaleh-agent` | `hassaleh_reader` (read-only) | Direct read-only graph queries, submit intents to Daemon API |
+| **System Actions** | `hassaleh-fs`, `hassaleh-writer`, `hassaleh-exec`, `hassaleh-net`, `hassaleh-pkg` | — | Per-action-class OS users with minimal permissions (invoked by Daemon via `su`) |
 | **Human Admin** | user account (e.g. `uranus`) | `neo4j` (admin) | Full DB access, Daemon management, manual overrides |
 
-The `hassaleh-agent` OS user has no `sudo`, no write access outside designated directories, and no ability to start processes. All system operations are proxied through the Daemon, which validates them against the SystemAction graph before execution.
+The `hassaleh-agent` OS user has no `sudo`, no write access outside designated directories, and no ability to start processes. All system operations are proxied through the Daemon, which validates them against the SystemAction graph and then executes via `su` to the appropriate action-specific OS user.
 
 ### 3.2 Daemon Execution Model
 
@@ -277,13 +278,28 @@ A permitted action on the host system. Actions are whitelisted — anything not 
     scope: "/home/uranus/moltbot-workspace/**",
     permission: "read",                 # read | write | execute | admin
     requires_confirmation: false,
-    os: "ubuntu"
+    os: "ubuntu",
+    exec_as_user: "hassaleh-fs"         # dedicated OS user for this action class
 })
 ```
 
-**Enforcement:** The Hassaleh Daemon checks SystemAction edges before executing any host operation. Enforcement is **dual-layered**:
-1. **OS level:** Agents run as `hassaleh-agent` user with minimal filesystem permissions
-2. **Graph level:** The Daemon verifies `[:PERMITTED]` edges before executing any operation on behalf of an agent
+**Per-action OS user isolation:** Each SystemAction specifies an `exec_as_user` — a dedicated Ubuntu user that has **only** the permissions needed for this specific action class. The Daemon executes the action via `su - <exec_as_user> -c "..."`. This provides fine-grained OS-level least-privilege:
+
+| Action Class | OS User | Permissions |
+|-------------|---------|------------|
+| Filesystem read (workspace) | `hassaleh-fs` | Read-only access to workspace dirs |
+| Filesystem write (reports) | `hassaleh-writer` | Write access to specific output dirs |
+| Process execution (scripts) | `hassaleh-exec` | Execute scripts in whitelisted paths |
+| Network (API calls) | `hassaleh-net` | Outbound HTTP only, no listeners |
+| Package management | `hassaleh-pkg` | `apt` with restricted package list |
+| Neo4j admin | `hassaleh-svc` | Only the Daemon itself |
+
+This ensures that even if the Daemon has a bug, a filesystem action cannot accidentally execute a process, and a network action cannot write files. Each OS user is configured with minimal capabilities via standard Ubuntu user/group permissions, and optionally hardened with AppArmor profiles.
+
+**Enforcement is triple-layered:**
+1. **Graph level:** The Daemon verifies `[:PERMITTED]` edges before executing any operation
+2. **Daemon level:** The Daemon switches to the action-specific OS user via `su`
+3. **OS level:** The action-specific user has only the filesystem/process/network permissions needed
 
 **Relationships:**
 ```
@@ -783,7 +799,7 @@ When Hassaleh is operational, it will be used to orchestrate further GWW3 develo
 |------|---------|---------|
 | 2026-03-29 | v0.1 | Initial concept: 14 node types, orchestration rules, roadmap |
 | 2026-03-29 | v0.2 | Gemini Deep Think review: +7 node types (Workspace, ConfigFile, Memory, SecretRef, Message, Intent, SystemTrace, TimeBucket, Discussion split). Trusted Daemon architecture. GSL-Ops subset. Priority-based conflict resolution. Circuit breakers. Task timeouts. Idempotency keys. Edge-first modeling (no string FKs). Message cursor pattern. TimeBucket log partitioning. Universal LifecycleStatus enum. Roadmap reordered (Daemon before Rule Engine). |
-| 2026-03-29 | v0.3 | OS-level enforcement: dedicated OS users (`hassaleh-svc`, `hassaleh-agent`). Dual Neo4j users (`hassaleh_daemon` r/w, `hassaleh_reader` r/o). Agents get direct read-only DB access for status queries. Daemon is CronJob-invoked (stateless, not long-running). Three CronJob tiers: tick (1-5 min), sweep (15 min), audit (daily). Dual-layered permission enforcement (OS + graph). |
+| 2026-03-29 | v0.3 | OS-level enforcement: dedicated OS users (`hassaleh-svc`, `hassaleh-agent`). Dual Neo4j users (`hassaleh_daemon` r/w, `hassaleh_reader` r/o). Agents get direct read-only DB access for status queries. Daemon is CronJob-invoked (stateless, not long-running). Three CronJob tiers: tick (1-5 min), sweep (15 min), audit (daily). Per-action OS user isolation (`hassaleh-fs`, `hassaleh-writer`, `hassaleh-exec`, `hassaleh-net`, `hassaleh-pkg`) — Daemon executes system actions via `su` to dedicated least-privilege users. Triple-layered enforcement (graph + daemon + OS). `exec_as_user` field on SystemAction nodes. |
 
 ---
 
