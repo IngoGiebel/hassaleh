@@ -156,8 +156,6 @@ Agents query the graph through the **`hassaleh.query()` SDK** — a lightweight 
 })
 ```
 
-**Relationships:** None (singleton, read by Agent SDK on init).
-
 This avoids a single global DBMS timeout that would be either too strict for reports or too lenient for routine queries.
 
 ---
@@ -323,7 +321,7 @@ Workspaces are **project-specific**. An agent working on GWW3 gets access to the
 
 ### 4.5 ConfigFile
 
-A configuration file referenced by tools or agents.
+A configuration file referenced by capabilities or agents.
 
 ```
 (:ConfigFile {
