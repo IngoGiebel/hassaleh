@@ -6,7 +6,8 @@
 *Revised: 2026-03-29 — v0.4: Continuous async Daemon, Intent feedback, workspace fast-path, all config in DB*
 *Revised: 2026-03-29 — v0.5: Third Gemini DT review: async subprocess, zombie recovery, HITL, SDK safety, missing features*
 *Revised: 2026-03-29 — v1.0: Final review: Capability merge, consistency fixes, graceful shutdown, UTC mandate, Docker dev-env*
-*Status: v1.0 — Implementation-ready (GO)*
+*Revised: 2026-03-29 — v1.01: Consistency audit: 15 fixes (renumbering, cross-refs, terminology, datetime UTC, relationships)*
+*Status: v1.01 — Implementation-ready (GO)*
 
 ---
 
@@ -25,7 +26,7 @@ The graph is the **single source of truth** — no YAML files, no scattered conf
 
 ## 2. Core Principles
 
-1. **The graph IS the runtime configuration** — Agents, tools, permissions, schedules, and rules live as nodes and edges in Neo4j.
+1. **The graph IS the runtime configuration** — Agents, capabilities, schedules, and rules live as nodes and edges in Neo4j.
 2. **Rule-based orchestration** — Agent startup, task assignment, failure recovery, and synchronization are governed by declarative rules (GSL-Ops), not imperative code.
 3. **Database-mediated communication** — Agents exchange information through the graph, not through direct messaging. Every contribution and consensus is persisted.
 4. **Trusted Daemon architecture** — Agents never hold Neo4j write credentials or raw shell access. The Hassaleh Daemon mediates all write operations (database + system) and enforces permissions via OS-level user separation. Agents receive read-only database credentials for direct graph queries.
@@ -92,7 +93,7 @@ The Daemon is a **persistent asyncio service** managed by systemd, with a fast i
 
 **Hot Path (1-second ticks):**
 1. Read pending Intents submitted by agents
-2. Validate each Intent against SystemAction permissions
+2. Validate each Intent against Capability permissions
 3. For approved Intents: execute via async action workers (never block the loop)
 4. Write Intent results (stdout, stderr, error_reason) back to the Intent node
 5. Evaluate GSL-Ops rules against current graph state
@@ -154,6 +155,8 @@ Agents query the graph through the **`hassaleh.query()` SDK** — a lightweight 
 })
 ```
 
+**Relationships:** None (singleton, read by Agent SDK on init).
+
 This avoids a single global DBMS timeout that would be either too strict for reports or too lenient for routine queries.
 
 ---
@@ -188,7 +191,12 @@ An AI model that can be instantiated to power an agent.
 })
 ```
 
-**Secrets:** Model authentication credentials are **never stored in the graph**. See SecretRef (4.15).
+**Relationships:**
+```
+(Model)-[:AUTHENTICATES_VIA]->(SecretRef)
+```
+
+**Secrets:** Model authentication credentials are **never stored in the graph**. See SecretRef (4.13).
 
 ### 4.2 Agent
 
@@ -207,7 +215,7 @@ An AI agent with defined capabilities. Each agent has one or more models assigne
     
     # State
     lifecycle: "running",               # → universal LifecycleStatus
-    last_heartbeat: datetime(),
+    last_heartbeat: datetime({timezone: "UTC"}),
     os_pid: 12345,                      # Linux PID for process liveness verification
     credits_remaining: null,            # null = unlimited (subscription)
     health_check_interval_sec: 300,
@@ -280,7 +288,7 @@ stdout, stderr = await proc.communicate()
 
 **Relationships:**
 ```
-(Agent)-[:HAS_CAPABILITY {granted_at: datetime()}]->(Capability)
+(Agent)-[:HAS_CAPABILITY {granted_at: datetime({timezone: "UTC"})}]->(Capability)
 (Capability)-[:CONFIGURED_IN]->(ConfigFile)
 (Capability)-[:AUTHENTICATES_VIA]->(SecretRef)
 (Capability)-[:LOCATED_AT]->(Artifact)    # for skills: SKILL.md file
@@ -288,7 +296,7 @@ stdout, stderr = await proc.communicate()
 (Project)-[:REQUIRES_CAPABILITY]->(Capability)
 ```
 
-### 4.5 Workspace
+### 4.4 Workspace
 
 A filesystem directory where agents and projects operate. Agents have **direct OS-level read/write access** to their assigned Workspace directories (no need to route file I/O through the Daemon).
 
@@ -306,13 +314,13 @@ Workspaces are **project-specific**. An agent working on GWW3 gets access to the
 
 **Relationships:**
 ```
-(Agent)-[:OPERATES_IN {since: datetime()}]->(Workspace)
+(Agent)-[:OPERATES_IN {since: datetime({timezone: "UTC"})}]->(Workspace)
 (Project)-[:LOCATED_IN]->(Workspace)
 ```
 
 **Access enforcement:** When the Daemon assigns an agent to a project, it ensures the `hassaleh-agent` user has OS-level group permissions on that project's Workspace directory. When unassigned, access is revoked.
 
-### 4.6 ConfigFile
+### 4.5 ConfigFile
 
 A configuration file referenced by tools or agents.
 
@@ -325,18 +333,9 @@ A configuration file referenced by tools or agents.
 })
 ```
 
-**Enforcement is triple-layered:**
-1. **Graph level:** The Daemon verifies `[:HAS_CAPABILITY]` edges before executing any operation on behalf of an agent
-2. **Daemon level:** The Daemon delegates via `sudo -n -u <exec_as_user>` with argument arrays (no shell)
-3. **OS level:** The capability-specific user has only the filesystem/process/network permissions needed
+**Relationships:** None (referenced by Capability via `[:CONFIGURED_IN]`).
 
-**Relationships:**
-```
-(Agent)-[:PERMITTED {granted_by: "ingo", granted_at: datetime()}]->(SystemAction)
-(Project)-[:ALLOWS_ACTION]->(SystemAction)
-```
-
-### 4.8 CronJob
+### 4.6 CronJob
 
 A scheduled recurring or one-shot task.
 
@@ -349,9 +348,9 @@ A scheduled recurring or one-shot task.
     command: "bash scripts/daily-maintenance.sh",
     
     enabled: true,
-    last_run: datetime(),
+    last_run: datetime({timezone: "UTC"}),
     lifecycle: "success",               # last run status → universal LifecycleStatus
-    next_run: datetime(),
+    next_run: datetime({timezone: "UTC"}),
     retry_on_failure: true,
     max_retries: 3
 })
@@ -364,7 +363,7 @@ A scheduled recurring or one-shot task.
 (CronJob)-[:TRIGGERS]->(CronJob)
 ```
 
-### 4.9 Project
+### 4.7 Project
 
 The central organizing node. Projects form a **hierarchy** (parent/child) and can represent anything from a long-running endeavor to a recurring task.
 
@@ -376,7 +375,7 @@ The central organizing node. Projects form a **hierarchy** (parent/child) and ca
     type: "development",               # development | operations | recurring | research
     
     # Timeline
-    started_at: datetime(),
+    started_at: datetime({timezone: "UTC"}),
     target_date: null,
     lifecycle: "running",              # → universal LifecycleStatus
     priority: "high"                   # critical | high | medium | low
@@ -399,7 +398,7 @@ The central organizing node. Projects form a **hierarchy** (parent/child) and ca
 (Project)-[:HAS_REPO {url: "https://github.com/..."}]->(Artifact)
 ```
 
-### 4.10 Sprint
+### 4.8 Sprint
 
 A time-boxed work phase within a project.
 
@@ -409,7 +408,7 @@ A time-boxed work phase within a project.
     name: "Sprint 4: Rules Engine (GSL)",
     description: "Build the GSL parser, evaluator, and intent reducer",
     
-    started_at: datetime(),
+    started_at: datetime({timezone: "UTC"}),
     target_date: date("2026-04-15"),
     lifecycle: "running"
 })
@@ -422,7 +421,7 @@ A time-boxed work phase within a project.
 (Sprint)-[:NEXT]->(Sprint)
 ```
 
-### 4.11 Task
+### 4.9 Task
 
 A concrete unit of work within a sprint.
 
@@ -433,8 +432,8 @@ A concrete unit of work within a sprint.
     description: "Rewrite .lark grammar with MATCH …: / IF …: syntax",
     
     lifecycle: "success",
-    completed_at: datetime(),
-    expires_at: datetime(),             # timeout — auto-reset if exceeded
+    completed_at: datetime({timezone: "UTC"}),
+    expires_at: datetime({timezone: "UTC"}),             # timeout — auto-reset if exceeded
     verification_method: "pytest tests/engine/test_gsl_parser.py",
     idempotency_key: null               # for external side effects
 })
@@ -447,7 +446,7 @@ A concrete unit of work within a sprint.
 (Task)-[:HAS_MEMORY]->(Memory)          # agent scratchpad for this task
 ```
 
-### 4.12 Milestone
+### 4.10 Milestone
 
 A checkpoint with verifiable acceptance criteria.
 
@@ -459,11 +458,13 @@ A checkpoint with verifiable acceptance criteria.
     check_expected: "26 passed",
     
     lifecycle: "success",
-    reached_at: datetime()
+    reached_at: datetime({timezone: 'UTC'})
 })
 ```
 
-### 4.13 Artifact
+**Relationships:** None (referenced by Sprint via `[:HAS_MILESTONE]`).
+
+### 4.11 Artifact
 
 A file, directory, or external resource linked to a project.
 
@@ -477,14 +478,16 @@ A file, directory, or external resource linked to a project.
 })
 ```
 
-### 4.14 Memory
+**Relationships:** None (referenced by Capability via `[:LOCATED_AT]`, Project via `[:HAS_ARTIFACT]`, Message via `[:REFERENCES]`).
+
+### 4.12 Memory
 
 Ephemeral working memory for agents during task execution. Separated from the audit trail.
 
 ```
 (:Memory {
     id: uuid(),
-    created_at: datetime(),
+    created_at: datetime({timezone: "UTC"}),
     content: '{"step": 3, "intermediate_results": [...]}',
     ttl_hours: 72                       # auto-expire after N hours
 })
@@ -496,7 +499,7 @@ Ephemeral working memory for agents during task execution. Separated from the au
 (Agent)-[:OWNS_MEMORY]->(Memory)
 ```
 
-### 4.15 SecretRef
+### 4.13 SecretRef
 
 A reference to a secret stored **outside** the graph (environment variable, vault, encrypted file). The Hassaleh Daemon resolves these at runtime.
 
@@ -514,10 +517,10 @@ A reference to a secret stored **outside** the graph (environment variable, vaul
 **Relationships:**
 ```
 (Model)-[:AUTHENTICATES_VIA]->(SecretRef)
-(Tool)-[:AUTHENTICATES_VIA]->(SecretRef)
+(Capability)-[:AUTHENTICATES_VIA]->(SecretRef)
 ```
 
-### 4.16 Rule
+### 4.14 Rule
 
 A declarative rule governing agent behavior within a project. Uses GSL-Ops (deterministic subset of GSL).
 
@@ -543,7 +546,7 @@ A declarative rule governing agent behavior within a project. Uses GSL-Ops (dete
     ...
     rule_text: "MATCH (a:Agent):\n    ...",      # GSL-Ops source (authoritative)
     compiled_python: "def evaluate(ctx):\n ...",  # cached compiled output
-    compiled_at: datetime(),
+    compiled_at: datetime({timezone: "UTC"}),
     compiler_version: "gsl-ops-0.4",
     ...
 })
@@ -559,14 +562,14 @@ A declarative rule governing agent behavior within a project. Uses GSL-Ops (dete
 (Rule)-[:APPLIES_TO]->(Agent)
 ```
 
-### 4.17 Message
+### 4.15 Message
 
 Inter-agent communication node. Part of a linked-list message queue.
 
 ```
 (:Message {
     id: uuid(),
-    timestamp: datetime(),
+    timestamp: datetime({timezone: "UTC"}),
     content: "I've completed the GSL parser rewrite. 26 tests pass."
 })
 ```
@@ -583,15 +586,15 @@ Inter-agent communication node. Part of a linked-list message queue.
 
 **Efficient retrieval:** Agents don't poll by timestamp. They follow their `LAST_READ` cursor forward through the `NEXT` chain. Empty check = O(1).
 
-### 4.18 Intent
+### 4.16 Intent
 
 A proposed state change or action submitted by an agent, processed by the Daemon. Includes full feedback loop so agents can read results.
 
 ```
 (:Intent {
     id: uuid(),
-    submitted_at: datetime(),
-    action: "update_property",         # update_property | create_node | create_edge | execute_capability
+    submitted_at: datetime({timezone: "UTC"}),
+    action: "update_property",          # update_property | create_node | create_edge | execute_capability
     property: "lifecycle",              # target identified via [:TARGETS] edge, not string FK
     value: "failed",
     idempotency_key: "health-check-dione-2026-03-29T13:00",
@@ -600,14 +603,14 @@ A proposed state change or action submitted by an agent, processed by the Daemon
     lifecycle: "pending",              # pending | awaiting_approval | running | success | failed | rejected
     started_at: null,
     completed_at: null,
-    stdout: null,                      # captured output (for execute_command)
+    stdout: null,                      # captured output (for execute_capability)
     stderr: null,                      # captured errors
     error_reason: null,                # why it was rejected/failed
-    exit_code: null                    # for command execution
+    exit_code: null                    # for capability execution
 })
 ```
 
-Agents poll their submitted Intents (via read-only SDK) to retrieve tool outputs and detect rejections. This closes the feedback loop — no agent hangs waiting for a result that never comes.
+Agents poll their submitted Intents (via read-only SDK) to retrieve capability outputs and detect rejections. This closes the feedback loop — no agent hangs waiting for a result that never comes.
 
 **Relationships:**
 ```
@@ -616,14 +619,14 @@ Agents poll their submitted Intents (via read-only SDK) to retrieve tool outputs
 (Rule)-[:GENERATED]->(Intent)
 ```
 
-### 4.19 SystemTrace
+### 4.17 SystemTrace
 
 Operational log entries (errors, restarts, performance). Separated from agent communication.
 
 ```
 (:SystemTrace {
     id: uuid(),
-    timestamp: datetime(),
+    timestamp: datetime({timezone: "UTC"}),
     level: "error",                    # debug | info | warn | error | fatal
     source: "daemon",                  # daemon | agent | rule | cronjob
     message: "Agent dione unresponsive for 15 minutes. Restarting.",
@@ -638,7 +641,7 @@ Operational log entries (errors, restarts, performance). Separated from agent co
 (SystemTrace)-[:IN_BUCKET]->(TimeBucket)
 ```
 
-### 4.20 TimeBucket
+### 4.18 TimeBucket
 
 Partitioning node for log aggregation. Prevents supernode problem on Project nodes.
 
@@ -659,7 +662,7 @@ Partitioning node for log aggregation. Prevents supernode problem on Project nod
 
 **Archival:** A CronJob archives TimeBuckets older than 30 days to JSONL and DETACH DELETEs them.
 
-### 4.21 DaemonConfig
+### 4.19 DaemonConfig
 
 Singleton node — all Daemon runtime settings. No external config files.
 
@@ -678,7 +681,9 @@ Singleton node — all Daemon runtime settings. No external config files.
 })
 ```
 
-### 4.22 QueryConfig
+**Relationships:** None (singleton, read by Daemon on boot).
+
+### 4.20 QueryConfig
 
 Singleton node — read-access guardrails for agents. Loaded by the hassaleh.query() SDK.
 
@@ -693,7 +698,7 @@ Singleton node — read-access guardrails for agents. Loaded by the hassaleh.que
 })
 ```
 
-### 4.23 SystemVersion
+### 4.21 SystemVersion
 
 Singleton node — tracks the graph schema version for safe migrations.
 
@@ -701,14 +706,16 @@ Singleton node — tracks the graph schema version for safe migrations.
 (:SystemVersion {
     id: "hassaleh",
     schema_version: "0.4",
-    last_migration: datetime(),
-    compatible_daemon_versions: ["0.4", "0.3"]
+    last_migration: datetime({timezone: "UTC"}),
+    compatible_daemon_versions: ["1.0", "0.5"]
 })
 ```
 
+**Relationships:** None (singleton, checked by Daemon on boot).
+
 The Daemon checks this on boot and refuses to start (or applies migration scripts) if the code version is incompatible.
 
-### 4.24 Discussion
+### 4.22 Discussion
 
 A structured multi-agent discussion for collaborative decision-making.
 
@@ -718,7 +725,7 @@ A structured multi-agent discussion for collaborative decision-making.
     topic: "Should we use LALR or Earley parser for GSL?",
     lifecycle: "success",              # resolved
     resolution: "Earley — handles ambiguity, performance is sufficient",
-    resolved_at: datetime()
+    resolved_at: datetime({timezone: "UTC"})
 })
 ```
 
@@ -726,7 +733,7 @@ A structured multi-agent discussion for collaborative decision-making.
 ```
 (Discussion)-[:IN_CONTEXT_OF]->(Project)
 (Discussion)-[:IN_CONTEXT_OF]->(Task)
-(Agent)-[:CONTRIBUTED {position: "pro-earley", reasoning: "...", timestamp: datetime()}]->(Discussion)
+(Agent)-[:CONTRIBUTED {position: "pro-earley", reasoning: "...", timestamp: datetime({timezone: "UTC"})}]->(Discussion)
 (Discussion)-[:DECIDED_BY]->(Agent)
 ```
 
@@ -749,7 +756,7 @@ All stateful nodes use a consistent lifecycle enum:
 | `suspended` | Paused (by rule or human) — can be resumed |
 | `archived` | Retained for history, no longer active |
 
-Used by: Agent, Model, Capability, Project, Sprint, Task, Milestone, CronJob, Discussion, Intent.
+Used by: Agent, Model, Capability, Rule, Project, Sprint, Task, Milestone, CronJob, Discussion, Intent.
 
 ---
 
@@ -837,9 +844,9 @@ For tasks with external side effects (sending emails, API calls, deployments), t
 
 ## 8. Human-in-the-Loop (HITL)
 
-For sensitive actions (SystemActions with `requires_confirmation: true`), the Daemon does **not** execute immediately:
+For sensitive actions (Capabilities with `requires_confirmation: true`), the Daemon does **not** execute immediately:
 
-1. Agent submits an Intent targeting a SystemAction that requires confirmation
+1. Agent submits an Intent targeting a Capability that requires confirmation
 2. Daemon sets the Intent to `awaiting_approval`
 3. Human admin is notified (via OpenClaw, Telegram, or Daemon health endpoint)
 4. Admin reviews the Intent in the graph (via CLI `hassaleh approve <intent-id>` or direct Cypher as `neo4j` admin user)
@@ -873,7 +880,7 @@ GET /health
 
 ### 9.2 SystemTrace + TimeBucket
 
-All operational events are logged as SystemTrace nodes, partitioned by TimeBucket (daily). See sections 4.19 and 4.20.
+All operational events are logged as SystemTrace nodes, partitioned by TimeBucket (daily). See sections 4.17 and 4.18.
 
 ### 9.3 Alerting
 
@@ -888,7 +895,7 @@ Alerts are dispatched via the Daemon's notification channel (configured in Daemo
 
 ## 10. Agent Registration & Discovery
 
-New agents register by having the human admin create an `(:Agent)` node in the graph with appropriate `[:USES_MODEL]`, `[:HAS_TOOL]`, `[:HAS_SKILL]`, and `[:PERMITTED]` edges.
+New agents register by having the human admin create an `(:Agent)` node in the graph with appropriate `[:USES_MODEL]`, `[:HAS_CAPABILITY]`, and `[:OPERATES_IN]` edges.
 
 The Daemon discovers agents by querying for `(:Agent)` nodes with `lifecycle: "pending"` and initiates their startup sequence (spawning the process, injecting credentials, setting `os_pid`).
 
@@ -987,7 +994,7 @@ When Hassaleh is operational, it will be used to orchestrate further GWW3 develo
 |-------|------|
 | **0 — Concept** ✅ | Architecture document, GitHub repo |
 | **1 — Schema + Seed** | Neo4j schema (constraints, indexes), DaemonConfig/QueryConfig/SystemVersion singletons, seed data for 1 project + 1 agent |
-| **2 — Daemon MVP** | Persistent async service (systemd), Intent processing loop, SystemAction enforcement via `sudo -n -u`, SecretRef resolution, Intent feedback (stdout/stderr) |
+| **2 — Daemon MVP** | Persistent async service (systemd), Intent processing loop, Capability enforcement via `sudo -n -u`, SecretRef resolution, Intent feedback (stdout/stderr) |
 | **2.5 — Agent SDK** | `hassaleh.query()` read-proxy with Cypher linting, per-query timeouts from DB, convenience methods |
 | **3 — Blackboard Spike** | 1 real agent (Dione) submitting Intents + reading results. Prove the full loop: agent → Intent → Daemon → action → feedback → agent reads result |
 
@@ -995,12 +1002,17 @@ When Hassaleh is operational, it will be used to orchestrate further GWW3 develo
 
 | File | Purpose |
 |------|---------|
-| `schema.cypher` | CREATE CONSTRAINT/INDEX for MVP nodes (Agent, Capability, Workspace, Intent, Task, DaemonConfig, QueryConfig, SystemVersion) |
-| `seed.cypher` | Create initial Agent node, Capability (allow `ls`), Task, Workspace, DaemonConfig, QueryConfig, SystemVersion |
-| `setup_os.sh` | Create OS users (`hassaleh-svc`, `hassaleh-agent`, `hassaleh-exec`), configure `/etc/sudoers.d/hassaleh`, install `hassaleh-daemon.service` systemd unit file |
+| `schema.cypher` | CREATE CONSTRAINT/INDEX for MVP node types (Agent, Capability, Workspace, Intent, Task, DaemonConfig, QueryConfig, SystemVersion) |
+| `seed.cypher` | Create initial Agent, Capability (`ls` command), Task, Workspace, DaemonConfig, QueryConfig, SystemVersion nodes |
+| `setup_os.sh` | Create OS users (`hassaleh-svc`, `hassaleh-agent`, `hassaleh-fs`, `hassaleh-writer`, `hassaleh-exec`, `hassaleh-net`, `hassaleh-pkg`), configure `/etc/sudoers.d/hassaleh`, install `hassaleh-daemon.service` systemd unit file |
 | `daemon.py` | Asyncio event loop, Neo4j polling for pending Intents, `create_subprocess_exec` async workers, zombie recovery on boot, graceful shutdown, systemd watchdog |
 | `sdk.py` | `hassaleh.query()` (parameterized read-only) + `hassaleh.submit_intent()` |
 | `agent_dummy.py` | Test agent: claim a Task, write a file to Workspace, submit Intent to execute `ls -la` via Capability, read result |
+
+### Subsequent Phases
+
+| Phase | Goal |
+|-------|------|
 | **4 — Rule Engine** | Port GSL-Ops from GWW3, compile on boot, priority-based conflict resolution |
 | **5 — CLI** | `hassaleh init`, `hassaleh status`, `hassaleh report` |
 | **6 — Integration** | OpenClaw integration, first operational rules (health checks, task assignment) |
@@ -1019,8 +1031,12 @@ When Hassaleh is operational, it will be used to orchestrate further GWW3 develo
 | 2026-03-29 | v0.3 | OS-level enforcement: dedicated OS users (`hassaleh-svc`, `hassaleh-agent`). Dual Neo4j users (`hassaleh_daemon` r/w, `hassaleh_reader` r/o). Per-action OS user isolation (`hassaleh-fs`, `hassaleh-writer`, `hassaleh-exec`, `hassaleh-net`, `hassaleh-pkg`). Triple-layered enforcement (graph + daemon + OS). `exec_as_user` field on SystemAction nodes. |
 | 2026-03-29 | v0.4 | **Second Gemini DT review.** CronJob Daemon → persistent asyncio service (systemd). 1-second ticks + async action workers (never blocks). Intent feedback loop (lifecycle, stdout, stderr, error_reason). `hassaleh.query()` read-proxy SDK with Cypher linting. Per-query timeouts from DB (not global DBMS timeout). QueryConfig + DaemonConfig + SystemVersion singleton nodes. All configuration in graph (no external config files). Workspaces project-specific with direct OS-level agent r/w access. Safe subprocess execution (`sudo -n -u`, no `shell=True`). Rules compiled on boot + on-change (not per-tick). Memory limits 1 GB (not 256 MB). Roadmap reordered: Daemon → SDK → Blackboard Spike → Rule Engine. |
 | 2026-03-29 | v0.5 | **Third Gemini DT review.** async subprocess, zombie recovery, systemd watchdog, HITL, SDK safety, observability, testing, file coordination, agent registration, multi-host, MVP sprint scope. |
-| 2026-03-29 | v1.0 | **Fourth Gemini DT review (final — GO).** Merged Tool + Skill + SystemAction → **Capability** (single unified node). Fixed string FK in Intent (`target_node_id` → `[:TARGETS]` edge). Added `available` + `deprecated` to LifecycleStatus. Fixed CronJob `last_status` → `lifecycle`. Message metadata → `[:REFERENCES]` edge. Graceful Daemon shutdown (SIGTERM handler, orphan process cleanup). Neo4j read-only fallback handling. UTC mandate for all timestamps. `setup_os.sh` added to MVP (6th file). Docker dev-env added to roadmap (Phase 9). 17 sections, 21 node types. |
+| 2026-03-29 | v1.0 | **Fourth Gemini DT review (final — GO).** Merged Tool + Skill + SystemAction → **Capability** (single unified node). Fixed string FK in Intent (`target_node_id` → `[:TARGETS]` edge). Added `available` + `deprecated` to LifecycleStatus. Fixed CronJob `last_status` → `lifecycle`. Message metadata → `[:REFERENCES]` edge. Graceful Daemon shutdown (SIGTERM handler, orphan process cleanup). Neo4j read-only fallback handling. UTC mandate for all timestamps. `setup_os.sh` added to MVP (6th file). Docker dev-env added to roadmap (Phase 9). 17 sections, 22 node types. |
 
 ---
 
-*This document has been reviewed through 4 iterations of Gemini Deep Think analysis. It is ready for implementation.*
+| 2026-03-29 | v1.01 | **Final consistency audit.** Removed orphaned SystemAction text block from ConfigFile section. Fixed all `datetime()` → `datetime({timezone: 'UTC'})`. Renumbered sections 4.4–4.22 (no gaps). Fixed cross-references (SecretRef 4.13, SystemTrace/TimeBucket 4.17/4.18). Replaced all stale terminology (SystemAction→Capability, Tool→Capability, execute_command→execute_capability). Added `Rule` to LifecycleStatus "Used by" list. Added Relationships sections to Model, ConfigFile, Milestone, Artifact, DaemonConfig, QueryConfig, SystemVersion. Fixed SecretRef relationship (Tool→Capability). Added all 7 OS users to setup_os.sh description. Fixed node type count to 22. |
+
+---
+
+*This document has been reviewed through 4 iterations of Gemini Deep Think analysis plus a final consistency audit. It is internally consistent and ready for implementation.*
