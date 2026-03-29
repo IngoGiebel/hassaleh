@@ -17,7 +17,7 @@ Hassaleh is a **graph-native agentic framework** where the entire configuration,
 
 A capable AI agent (e.g. Claude Opus, steered via OpenClaw) can read the graph to:
 - Generate reports on agent activity and project progress
-- Understand the full system topology (who does what, with which tools, on which projects)
+- Understand the full system topology (who does what, with which capabilities, on which projects)
 - Audit rule execution and agent decisions
 
 The graph is the **single source of truth** — no YAML files, no scattered configs, no hidden state.
@@ -698,6 +698,8 @@ Singleton node — read-access guardrails for agents. Loaded by the hassaleh.que
 })
 ```
 
+**Relationships:** None (singleton, read by Agent SDK on init).
+
 ### 4.21 SystemVersion
 
 Singleton node — tracks the graph schema version for safe migrations.
@@ -788,7 +790,7 @@ Agent coordination is **purely rule-based**. Rules define:
 ```
 # Health check with circuit breaker
 MATCH (a:Agent {lifecycle: "running"}):
-    IF a.last_heartbeat < datetime() - duration("PT15M"):
+    IF a.last_heartbeat < datetime({timezone: 'UTC'}) - duration("PT15M"):
         IF a.restart_count_1h >= a.max_restarts_1h:
             a.lifecycle = "suspended"
             NOTIFY "ingo" "Agent {a.name} suspended after {a.max_restarts_1h} restarts"
@@ -819,7 +821,7 @@ Every Task has an `expires_at` property. A background rule sweeps for expired ta
 
 ```
 MATCH (t:Task {lifecycle: "running"}):
-    IF t.expires_at < datetime():
+    IF t.expires_at < datetime({timezone: 'UTC'}):
         t.lifecycle = "failed"
         MATCH (t)-[:ASSIGNED_TO]->(a:Agent):
             a.lifecycle = "pending"
