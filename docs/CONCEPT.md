@@ -548,7 +548,20 @@ A declarative rule governing agent behavior within a project. Uses GSL-Ops (dete
 })
 ```
 
-**Security:** `compiled_python` is **not stored in the graph**. The Daemon (running as `hassaleh-svc`) compiles `rule_text` to Python in memory during each tick invocation. Since agents only have read-only DB access, they cannot inject malicious rule text. Only the human admin can create or modify Rule nodes.
+**Compilation:** The Daemon compiles `rule_text` → `compiled_python` on boot and whenever a Rule node is modified, then writes the result back to the Rule node. At runtime, the Daemon executes the cached `compiled_python` directly — no per-tick recompilation.
+
+```
+(:Rule {
+    ...
+    rule_text: "MATCH (a:Agent):\n    ...",      # GSL-Ops source (authoritative)
+    compiled_python: "def evaluate(ctx):\n ...",  # cached compiled output
+    compiled_at: datetime(),
+    compiler_version: "gsl-ops-0.4",
+    ...
+})
+```
+
+**Security:** Since agents only have read-only DB access (`hassaleh_reader`), they cannot inject malicious rule text or tamper with compiled code. Only the human admin (via `neo4j` user) can create or modify Rule nodes. The Daemon validates that `compiler_version` matches its own version before executing — stale compiled code triggers automatic recompilation from `rule_text`.
 
 **Conflict resolution:** When multiple rules target the same property on the same node, the rule with the **lowest priority number wins** (priority 1 overrides priority 10). For additive/modifier operations (numeric), the GWW3-style commutative reducer is used. For absolute state assignments (enums like `lifecycle`), the highest-priority rule wins.
 
