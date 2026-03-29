@@ -4,7 +4,8 @@
 *Revised: 2026-03-29 — v0.2: Gemini Deep Think review incorporated*
 *Revised: 2026-03-29 — v0.3: Daemon enforcement model, DB access separation, CronJob-driven rule evaluation*
 *Revised: 2026-03-29 — v0.4: Continuous async Daemon, Intent feedback, workspace fast-path, all config in DB*
-*Status: Draft v0.4*
+*Revised: 2026-03-29 — v0.5: Third Gemini DT review: async subprocess, zombie recovery, HITL, SDK safety, missing features*
+*Status: Draft v0.5 — Ready for implementation*
 
 ---
 
@@ -101,31 +102,39 @@ The Daemon is a **persistent asyncio service** managed by systemd, with a fast i
 
 | Task | Interval | Purpose |
 |------|----------|---------|
-| `sweep` | Every 15 min | Archive expired TimeBuckets. Clean up stale Memory nodes. Reset circuit breaker counters. |
+| `sweep` | Every 15 min | Archive expired TimeBuckets. Clean up stale Memory nodes. Decay circuit breaker counters (subtract `circuit_breaker_decay_per_sweep` from `restart_count_1h`, creating a rolling recovery window). |
 | `audit` | Daily | Generate daily activity summary. Check rule consistency. Verify graph integrity. |
 
 **Key design decisions:**
-- **Never blocks on I/O:** System actions (e.g., `apt-get`, API calls, script execution) are spawned as async subprocess tasks. The Daemon updates the Intent to `running` and immediately returns to the event loop.
-- **Rules compiled once:** GSL-Ops rules are compiled to Python ASTs on Daemon boot and recompiled only when Rule nodes are modified. No per-tick recompilation.
-- **Managed by systemd:** Automatic restart on crash, journald logging, resource limits via cgroup.
+- **Never blocks on I/O:** System actions use `asyncio.create_subprocess_exec()` (not `subprocess.run`!). The worker `await`s `process.communicate()`, yielding control back to the tick loop while the OS works. The Daemon updates the Intent to `running` and immediately returns to process other agents.
+- **Zombie Intent recovery:** On boot, the Daemon queries for all Intents with `lifecycle: "running"` and transitions them to `failed` with `error_reason: "Daemon restarted during execution"`. This allows agents to detect the failure and cleanly retry.
+- **Rules compiled once:** GSL-Ops rules are compiled to Python on Daemon boot (from `compiled_python` cache or fresh from `rule_text`) and recompiled only when Rule nodes are modified. No per-tick recompilation.
+- **Managed by systemd:** Automatic restart on crash, journald logging, resource limits via cgroup. The Daemon pings the systemd watchdog (`sd_notify`) on every tick — if the asyncio loop hangs, systemd automatically restarts the service.
+- **Health endpoint:** The Daemon exposes a minimal HTTP health endpoint (configurable port in DaemonConfig) for monitoring tools (uptime, tick count, pending intents, active workers).
 - **All configuration from the graph:** The Daemon reads its own configuration (tick interval, sweep schedule, timeout defaults) from a `(:DaemonConfig)` singleton node in Neo4j. No external config files.
 
 ### 3.3 Agent Read Access
 
 Agents query the graph through the **`hassaleh.query()` SDK** — a lightweight Python library that:
 - Connects to Neo4j as `hassaleh_reader` (read-only)
-- Applies **per-query timeouts** (loaded from `(:QueryConfig)` node in the graph, passed with each query)
-- Lints Cypher queries before execution (blocks known-unsafe patterns: unbounded Cartesian products, `DETACH DELETE`, `CREATE`, `SET`, `REMOVE`)
+- **Forces parameterized queries** — agents pass query templates + parameters, never raw string concatenation. This prevents Cypher injection.
+- Applies **per-query timeouts** (loaded from `(:QueryConfig)` node in the graph, passed with each query call)
 - Enforces **result-set limits** (configurable per query type, stored in DB)
 - Provides convenience methods for common queries (`hassaleh.my_tasks()`, `hassaleh.project_status()`, etc.)
+- Provides `hassaleh.submit_intent()` for submitting write requests to the Daemon
+
+**Credential bootstrapping:** When the Daemon (or systemd) spawns an agent process, it injects `NEO4J_URI`, `NEO4J_USER=hassaleh_reader`, and `NEO4J_PASSWORD` as **environment variables**. Agents never query the graph for their own DB credentials.
+
+**Security model:** No regex-based Cypher linting. The `hassaleh_reader` Neo4j role physically cannot write, create, or delete. Combined with per-query timeouts and memory limits, this provides robust protection without brittle pattern matching.
 
 **What agents can read:**
 - Project status, task assignments, sprint progress
 - Messages and Discussion threads
 - Their own health state and model assignments
 - All graph data (shared knowledge — "swarm brain")
+- Intent results (stdout, stderr, error_reason)
 
-**What agents cannot do via the SDK:**
+**What agents cannot do:**
 - Write, create, update, or delete any nodes or relationships
 - Access actual secrets (SecretRef nodes contain only vault references)
 - Run queries that exceed the configured timeout or memory limits
@@ -137,7 +146,6 @@ Agents query the graph through the **`hassaleh.query()` SDK** — a lightweight 
     default_timeout_ms: 3000,          # per-query timeout (passed with each call)
     max_result_rows: 10000,            # hard limit on returned rows
     max_transaction_memory_mb: 1024,   # per-transaction memory limit
-    blocked_patterns: ["MATCH (a), (b), (c)", "DETACH DELETE", "CALL db."],
     report_query_timeout_ms: 30000     # longer timeout for reporting queries
 })
 ```
@@ -196,6 +204,7 @@ An AI agent with defined capabilities. Each agent has one or more models assigne
     # State
     lifecycle: "running",               # → universal LifecycleStatus
     last_heartbeat: datetime(),
+    os_pid: 12345,                      # Linux PID for process liveness verification
     credits_remaining: null,            # null = unlimited (subscription)
     health_check_interval_sec: 300,
     restart_count_1h: 0,                # circuit breaker tracking
@@ -330,11 +339,17 @@ A permitted action on the host system. Actions are whitelisted — anything not 
 
 This ensures that even if the Daemon has a bug, a filesystem action cannot accidentally execute a process, and a network action cannot write files. Each OS user is configured with minimal capabilities via standard Ubuntu user/group permissions, and optionally hardened with AppArmor profiles.
 
-**Safe subprocess execution:** The Daemon **never** uses `shell=True` or string concatenation for commands. All delegated actions use strict argument arrays:
+**Safe async subprocess execution:** The Daemon **never** uses `shell=True`, `subprocess.run`, or string concatenation for commands. All delegated actions use `asyncio.create_subprocess_exec` with strict argument arrays:
 ```python
-subprocess.run(["sudo", "-n", "-u", exec_as_user, "/path/to/script", safe_arg1, safe_arg2])
+proc = await asyncio.create_subprocess_exec(
+    "sudo", "-n", "-u", exec_as_user,
+    "/path/to/script", safe_arg1, safe_arg2,
+    stdout=asyncio.subprocess.PIPE,
+    stderr=asyncio.subprocess.PIPE,
+)
+stdout, stderr = await proc.communicate()
 ```
-This prevents shell injection attacks from agent-provided parameters.
+This prevents both shell injection attacks and event-loop blocking.
 
 **Enforcement is triple-layered:**
 1. **Graph level:** The Daemon verifies `[:PERMITTED]` edges before executing any operation
@@ -610,7 +625,7 @@ A proposed state change or action submitted by an agent, processed by the Daemon
     idempotency_key: "health-check-dione-2026-03-29T13:00",
     
     # ── Feedback (written by Daemon) ──
-    lifecycle: "pending",              # pending | running | success | failed | rejected
+    lifecycle: "pending",              # pending | awaiting_approval | running | success | failed | rejected
     started_at: null,
     completed_at: null,
     stdout: null,                      # captured output (for execute_command)
@@ -685,8 +700,9 @@ Singleton node — all Daemon runtime settings. No external config files.
     intent_timeout_default_sec: 300,   # max time for an Intent to complete
     max_concurrent_actions: 10,        # async action worker pool size
     circuit_breaker_window_min: 60,    # time window for restart counting
+    circuit_breaker_decay_per_sweep: 1,# subtract from restart_count each sweep
     notification_channel: "openclaw",  # how to wake agents
-    schema_version: "0.4"             # for migration checks
+    health_endpoint_port: 9100         # systemd watchdog + monitoring
 })
 ```
 
@@ -751,13 +767,15 @@ All stateful nodes use a consistent lifecycle enum:
 | Status | Meaning |
 |--------|---------|
 | `pending` | Created, not yet started |
+| `awaiting_approval` | Parked — requires human confirmation before proceeding |
 | `running` | Actively executing |
 | `success` | Completed successfully |
 | `failed` | Completed with failure |
+| `rejected` | Denied by Daemon (permission check failed, rule conflict, etc.) |
 | `suspended` | Paused (by rule or human) — can be resumed |
 | `archived` | Retained for history, no longer active |
 
-Used by: Agent, Model, Tool, Project, Sprint, Task, Milestone, CronJob, Discussion.
+Used by: Agent, Model, Tool, Project, Sprint, Task, Milestone, CronJob, Discussion, Intent.
 
 ---
 
@@ -843,7 +861,106 @@ For tasks with external side effects (sending emails, API calls, deployments), t
 
 ---
 
-## 8. Reporting
+## 8. Human-in-the-Loop (HITL)
+
+For sensitive actions (SystemActions with `requires_confirmation: true`), the Daemon does **not** execute immediately:
+
+1. Agent submits an Intent targeting a SystemAction that requires confirmation
+2. Daemon sets the Intent to `awaiting_approval`
+3. Human admin is notified (via OpenClaw, Telegram, or Daemon health endpoint)
+4. Admin reviews the Intent in the graph (via CLI `hassaleh approve <intent-id>` or direct Cypher as `neo4j` admin user)
+5. Admin sets Intent to `pending` (approved) or `rejected` (denied with reason)
+6. Daemon processes the Intent on its next tick
+
+This keeps humans in the loop for irreversible or dangerous operations without blocking the entire orchestration pipeline.
+
+---
+
+## 9. Observability
+
+### 9.1 Daemon Health Endpoint
+
+The Daemon exposes a minimal HTTP health endpoint (port configured in `DaemonConfig.health_endpoint_port`):
+
+```json
+GET /health
+{
+    "status": "healthy",
+    "uptime_seconds": 3600,
+    "tick_count": 3592,
+    "pending_intents": 2,
+    "active_workers": 1,
+    "last_tick_ms": 12,
+    "schema_version": "0.5",
+    "agents_running": 3,
+    "agents_failed": 0
+}
+```
+
+### 9.2 SystemTrace + TimeBucket
+
+All operational events are logged as SystemTrace nodes, partitioned by TimeBucket (daily). See sections 4.19 and 4.20.
+
+### 9.3 Alerting
+
+Alerts are dispatched via the Daemon's notification channel (configured in DaemonConfig):
+- Agent failures (circuit breaker triggered)
+- Intent rejections (permission denied)
+- Intents awaiting human approval
+- Schema version mismatches
+- Daemon health anomalies (tick latency > threshold)
+
+---
+
+## 10. Agent Registration & Discovery
+
+New agents register by having the human admin create an `(:Agent)` node in the graph with appropriate `[:USES_MODEL]`, `[:HAS_TOOL]`, `[:HAS_SKILL]`, and `[:PERMITTED]` edges.
+
+The Daemon discovers agents by querying for `(:Agent)` nodes with `lifecycle: "pending"` and initiates their startup sequence (spawning the process, injecting credentials, setting `os_pid`).
+
+Self-registration by agents is **not supported** — this is a deliberate security decision. All agent creation flows through the human admin.
+
+---
+
+## 11. File Coordination
+
+When agents work on shared workspaces, file coordination uses the Intent mechanism:
+
+1. Agent A finishes writing a file and submits an Intent: `{action: "artifact_ready", path: "reports/analysis.md"}`
+2. Daemon creates/updates an `(:Artifact)` node and links it to the Task
+3. Agent B (or a rule) can query for `(:Artifact)` nodes in the `success` state before reading the file
+
+This avoids race conditions where one agent reads a file that another is still writing.
+
+---
+
+## 12. Multi-Host Considerations
+
+The initial version is **single-host** (Ubuntu). However, the architecture supports multi-host extension:
+- Neo4j can be accessed remotely (Bolt protocol)
+- Agents on remote hosts use the `hassaleh.query()` SDK over the network
+- Intents are submitted via HTTP API to the Daemon
+- Workspace access would require shared filesystems (NFS, SSHFS) or artifact transfer via the graph
+
+Multi-host support is **deferred** to post-MVP.
+
+---
+
+## 13. Testing Strategy
+
+| Level | What | How |
+|-------|------|-----|
+| **Unit** | SDK query guards, Intent validation, GSL-Ops compiler | pytest, mock Neo4j driver |
+| **Integration** | Daemon tick loop, Intent processing, async workers | Real Neo4j test instance, test agent |
+| **End-to-End** | Full loop: agent → Intent → Daemon → action → feedback | Dedicated test DB, dummy agent, real systemd service |
+| **Rule Testing** | GSL-Ops rules produce correct Intents | Parse → compile → evaluate against test graph |
+| **Chaos** | Daemon crash recovery, zombie Intents, circuit breakers | Kill Daemon mid-tick, verify recovery on restart |
+
+The GWW3 test database infrastructure (multiple Neo4j instances on different ports) is reused for Hassaleh testing.
+
+---
+
+## 14. Reporting
 
 A reporting agent queries the graph to generate:
 
@@ -857,7 +974,7 @@ All reports generated from **graph queries only** — no external state needed.
 
 ---
 
-## 9. Technology Stack
+## 15. Technology Stack
 
 | Component | Technology |
 |-----------|-----------|
@@ -873,7 +990,7 @@ All reports generated from **graph queries only** — no external state needed.
 
 ---
 
-## 10. Relationship to GWW3
+## 16. Relationship to GWW3
 
 Hassaleh extracts and generalizes the **rule engine architecture** developed for Games of World War 3:
 
@@ -890,7 +1007,7 @@ When Hassaleh is operational, it will be used to orchestrate further GWW3 develo
 
 ---
 
-## 11. Roadmap
+## 17. Roadmap
 
 | Phase | Goal |
 |-------|------|
@@ -899,6 +1016,16 @@ When Hassaleh is operational, it will be used to orchestrate further GWW3 develo
 | **2 — Daemon MVP** | Persistent async service (systemd), Intent processing loop, SystemAction enforcement via `sudo -n -u`, SecretRef resolution, Intent feedback (stdout/stderr) |
 | **2.5 — Agent SDK** | `hassaleh.query()` read-proxy with Cypher linting, per-query timeouts from DB, convenience methods |
 | **3 — Blackboard Spike** | 1 real agent (Dione) submitting Intents + reading results. Prove the full loop: agent → Intent → Daemon → action → feedback → agent reads result |
+
+### MVP Sprint (Phase 1–3): First 5 Files
+
+| File | Purpose |
+|------|---------|
+| `schema.cypher` | CREATE CONSTRAINT/INDEX for MVP nodes (Agent, SystemAction, Workspace, Intent, Task, DaemonConfig, QueryConfig, SystemVersion) |
+| `daemon.py` | Asyncio event loop, Neo4j polling for pending Intents, `create_subprocess_exec` async workers, zombie recovery on boot, systemd watchdog |
+| `sdk.py` | `hassaleh.query()` (parameterized read-only) + `hassaleh.submit_intent()` |
+| `agent_dummy.py` | Test agent: claim a Task, write a file to Workspace, submit Intent to run `ls -la`, read result |
+| `seed.cypher` | Create initial Agent node, SystemAction (allow `ls`), Task, Workspace, DaemonConfig, QueryConfig |
 | **4 — Rule Engine** | Port GSL-Ops from GWW3, compile on boot, priority-based conflict resolution |
 | **5 — CLI** | `hassaleh init`, `hassaleh status`, `hassaleh report` |
 | **6 — Integration** | OpenClaw integration, first operational rules (health checks, task assignment) |
@@ -915,6 +1042,7 @@ When Hassaleh is operational, it will be used to orchestrate further GWW3 develo
 | 2026-03-29 | v0.2 | Gemini Deep Think review: +7 node types (Workspace, ConfigFile, Memory, SecretRef, Message, Intent, SystemTrace, TimeBucket, Discussion split). Trusted Daemon architecture. GSL-Ops subset. Priority-based conflict resolution. Circuit breakers. Task timeouts. Idempotency keys. Edge-first modeling (no string FKs). Message cursor pattern. TimeBucket log partitioning. Universal LifecycleStatus enum. Roadmap reordered (Daemon before Rule Engine). |
 | 2026-03-29 | v0.3 | OS-level enforcement: dedicated OS users (`hassaleh-svc`, `hassaleh-agent`). Dual Neo4j users (`hassaleh_daemon` r/w, `hassaleh_reader` r/o). Per-action OS user isolation (`hassaleh-fs`, `hassaleh-writer`, `hassaleh-exec`, `hassaleh-net`, `hassaleh-pkg`). Triple-layered enforcement (graph + daemon + OS). `exec_as_user` field on SystemAction nodes. |
 | 2026-03-29 | v0.4 | **Second Gemini DT review.** CronJob Daemon → persistent asyncio service (systemd). 1-second ticks + async action workers (never blocks). Intent feedback loop (lifecycle, stdout, stderr, error_reason). `hassaleh.query()` read-proxy SDK with Cypher linting. Per-query timeouts from DB (not global DBMS timeout). QueryConfig + DaemonConfig + SystemVersion singleton nodes. All configuration in graph (no external config files). Workspaces project-specific with direct OS-level agent r/w access. Safe subprocess execution (`sudo -n -u`, no `shell=True`). Rules compiled on boot + on-change (not per-tick). Memory limits 1 GB (not 256 MB). Roadmap reordered: Daemon → SDK → Blackboard Spike → Rule Engine. |
+| 2026-03-29 | v0.5 | **Third Gemini DT review.** `asyncio.create_subprocess_exec` (not `subprocess.run`). Zombie Intent recovery on Daemon boot. systemd watchdog integration (`sd_notify`). Daemon health endpoint. `awaiting_approval` + `rejected` lifecycle states. HITL flow for sensitive actions. `os_pid` on Agent nodes. Circuit breaker decay (not hard reset). Drop regex Cypher linting — rely on Neo4j role + query limits. Parameterized queries enforced in SDK. Credential bootstrapping via env vars. `artifact_ready` Intent for file coordination. Agent registration (admin-only, no self-registration). Multi-host considerations (deferred). Testing strategy. Observability section. MVP sprint scope (5 files). `compiled_python` restored in Rule nodes. |
 
 ---
 
