@@ -5,7 +5,8 @@
 *Revised: 2026-03-29 — v0.3: Daemon enforcement model, DB access separation, CronJob-driven rule evaluation*
 *Revised: 2026-03-29 — v0.4: Continuous async Daemon, Intent feedback, workspace fast-path, all config in DB*
 *Revised: 2026-03-29 — v0.5: Third Gemini DT review: async subprocess, zombie recovery, HITL, SDK safety, missing features*
-*Status: Draft v0.5 — Ready for implementation*
+*Revised: 2026-03-29 — v1.0: Final review: Capability merge, consistency fixes, graceful shutdown, UTC mandate, Docker dev-env*
+*Status: v1.0 — Implementation-ready (GO)*
 
 ---
 
@@ -78,12 +79,12 @@ The Daemon does not merely *describe* permissions — it **enforces** them at th
 
 | Component | OS User | Neo4j User | Capabilities |
 |-----------|---------|------------|-------------|
-| **Hassaleh Daemon** | `hassaleh-svc` | `hassaleh_daemon` (read/write) | Full DB writes, rule evaluation, agent lifecycle, delegates system ops via `su` to action-specific users |
-| **AI Agents** | `hassaleh-agent` | `hassaleh_reader` (read-only) | Direct read-only graph queries, submit intents to Daemon API |
-| **System Actions** | `hassaleh-fs`, `hassaleh-writer`, `hassaleh-exec`, `hassaleh-net`, `hassaleh-pkg` | — | Per-action-class OS users with minimal permissions (invoked by Daemon via `su`) |
+| **Hassaleh Daemon** | `hassaleh-svc` | `hassaleh_daemon` (read/write) | Full DB writes, rule evaluation, agent lifecycle, delegates capability execution to per-capability OS users |
+| **AI Agents** | `hassaleh-agent` | `hassaleh_reader` (read-only) | Direct read-only graph queries, direct r/w to assigned Workspaces, submit Intents to Daemon API |
+| **Capability Users** | `hassaleh-fs`, `hassaleh-writer`, `hassaleh-exec`, `hassaleh-net`, `hassaleh-pkg` | — | Per-capability-class OS users with minimal permissions (invoked by Daemon via `sudo -n -u`) |
 | **Human Admin** | user account (e.g. `uranus`) | `neo4j` (admin) | Full DB access, Daemon management, manual overrides |
 
-The `hassaleh-agent` OS user has no `sudo`, no write access outside designated directories, and no ability to start processes. All system operations are proxied through the Daemon, which validates them against the SystemAction graph and then executes via `su` to the appropriate action-specific OS user.
+The `hassaleh-agent` OS user has no `sudo`, no write access outside assigned Workspace directories, and no ability to start privileged processes. All privileged operations are proxied through the Daemon, which validates `[:HAS_CAPABILITY]` edges and then executes via `sudo -n -u` to the appropriate capability-specific OS user.
 
 ### 3.2 Daemon Execution Model
 
@@ -112,6 +113,9 @@ The Daemon is a **persistent asyncio service** managed by systemd, with a fast i
 - **Managed by systemd:** Automatic restart on crash, journald logging, resource limits via cgroup. The Daemon pings the systemd watchdog (`sd_notify`) on every tick — if the asyncio loop hangs, systemd automatically restarts the service.
 - **Health endpoint:** The Daemon exposes a minimal HTTP health endpoint (configurable port in DaemonConfig) for monitoring tools (uptime, tick count, pending intents, active workers).
 - **All configuration from the graph:** The Daemon reads its own configuration (tick interval, sweep schedule, timeout defaults) from a `(:DaemonConfig)` singleton node in Neo4j. No external config files.
+- **Graceful shutdown:** On SIGTERM/SIGINT, the Daemon stops pulling new Intents, sends SIGTERM to all active subprocess workers, awaits their exit (up to 30s timeout), writes `failed` with `error_reason: "Daemon shutdown"` to any still-running Intents, then exits cleanly. This prevents orphaned background processes.
+- **Neo4j read-only fallback:** If Neo4j enters read-only mode (e.g., disk full), the Daemon catches `TransientError` exceptions, pauses the hot-path, and emits a loud alert rather than crash-looping.
+- **UTC everywhere:** All timestamps in Python use `datetime.now(datetime.UTC)`. All Cypher uses `datetime({timezone: 'UTC'})`. No local timezone assumptions.
 
 ### 3.3 Agent Read Access
 
@@ -217,59 +221,71 @@ An AI agent with defined capabilities. Each agent has one or more models assigne
 (Agent)-[:USES_MODEL {priority: 1, fallback: false}]->(Model)
 (Agent)-[:USES_MODEL {priority: 2, fallback: true}]->(Model)
 (Agent)-[:OPERATES_IN]->(Workspace)
-(Agent)-[:HAS_TOOL]->(Tool)
-(Agent)-[:HAS_SKILL]->(Skill)
-(Agent)-[:PERMITTED]->(SystemAction)
+(Agent)-[:HAS_CAPABILITY]->(Capability) # tools, skills, system actions — all unified
 (Agent)-[:LAST_READ]->(Message)         # cursor for message queue
 ```
 
-### 4.3 Tool
+### 4.3 Capability
 
-An MCP server or standalone tool available to agents.
+A unified abstraction for anything an agent can do: MCP server calls, CLI tools, skills, filesystem operations, network access, package management. From the Daemon's perspective, they are all **parameterized system executions**.
 
 ```
-(:Tool {
-    id: "firecrawl",
-    name: "Firecrawl",
-    type: "mcp_server",                 # mcp_server | cli | api | builtin
-    description: "Web scraping, search, crawling via Firecrawl API",
+(:Capability {
+    id: "firecrawl-search",
+    name: "Firecrawl Search",
+    kind: "mcp_server",                 # mcp_server | cli | api | skill | filesystem | network | package
+    description: "Web search with full page content extraction via Firecrawl API",
     
     # Invocation (executed by Daemon, not agent)
-    invoke_command: "mcporter call firecrawl.*",
+    invoke_command: "mcporter call firecrawl.firecrawl_search",
+    invoke_params_schema: '{"query": "string", "limit": "int"}',
+    
+    # Skill metadata (for kind: "skill")
+    version: null,                      # e.g. "1.0.0" for skills
+    source: null,                       # clawhub | local | github
+    
+    # OS execution context
+    exec_as_user: "hassaleh-net",       # dedicated OS user for this capability
     requires_auth: true,
+    requires_confirmation: false,       # true → Intent goes to awaiting_approval
     
     # Operational constraints
     rate_limit: "500 credits/month",
-    cost_model: "per_call",
-    lifecycle: "available"
+    cost_model: "per_call",             # per_call | free | subscription
+    
+    lifecycle: "available"              # → LifecycleStatus (available | deprecated)
 })
+```
+
+**Per-capability OS user isolation:** Each Capability specifies an `exec_as_user` — a dedicated Ubuntu user with **only** the permissions needed for this capability class. The Daemon executes via `asyncio.create_subprocess_exec("sudo", "-n", "-u", exec_as_user, ...)`:
+
+| Capability Kind | OS User | Permissions |
+|----------------|---------|------------|
+| `filesystem` (read) | `hassaleh-fs` | Read-only access to workspace dirs |
+| `filesystem` (write) | `hassaleh-writer` | Write access to specific output dirs |
+| `cli` / `skill` (scripts) | `hassaleh-exec` | Execute scripts in whitelisted paths |
+| `mcp_server` / `api` / `network` | `hassaleh-net` | Outbound HTTP only, no listeners |
+| `package` | `hassaleh-pkg` | `apt` with restricted package list |
+
+**Safe async subprocess execution:** The Daemon **never** uses `shell=True`, `subprocess.run`, or string concatenation. All delegated actions use `asyncio.create_subprocess_exec` with strict argument arrays:
+```python
+proc = await asyncio.create_subprocess_exec(
+    "sudo", "-n", "-u", exec_as_user,
+    "/path/to/script", safe_arg1, safe_arg2,
+    stdout=asyncio.subprocess.PIPE,
+    stderr=asyncio.subprocess.PIPE,
+)
+stdout, stderr = await proc.communicate()
 ```
 
 **Relationships:**
 ```
-(Tool)-[:CONFIGURED_IN]->(ConfigFile)
-(Tool)-[:AUTHENTICATES_VIA]->(SecretRef)
-```
-
-### 4.4 Skill
-
-A reusable skill package (e.g. OpenClaw skills, ClawHub skills).
-
-```
-(:Skill {
-    id: "firecrawl-search",
-    name: "Firecrawl Search",
-    description: "Web search with full page content extraction",
-    version: "1.0.0",
-    source: "clawhub",                  # clawhub | local | github
-    lifecycle: "available"
-})
-```
-
-**Relationships:**
-```
-(Skill)-[:LOCATED_AT]->(Artifact)       # SKILL.md file
-(Skill)-[:DEPENDS_ON]->(Tool)
+(Agent)-[:HAS_CAPABILITY {granted_at: datetime()}]->(Capability)
+(Capability)-[:CONFIGURED_IN]->(ConfigFile)
+(Capability)-[:AUTHENTICATES_VIA]->(SecretRef)
+(Capability)-[:LOCATED_AT]->(Artifact)    # for skills: SKILL.md file
+(Capability)-[:DEPENDS_ON]->(Capability)  # skill depends on MCP server, etc.
+(Project)-[:REQUIRES_CAPABILITY]->(Capability)
 ```
 
 ### 4.5 Workspace
@@ -309,52 +325,10 @@ A configuration file referenced by tools or agents.
 })
 ```
 
-### 4.7 SystemAction
-
-A permitted action on the host system. Actions are whitelisted — anything not explicitly permitted is **denied by the Daemon**.
-
-```
-(:SystemAction {
-    id: "file-read-workspace",
-    name: "Read workspace files",
-    type: "filesystem",                 # filesystem | process | network | package | sudo
-    scope: "/home/uranus/moltbot-workspace/**",
-    permission: "read",                 # read | write | execute | admin
-    requires_confirmation: false,
-    os: "ubuntu",
-    exec_as_user: "hassaleh-fs"         # dedicated OS user for this action class
-})
-```
-
-**Per-action OS user isolation:** Each SystemAction specifies an `exec_as_user` — a dedicated Ubuntu user that has **only** the permissions needed for this specific action class. The Daemon executes the action via `su - <exec_as_user> -c "..."`. This provides fine-grained OS-level least-privilege:
-
-| Action Class | OS User | Permissions |
-|-------------|---------|------------|
-| Filesystem read (workspace) | `hassaleh-fs` | Read-only access to workspace dirs |
-| Filesystem write (reports) | `hassaleh-writer` | Write access to specific output dirs |
-| Process execution (scripts) | `hassaleh-exec` | Execute scripts in whitelisted paths |
-| Network (API calls) | `hassaleh-net` | Outbound HTTP only, no listeners |
-| Package management | `hassaleh-pkg` | `apt` with restricted package list |
-| Neo4j admin | `hassaleh-svc` | Only the Daemon itself |
-
-This ensures that even if the Daemon has a bug, a filesystem action cannot accidentally execute a process, and a network action cannot write files. Each OS user is configured with minimal capabilities via standard Ubuntu user/group permissions, and optionally hardened with AppArmor profiles.
-
-**Safe async subprocess execution:** The Daemon **never** uses `shell=True`, `subprocess.run`, or string concatenation for commands. All delegated actions use `asyncio.create_subprocess_exec` with strict argument arrays:
-```python
-proc = await asyncio.create_subprocess_exec(
-    "sudo", "-n", "-u", exec_as_user,
-    "/path/to/script", safe_arg1, safe_arg2,
-    stdout=asyncio.subprocess.PIPE,
-    stderr=asyncio.subprocess.PIPE,
-)
-stdout, stderr = await proc.communicate()
-```
-This prevents both shell injection attacks and event-loop blocking.
-
 **Enforcement is triple-layered:**
-1. **Graph level:** The Daemon verifies `[:PERMITTED]` edges before executing any operation
+1. **Graph level:** The Daemon verifies `[:HAS_CAPABILITY]` edges before executing any operation on behalf of an agent
 2. **Daemon level:** The Daemon delegates via `sudo -n -u <exec_as_user>` with argument arrays (no shell)
-3. **OS level:** The action-specific user has only the filesystem/process/network permissions needed
+3. **OS level:** The capability-specific user has only the filesystem/process/network permissions needed
 
 **Relationships:**
 ```
@@ -376,7 +350,7 @@ A scheduled recurring or one-shot task.
     
     enabled: true,
     last_run: datetime(),
-    last_status: "success",
+    lifecycle: "success",               # last run status → universal LifecycleStatus
     next_run: datetime(),
     retry_on_failure: true,
     max_retries: 3
@@ -416,9 +390,7 @@ The central organizing node. Projects form a **hierarchy** (parent/child) and ca
 (Project)-[:HAS_AGENT {role: "orchestrator"}]->(Agent)
 (Project)-[:HAS_AGENT {role: "developer"}]->(Agent)
 (Project)-[:HAS_AGENT {role: "reviewer"}]->(Agent)
-(Project)-[:REQUIRES_TOOL]->(Tool)
-(Project)-[:REQUIRES_SKILL]->(Skill)
-(Project)-[:ALLOWS_ACTION]->(SystemAction)
+(Project)-[:REQUIRES_CAPABILITY]->(Capability)
 (Project)-[:HAS_CRONJOB]->(CronJob)
 (Project)-[:HAS_SPRINT]->(Sprint)
 (Project)-[:HAS_ARTIFACT]->(Artifact)
@@ -559,7 +531,8 @@ A declarative rule governing agent behavior within a project. Uses GSL-Ops (dete
     rule_text: "...",                  # GSL-Ops source (compiled by Daemon at runtime)
     
     description: "Check agent health every 5 min. Restart if unresponsive. Circuit breaker after 5 failures.",
-    author: "ingo"
+    author: "ingo",
+    lifecycle: "available"
 })
 ```
 
@@ -594,8 +567,7 @@ Inter-agent communication node. Part of a linked-list message queue.
 (:Message {
     id: uuid(),
     timestamp: datetime(),
-    content: "I've completed the GSL parser rewrite. 26 tests pass.",
-    metadata: '{"artifact": "gsl.lark", "test_count": 26}'
+    content: "I've completed the GSL parser rewrite. 26 tests pass."
 })
 ```
 
@@ -605,6 +577,7 @@ Inter-agent communication node. Part of a linked-list message queue.
 (Message)-[:NEXT]->(Message)            # linked-list for O(1) cursor traversal
 (Message)-[:IN_CONTEXT_OF]->(Task)
 (Message)-[:IN_CONTEXT_OF]->(Discussion)
+(Message)-[:REFERENCES]->(Artifact)     # explicit edge, not JSON metadata
 (Agent)-[:LAST_READ]->(Message)         # cursor — agent's read position
 ```
 
@@ -618,9 +591,8 @@ A proposed state change or action submitted by an agent, processed by the Daemon
 (:Intent {
     id: uuid(),
     submitted_at: datetime(),
-    action: "update_property",         # update_property | create_node | create_edge | execute_command
-    target_node_id: "...",
-    property: "lifecycle",
+    action: "update_property",         # update_property | create_node | create_edge | execute_capability
+    property: "lifecycle",              # target identified via [:TARGETS] edge, not string FK
     value: "failed",
     idempotency_key: "health-check-dione-2026-03-29T13:00",
     
@@ -766,6 +738,8 @@ All stateful nodes use a consistent lifecycle enum:
 
 | Status | Meaning |
 |--------|---------|
+| `available` | Static resource ready for use (Model, Capability) |
+| `deprecated` | Static resource still functional but scheduled for removal |
 | `pending` | Created, not yet started |
 | `awaiting_approval` | Parked — requires human confirmation before proceeding |
 | `running` | Actively executing |
@@ -775,7 +749,7 @@ All stateful nodes use a consistent lifecycle enum:
 | `suspended` | Paused (by rule or human) — can be resumed |
 | `archived` | Retained for history, no longer active |
 
-Used by: Agent, Model, Tool, Project, Sprint, Task, Milestone, CronJob, Discussion, Intent.
+Used by: Agent, Model, Capability, Project, Sprint, Task, Milestone, CronJob, Discussion, Intent.
 
 ---
 
@@ -1017,20 +991,22 @@ When Hassaleh is operational, it will be used to orchestrate further GWW3 develo
 | **2.5 — Agent SDK** | `hassaleh.query()` read-proxy with Cypher linting, per-query timeouts from DB, convenience methods |
 | **3 — Blackboard Spike** | 1 real agent (Dione) submitting Intents + reading results. Prove the full loop: agent → Intent → Daemon → action → feedback → agent reads result |
 
-### MVP Sprint (Phase 1–3): First 5 Files
+### MVP Sprint (Phase 1–3): First 6 Files
 
 | File | Purpose |
 |------|---------|
-| `schema.cypher` | CREATE CONSTRAINT/INDEX for MVP nodes (Agent, SystemAction, Workspace, Intent, Task, DaemonConfig, QueryConfig, SystemVersion) |
-| `daemon.py` | Asyncio event loop, Neo4j polling for pending Intents, `create_subprocess_exec` async workers, zombie recovery on boot, systemd watchdog |
+| `schema.cypher` | CREATE CONSTRAINT/INDEX for MVP nodes (Agent, Capability, Workspace, Intent, Task, DaemonConfig, QueryConfig, SystemVersion) |
+| `seed.cypher` | Create initial Agent node, Capability (allow `ls`), Task, Workspace, DaemonConfig, QueryConfig, SystemVersion |
+| `setup_os.sh` | Create OS users (`hassaleh-svc`, `hassaleh-agent`, `hassaleh-exec`), configure `/etc/sudoers.d/hassaleh`, install `hassaleh-daemon.service` systemd unit file |
+| `daemon.py` | Asyncio event loop, Neo4j polling for pending Intents, `create_subprocess_exec` async workers, zombie recovery on boot, graceful shutdown, systemd watchdog |
 | `sdk.py` | `hassaleh.query()` (parameterized read-only) + `hassaleh.submit_intent()` |
-| `agent_dummy.py` | Test agent: claim a Task, write a file to Workspace, submit Intent to run `ls -la`, read result |
-| `seed.cypher` | Create initial Agent node, SystemAction (allow `ls`), Task, Workspace, DaemonConfig, QueryConfig |
+| `agent_dummy.py` | Test agent: claim a Task, write a file to Workspace, submit Intent to execute `ls -la` via Capability, read result |
 | **4 — Rule Engine** | Port GSL-Ops from GWW3, compile on boot, priority-based conflict resolution |
 | **5 — CLI** | `hassaleh init`, `hassaleh status`, `hassaleh report` |
 | **6 — Integration** | OpenClaw integration, first operational rules (health checks, task assignment) |
 | **7 — Reporting** | Graph-based project/agent reporting |
 | **8 — Multi-Agent** | Discussion protocol, consensus mechanism, workspace permission management |
+| **9 — Docker Dev-Env** | Dockerized development environment: Neo4j instance + simulated OS-level isolation (hassaleh-svc/agent/exec users) + Daemon + sample agent. Enables `docker compose up` onboarding for open-source contributors |
 
 ---
 
@@ -1042,8 +1018,9 @@ When Hassaleh is operational, it will be used to orchestrate further GWW3 develo
 | 2026-03-29 | v0.2 | Gemini Deep Think review: +7 node types (Workspace, ConfigFile, Memory, SecretRef, Message, Intent, SystemTrace, TimeBucket, Discussion split). Trusted Daemon architecture. GSL-Ops subset. Priority-based conflict resolution. Circuit breakers. Task timeouts. Idempotency keys. Edge-first modeling (no string FKs). Message cursor pattern. TimeBucket log partitioning. Universal LifecycleStatus enum. Roadmap reordered (Daemon before Rule Engine). |
 | 2026-03-29 | v0.3 | OS-level enforcement: dedicated OS users (`hassaleh-svc`, `hassaleh-agent`). Dual Neo4j users (`hassaleh_daemon` r/w, `hassaleh_reader` r/o). Per-action OS user isolation (`hassaleh-fs`, `hassaleh-writer`, `hassaleh-exec`, `hassaleh-net`, `hassaleh-pkg`). Triple-layered enforcement (graph + daemon + OS). `exec_as_user` field on SystemAction nodes. |
 | 2026-03-29 | v0.4 | **Second Gemini DT review.** CronJob Daemon → persistent asyncio service (systemd). 1-second ticks + async action workers (never blocks). Intent feedback loop (lifecycle, stdout, stderr, error_reason). `hassaleh.query()` read-proxy SDK with Cypher linting. Per-query timeouts from DB (not global DBMS timeout). QueryConfig + DaemonConfig + SystemVersion singleton nodes. All configuration in graph (no external config files). Workspaces project-specific with direct OS-level agent r/w access. Safe subprocess execution (`sudo -n -u`, no `shell=True`). Rules compiled on boot + on-change (not per-tick). Memory limits 1 GB (not 256 MB). Roadmap reordered: Daemon → SDK → Blackboard Spike → Rule Engine. |
-| 2026-03-29 | v0.5 | **Third Gemini DT review.** `asyncio.create_subprocess_exec` (not `subprocess.run`). Zombie Intent recovery on Daemon boot. systemd watchdog integration (`sd_notify`). Daemon health endpoint. `awaiting_approval` + `rejected` lifecycle states. HITL flow for sensitive actions. `os_pid` on Agent nodes. Circuit breaker decay (not hard reset). Drop regex Cypher linting — rely on Neo4j role + query limits. Parameterized queries enforced in SDK. Credential bootstrapping via env vars. `artifact_ready` Intent for file coordination. Agent registration (admin-only, no self-registration). Multi-host considerations (deferred). Testing strategy. Observability section. MVP sprint scope (5 files). `compiled_python` restored in Rule nodes. |
+| 2026-03-29 | v0.5 | **Third Gemini DT review.** async subprocess, zombie recovery, systemd watchdog, HITL, SDK safety, observability, testing, file coordination, agent registration, multi-host, MVP sprint scope. |
+| 2026-03-29 | v1.0 | **Fourth Gemini DT review (final — GO).** Merged Tool + Skill + SystemAction → **Capability** (single unified node). Fixed string FK in Intent (`target_node_id` → `[:TARGETS]` edge). Added `available` + `deprecated` to LifecycleStatus. Fixed CronJob `last_status` → `lifecycle`. Message metadata → `[:REFERENCES]` edge. Graceful Daemon shutdown (SIGTERM handler, orphan process cleanup). Neo4j read-only fallback handling. UTC mandate for all timestamps. `setup_os.sh` added to MVP (6th file). Docker dev-env added to roadmap (Phase 9). 17 sections, 21 node types. |
 
 ---
 
-*This document is a living draft. It will evolve as Hassaleh develops.*
+*This document has been reviewed through 4 iterations of Gemini Deep Think analysis. It is ready for implementation.*
