@@ -6,8 +6,9 @@
 *Revised: 2026-03-29 — v0.4: Continuous async Daemon, Intent feedback, workspace fast-path, all config in DB*
 *Revised: 2026-03-29 — v0.5: Third Gemini DT review: async subprocess, zombie recovery, HITL, SDK safety, missing features*
 *Revised: 2026-03-29 — v1.0: Final review: Capability merge, consistency fixes, graceful shutdown, UTC mandate, Docker dev-env*
-*Revised: 2026-03-29 — v1.01: Consistency audit: 15 fixes (renumbering, cross-refs, terminology, datetime UTC, relationships)*
-*Status: v1.01 — Implementation-ready (GO)*
+*Revised: 2026-03-29 — v1.1: Consistency audit: 15 fixes (renumbering, cross-refs, terminology, datetime UTC, relationships)*
+*Revised: 2026-03-29 — v1.2: Final 8 fixes from audit + version renaming*
+*Status: v1.2 — Implementation-ready (GO)*
 
 ---
 
@@ -1037,8 +1038,9 @@ When Hassaleh is operational, it will be used to orchestrate further GWW3 develo
 
 ---
 
-| 2026-03-29 | v1.01 | **Final consistency audit.** Removed orphaned SystemAction text block from ConfigFile section. Fixed all `datetime()` → `datetime({timezone: 'UTC'})`. Renumbered sections 4.4–4.22 (no gaps). Fixed cross-references (SecretRef 4.13, SystemTrace/TimeBucket 4.17/4.18). Replaced all stale terminology (SystemAction→Capability, Tool→Capability, execute_command→execute_capability). Added `Rule` to LifecycleStatus "Used by" list. Added Relationships sections to Model, ConfigFile, Milestone, Artifact, DaemonConfig, QueryConfig, SystemVersion. Fixed SecretRef relationship (Tool→Capability). Added all 7 OS users to setup_os.sh description. Fixed node type count to 22. |
+| 2026-03-29 | v1.1 | **Final consistency audit (15 fixes).** Removed orphaned SystemAction text block from ConfigFile section. Fixed all `datetime()` → `datetime({timezone: 'UTC'})`. Renumbered sections 4.4–4.22 (no gaps). Fixed cross-references (SecretRef 4.13, SystemTrace/TimeBucket 4.17/4.18). Replaced all stale terminology (SystemAction→Capability, Tool→Capability, execute_command→execute_capability). Added `Rule` to LifecycleStatus "Used by" list. Added Relationships sections to Model, ConfigFile, Milestone, Artifact, DaemonConfig, QueryConfig, SystemVersion. Fixed SecretRef relationship (Tool→Capability). Added all 7 OS users to setup_os.sh description. Fixed node type count to 22. |
+| 2026-03-29 | v1.2 | **Second consistency audit (8 fixes).** "with which tools"→"capabilities" (Sec 1). `datetime()` → UTC in GSL pseudocode (Sec 7.1, 7.3). Added Relationships: None to QueryConfig (Sec 4.20). Renamed v1.01→v1.1, v1.02→v1.2 for cleaner versioning. |
 
 ---
 
-*This document has been reviewed through 4 iterations of Gemini Deep Think analysis plus a final consistency audit. It is internally consistent and ready for implementation.*
+*This document has been reviewed through 4 iterations of Gemini Deep Think analysis plus 2 consistency audits. It is internally consistent and ready for implementation.*
