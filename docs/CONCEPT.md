@@ -3,7 +3,8 @@
 *Created: 2026-03-29 by Ingo Giebel + Dione 🌙*
 *Revised: 2026-03-29 — v0.2: Gemini Deep Think review incorporated*
 *Revised: 2026-03-29 — v0.3: Daemon enforcement model, DB access separation, CronJob-driven rule evaluation*
-*Status: Draft v0.3*
+*Revised: 2026-03-29 — v0.4: Continuous async Daemon, Intent feedback, workspace fast-path, all config in DB*
+*Status: Draft v0.4*
 
 ---
 
@@ -40,32 +41,33 @@ The graph is the **single source of truth** — no YAML files, no scattered conf
 │  Agents (Dione, Inanna, Codex, Claude Code, ...)    │
 │  • Run as unprivileged OS user (hassaleh-agent)     │
 │  • Neo4j READ-ONLY access (user: hassaleh_reader)   │
-│  • No shell access, no Neo4j writes                  │
-│  • Submit intents via Daemon API                     │
-│  • Query graph directly for status (read-only)       │
+│  • Direct r/w to assigned Workspace directories     │
+│  • Submit intents via Daemon API for privileged ops  │
+│  • Query graph via hassaleh.query() SDK (read-only)  │
 └─────────┬───────────────────────┬───────────────────┘
-          │ Intent API            │ Direct Cypher
-          │ (write requests)      │ (read-only)
+          │ Intent API            │ Read-Proxy SDK
+          │ (write requests)      │ (guarded read-only)
           ▼                       ▼
 ┌─────────────────────┐  ┌───────────────────────────┐
 │  Hassaleh Daemon    │  │  Neo4j Graph Database      │
-│                     │  │                             │
-│  • Runs as dedicated│  │  Two database users:        │
-│    OS user          │  │  • hassaleh_daemon (r/w)    │
-│    (hassaleh-svc)   │  │  • hassaleh_reader (r/o)    │
-│  • Neo4j WRITE      │  │                             │
-│    access (daemon)  │  │  All config, state, logs,   │
-│  • Enforces         │──│  rules, messages            │
-│    SystemAction     │  │                             │
-│    permissions      │  │  ACID transactions           │
-│  • Compiles & evals │  │  Single source of truth      │
-│    GSL-Ops rules    │  └───────────────────────────┘
-│  • Manages agent    │
-│    lifecycle        │
-│  • Resolves secrets │
-│  • Triggered by     │
-│    CronJobs at      │
-│    regular intervals│
+│  (systemd service)  │  │                             │
+│                     │  │  Two database users:        │
+│  • Persistent async │  │  • hassaleh_daemon (r/w)    │
+│    event loop       │  │  • hassaleh_reader (r/o)    │
+│    (1-second ticks) │  │                             │
+│  • Runs as          │  │  ALL configuration stored   │
+│    hassaleh-svc     │──│  here (no external configs) │
+│  • Neo4j r/w access │  │                             │
+│  • Compiles GSL-Ops │  │  ACID transactions           │
+│    rules on boot +  │  │  Single source of truth      │
+│    on-change        │  └───────────────────────────┘
+│  • Async action     │
+│    workers (never   │
+│    blocks on I/O)   │
+│  • Intent feedback  │
+│    (stdout/stderr)  │
+│  • SecretRef        │
+│    resolution       │
 └─────────────────────┘
 ```
 
@@ -84,36 +86,63 @@ The `hassaleh-agent` OS user has no `sudo`, no write access outside designated d
 
 ### 3.2 Daemon Execution Model
 
-The Daemon is **not a long-running event loop**. It is invoked by **system CronJobs** at configurable intervals:
+The Daemon is a **persistent asyncio service** managed by systemd, with a fast internal event loop:
 
-| CronJob | Interval | Purpose |
-|---------|----------|---------|
-| `hassaleh-tick` | Every 1–5 min | Evaluate GSL-Ops rules against current graph state. Process pending intents. Check agent health. Fire timed triggers. |
-| `hassaleh-sweep` | Every 15 min | Archive expired TimeBuckets. Clean up stale Memory nodes. Reset circuit breaker counters. |
-| `hassaleh-audit` | Daily | Generate daily activity summary. Check rule consistency. Verify graph integrity. |
+**Hot Path (1-second ticks):**
+1. Read pending Intents submitted by agents
+2. Validate each Intent against SystemAction permissions
+3. For approved Intents: execute via async action workers (never block the loop)
+4. Write Intent results (stdout, stderr, error_reason) back to the Intent node
+5. Evaluate GSL-Ops rules against current graph state
+6. Check for triggered events (new Messages, Milestone completions, etc.)
+7. Dispatch notifications to affected agents
 
-Each invocation:
-1. Daemon starts, connects to Neo4j as `hassaleh_daemon`
-2. Reads all pending Intents submitted by agents
-3. Validates each Intent against SystemAction permissions
-4. Evaluates GSL-Ops rules against current graph state
-5. Applies approved state changes in a single ACID transaction
-6. Checks for triggered events (new Messages, Milestone completions, etc.)
-7. Dispatches notifications to affected agents (via OpenClaw or direct wake)
-8. Writes SystemTrace entries
-9. Exits
+**Background Tasks (periodic, run inside the same Daemon process):**
 
-This ensures the Daemon is stateless between invocations, recoverable after crashes, and auditable via CronJob logs.
+| Task | Interval | Purpose |
+|------|----------|---------|
+| `sweep` | Every 15 min | Archive expired TimeBuckets. Clean up stale Memory nodes. Reset circuit breaker counters. |
+| `audit` | Daily | Generate daily activity summary. Check rule consistency. Verify graph integrity. |
+
+**Key design decisions:**
+- **Never blocks on I/O:** System actions (e.g., `apt-get`, API calls, script execution) are spawned as async subprocess tasks. The Daemon updates the Intent to `running` and immediately returns to the event loop.
+- **Rules compiled once:** GSL-Ops rules are compiled to Python ASTs on Daemon boot and recompiled only when Rule nodes are modified. No per-tick recompilation.
+- **Managed by systemd:** Automatic restart on crash, journald logging, resource limits via cgroup.
+- **All configuration from the graph:** The Daemon reads its own configuration (tick interval, sweep schedule, timeout defaults) from a `(:DaemonConfig)` singleton node in Neo4j. No external config files.
 
 ### 3.3 Agent Read Access
 
-Agents can query the graph **directly** using the `hassaleh_reader` Neo4j user:
-- Browse project status, task assignments, sprint progress
-- Read Messages and Discussion threads
-- Check their own health state and model assignments
-- Generate reports from graph data
+Agents query the graph through the **`hassaleh.query()` SDK** — a lightweight Python library that:
+- Connects to Neo4j as `hassaleh_reader` (read-only)
+- Applies **per-query timeouts** (loaded from `(:QueryConfig)` node in the graph, passed with each query)
+- Lints Cypher queries before execution (blocks known-unsafe patterns: unbounded Cartesian products, `DETACH DELETE`, `CREATE`, `SET`, `REMOVE`)
+- Enforces **result-set limits** (configurable per query type, stored in DB)
+- Provides convenience methods for common queries (`hassaleh.my_tasks()`, `hassaleh.project_status()`, etc.)
 
-This avoids routing all read traffic through the Daemon, keeping it lightweight and reducing latency for status queries. The read-only user **cannot** create, update, or delete any nodes or relationships.
+**What agents can read:**
+- Project status, task assignments, sprint progress
+- Messages and Discussion threads
+- Their own health state and model assignments
+- All graph data (shared knowledge — "swarm brain")
+
+**What agents cannot do via the SDK:**
+- Write, create, update, or delete any nodes or relationships
+- Access actual secrets (SecretRef nodes contain only vault references)
+- Run queries that exceed the configured timeout or memory limits
+
+**Query guardrails are stored in the graph** (not in neo4j.conf):
+```
+(:QueryConfig {
+    id: "default",
+    default_timeout_ms: 3000,          # per-query timeout (passed with each call)
+    max_result_rows: 10000,            # hard limit on returned rows
+    max_transaction_memory_mb: 1024,   # per-transaction memory limit
+    blocked_patterns: ["MATCH (a), (b), (c)", "DETACH DELETE", "CALL db."],
+    report_query_timeout_ms: 30000     # longer timeout for reporting queries
+})
+```
+
+This avoids a single global DBMS timeout that would be either too strict for reports or too lenient for routine queries.
 
 ---
 
@@ -236,22 +265,27 @@ A reusable skill package (e.g. OpenClaw skills, ClawHub skills).
 
 ### 4.5 Workspace
 
-A filesystem location where agents and projects operate.
+A filesystem directory where agents and projects operate. Agents have **direct OS-level read/write access** to their assigned Workspace directories (no need to route file I/O through the Daemon).
 
 ```
 (:Workspace {
-    id: "moltbot-workspace",
-    path: "/home/uranus/moltbot-workspace",
+    id: "gww3-workspace",
+    path: "/home/uranus/moltbot-workspace/projects/games-of-ww3",
     os: "ubuntu",
-    description: "Primary workspace for all agents"
+    writable: true,                     # agents get r/w access
+    description: "GWW3 project workspace"
 })
 ```
 
+Workspaces are **project-specific**. An agent working on GWW3 gets access to the GWW3 workspace, not the entire filesystem. The `hassaleh-agent` OS user is granted group-level r/w access to assigned workspace directories.
+
 **Relationships:**
 ```
-(Agent)-[:OPERATES_IN]->(Workspace)
+(Agent)-[:OPERATES_IN {since: datetime()}]->(Workspace)
 (Project)-[:LOCATED_IN]->(Workspace)
 ```
+
+**Access enforcement:** When the Daemon assigns an agent to a project, it ensures the `hassaleh-agent` user has OS-level group permissions on that project's Workspace directory. When unassigned, access is revoked.
 
 ### 4.6 ConfigFile
 
@@ -296,9 +330,15 @@ A permitted action on the host system. Actions are whitelisted — anything not 
 
 This ensures that even if the Daemon has a bug, a filesystem action cannot accidentally execute a process, and a network action cannot write files. Each OS user is configured with minimal capabilities via standard Ubuntu user/group permissions, and optionally hardened with AppArmor profiles.
 
+**Safe subprocess execution:** The Daemon **never** uses `shell=True` or string concatenation for commands. All delegated actions use strict argument arrays:
+```python
+subprocess.run(["sudo", "-n", "-u", exec_as_user, "/path/to/script", safe_arg1, safe_arg2])
+```
+This prevents shell injection attacks from agent-provided parameters.
+
 **Enforcement is triple-layered:**
 1. **Graph level:** The Daemon verifies `[:PERMITTED]` edges before executing any operation
-2. **Daemon level:** The Daemon switches to the action-specific OS user via `su`
+2. **Daemon level:** The Daemon delegates via `sudo -n -u <exec_as_user>` with argument arrays (no shell)
 3. **OS level:** The action-specific user has only the filesystem/process/network permissions needed
 
 **Relationships:**
@@ -544,19 +584,30 @@ Inter-agent communication node. Part of a linked-list message queue.
 
 ### 4.18 Intent
 
-A proposed state change submitted by an agent, awaiting Daemon processing.
+A proposed state change or action submitted by an agent, processed by the Daemon. Includes full feedback loop so agents can read results.
 
 ```
 (:Intent {
     id: uuid(),
-    timestamp: datetime(),
+    submitted_at: datetime(),
     action: "update_property",         # update_property | create_node | create_edge | execute_command
     target_node_id: "...",
     property: "lifecycle",
     value: "failed",
-    idempotency_key: "health-check-dione-2026-03-29T13:00"
+    idempotency_key: "health-check-dione-2026-03-29T13:00",
+    
+    # ── Feedback (written by Daemon) ──
+    lifecycle: "pending",              # pending | running | success | failed | rejected
+    started_at: null,
+    completed_at: null,
+    stdout: null,                      # captured output (for execute_command)
+    stderr: null,                      # captured errors
+    error_reason: null,                # why it was rejected/failed
+    exit_code: null                    # for command execution
 })
 ```
+
+Agents poll their submitted Intents (via read-only SDK) to retrieve tool outputs and detect rejections. This closes the feedback loop — no agent hangs waiting for a result that never comes.
 
 **Relationships:**
 ```
@@ -608,7 +659,55 @@ Partitioning node for log aggregation. Prevents supernode problem on Project nod
 
 **Archival:** A CronJob archives TimeBuckets older than 30 days to JSONL and DETACH DELETEs them.
 
-### 4.21 Discussion
+### 4.21 DaemonConfig
+
+Singleton node — all Daemon runtime settings. No external config files.
+
+```
+(:DaemonConfig {
+    id: "default",
+    tick_interval_ms: 1000,            # hot-path loop interval
+    sweep_interval_min: 15,
+    audit_schedule: "0 3 * * *",       # daily at 03:00
+    intent_timeout_default_sec: 300,   # max time for an Intent to complete
+    max_concurrent_actions: 10,        # async action worker pool size
+    circuit_breaker_window_min: 60,    # time window for restart counting
+    notification_channel: "openclaw",  # how to wake agents
+    schema_version: "0.4"             # for migration checks
+})
+```
+
+### 4.22 QueryConfig
+
+Singleton node — read-access guardrails for agents. Loaded by the hassaleh.query() SDK.
+
+```
+(:QueryConfig {
+    id: "default",
+    default_timeout_ms: 3000,
+    max_result_rows: 10000,
+    max_transaction_memory_mb: 1024,
+    blocked_patterns: ["MATCH (a), (b), (c)", "DETACH DELETE", "CALL db."],
+    report_query_timeout_ms: 30000
+})
+```
+
+### 4.23 SystemVersion
+
+Singleton node — tracks the graph schema version for safe migrations.
+
+```
+(:SystemVersion {
+    id: "hassaleh",
+    schema_version: "0.4",
+    last_migration: datetime(),
+    compatible_daemon_versions: ["0.4", "0.3"]
+})
+```
+
+The Daemon checks this on boot and refuses to start (or applies migration scripts) if the code version is incompatible.
+
+### 4.24 Discussion
 
 A structured multi-agent discussion for collaborative decision-making.
 
@@ -754,7 +853,8 @@ All reports generated from **graph queries only** — no external state needed.
 | Rule Engine | GSL-Ops (deterministic subset of GSL from GWW3) |
 | Parser | Lark 1.3.1 (Earley + PythonIndenter) |
 | Agent Runtime | OpenClaw, Google ADK, standalone |
-| Daemon | Python CLI (CronJob-invoked, stateless) |
+| Daemon | Python asyncio (systemd-managed, persistent) |
+| Agent SDK | `hassaleh.query()` — guarded read-only Neo4j access |
 | CLI | `hassaleh` (planned) |
 | Platform | Ubuntu 24.04+ (initial) |
 
@@ -782,14 +882,15 @@ When Hassaleh is operational, it will be used to orchestrate further GWW3 develo
 | Phase | Goal |
 |-------|------|
 | **0 — Concept** ✅ | Architecture document, GitHub repo |
-| **1 — Schema** | Neo4j schema definition, constraints, indexes, seed data |
-| **1.5 — Blackboard Spike** | 3 dummy agents reading/writing Neo4j concurrently — prove cursor pattern works |
-| **2 — Daemon MVP** | Trusted API gateway, SystemAction enforcement, SecretRef resolution |
-| **3 — Rule Engine** | Port GSL-Ops from GWW3, priority-based conflict resolution |
-| **4 — CLI** | `hassaleh init`, `hassaleh status`, `hassaleh report` |
-| **5 — Integration** | OpenClaw integration, first operational rules |
-| **6 — Reporting** | Graph-based project/agent reporting |
-| **7 — Multi-Agent** | Discussion protocol, consensus mechanism |
+| **1 — Schema + Seed** | Neo4j schema (constraints, indexes), DaemonConfig/QueryConfig/SystemVersion singletons, seed data for 1 project + 1 agent |
+| **2 — Daemon MVP** | Persistent async service (systemd), Intent processing loop, SystemAction enforcement via `sudo -n -u`, SecretRef resolution, Intent feedback (stdout/stderr) |
+| **2.5 — Agent SDK** | `hassaleh.query()` read-proxy with Cypher linting, per-query timeouts from DB, convenience methods |
+| **3 — Blackboard Spike** | 1 real agent (Dione) submitting Intents + reading results. Prove the full loop: agent → Intent → Daemon → action → feedback → agent reads result |
+| **4 — Rule Engine** | Port GSL-Ops from GWW3, compile on boot, priority-based conflict resolution |
+| **5 — CLI** | `hassaleh init`, `hassaleh status`, `hassaleh report` |
+| **6 — Integration** | OpenClaw integration, first operational rules (health checks, task assignment) |
+| **7 — Reporting** | Graph-based project/agent reporting |
+| **8 — Multi-Agent** | Discussion protocol, consensus mechanism, workspace permission management |
 
 ---
 
@@ -799,7 +900,8 @@ When Hassaleh is operational, it will be used to orchestrate further GWW3 develo
 |------|---------|---------|
 | 2026-03-29 | v0.1 | Initial concept: 14 node types, orchestration rules, roadmap |
 | 2026-03-29 | v0.2 | Gemini Deep Think review: +7 node types (Workspace, ConfigFile, Memory, SecretRef, Message, Intent, SystemTrace, TimeBucket, Discussion split). Trusted Daemon architecture. GSL-Ops subset. Priority-based conflict resolution. Circuit breakers. Task timeouts. Idempotency keys. Edge-first modeling (no string FKs). Message cursor pattern. TimeBucket log partitioning. Universal LifecycleStatus enum. Roadmap reordered (Daemon before Rule Engine). |
-| 2026-03-29 | v0.3 | OS-level enforcement: dedicated OS users (`hassaleh-svc`, `hassaleh-agent`). Dual Neo4j users (`hassaleh_daemon` r/w, `hassaleh_reader` r/o). Agents get direct read-only DB access for status queries. Daemon is CronJob-invoked (stateless, not long-running). Three CronJob tiers: tick (1-5 min), sweep (15 min), audit (daily). Per-action OS user isolation (`hassaleh-fs`, `hassaleh-writer`, `hassaleh-exec`, `hassaleh-net`, `hassaleh-pkg`) — Daemon executes system actions via `su` to dedicated least-privilege users. Triple-layered enforcement (graph + daemon + OS). `exec_as_user` field on SystemAction nodes. |
+| 2026-03-29 | v0.3 | OS-level enforcement: dedicated OS users (`hassaleh-svc`, `hassaleh-agent`). Dual Neo4j users (`hassaleh_daemon` r/w, `hassaleh_reader` r/o). Per-action OS user isolation (`hassaleh-fs`, `hassaleh-writer`, `hassaleh-exec`, `hassaleh-net`, `hassaleh-pkg`). Triple-layered enforcement (graph + daemon + OS). `exec_as_user` field on SystemAction nodes. |
+| 2026-03-29 | v0.4 | **Second Gemini DT review.** CronJob Daemon → persistent asyncio service (systemd). 1-second ticks + async action workers (never blocks). Intent feedback loop (lifecycle, stdout, stderr, error_reason). `hassaleh.query()` read-proxy SDK with Cypher linting. Per-query timeouts from DB (not global DBMS timeout). QueryConfig + DaemonConfig + SystemVersion singleton nodes. All configuration in graph (no external config files). Workspaces project-specific with direct OS-level agent r/w access. Safe subprocess execution (`sudo -n -u`, no `shell=True`). Rules compiled on boot + on-change (not per-tick). Memory limits 1 GB (not 256 MB). Roadmap reordered: Daemon → SDK → Blackboard Spike → Rule Engine. |
 
 ---
 
