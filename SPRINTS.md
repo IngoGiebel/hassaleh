@@ -19,10 +19,10 @@
 
 | # | Task | Assignee | Reviewer | Status |
 |---|------|----------|----------|--------|
-| 1.1 | Write `schema.cypher` — CREATE CONSTRAINT/INDEX for MVP nodes (Agent, Capability, Workspace, Intent, Task, DaemonConfig, QueryConfig, SystemVersion) | Dione | Codex | ⬜ todo |
-| 1.2 | Write `seed.cypher` — Create initial Agent (Dione), Capability (`ls`), Task, Workspace, DaemonConfig, QueryConfig, SystemVersion nodes | Dione | Gemini | ⬜ todo |
-| 1.3 | Create `hassaleh` Neo4j database + `hassaleh_daemon` (r/w) and `hassaleh_reader` (r/o) users | Dione | — | ⬜ todo |
-| 1.4 | Apply schema + seed to Neo4j, verify with Cypher queries | Dione | — | ⬜ todo |
+| 1.1 | Write `schema.cypher` — CREATE CONSTRAINT/INDEX for MVP nodes (Agent, Capability, Workspace, Intent, Task, DaemonConfig, QueryConfig, SystemVersion) | Dione | Codex | ✅ done |
+| 1.2 | Write `seed.cypher` — Create initial Agent (Dione), Capability (`ls`), Task, Workspace, DaemonConfig, QueryConfig, SystemVersion nodes | Dione | Gemini | ✅ done |
+| 1.3 | Create Neo4j users: `hassaleh_daemon` (r/w) and `hassaleh_reader` (r/o). Note: CE has no role-based access — read-only enforced in SDK. | Dione | — | ✅ done |
+| 1.4 | Apply schema + seed to Neo4j, verify with Cypher queries | Dione | — | ✅ done |
 
 ### Phase 2: Daemon MVP
 
