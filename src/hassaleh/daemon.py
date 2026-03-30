@@ -15,6 +15,7 @@ import json
 import logging
 import os
 import signal
+import socket
 import sys
 from datetime import datetime, timezone
 from typing import Any
@@ -63,6 +64,7 @@ class HassalehDaemon:
         self._start_time: float = 0
         self._health_app: web.Application | None = None
         self._health_runner: web.AppRunner | None = None
+        self._watchdog_usec: int = 0  # systemd watchdog interval (0 = disabled)
 
     # ── Lifecycle ──
 
@@ -96,9 +98,13 @@ class HassalehDaemon:
         # Start health endpoint
         await self._start_health_endpoint()
 
+        # Initialize watchdog
+        self._init_watchdog()
+
         # Start the main loop
         self.running = True
         self._start_time = asyncio.get_event_loop().time()
+        self._sd_notify("READY=1")
         log.info(f"Daemon running (tick interval: {self.config['tick_interval_ms']}ms)")
 
         await self._main_loop()
@@ -107,6 +113,7 @@ class HassalehDaemon:
         """Graceful shutdown: stop accepting, kill workers, update Intents."""
         log.info("Initiating graceful shutdown...")
         self.running = False
+        self._sd_notify("STOPPING=1")
 
         # Cancel all active workers
         if self.active_workers:
@@ -149,6 +156,9 @@ class HassalehDaemon:
             self.tick_count += 1
 
             try:
+                # Watchdog ping
+                self._sd_notify("WATCHDOG=1")
+
                 # Hot path: process pending Intents
                 await self._process_pending_intents()
 
@@ -437,6 +447,38 @@ class HassalehDaemon:
             task = self.active_workers.pop(k)
             if task.exception():
                 log.error(f"Worker {k} raised: {task.exception()}")
+
+    # ── Watchdog (sd_notify) ──
+
+    def _init_watchdog(self) -> None:
+        """Initialize systemd watchdog if WATCHDOG_USEC is set."""
+        usec = os.environ.get("WATCHDOG_USEC")
+        if usec:
+            self._watchdog_usec = int(usec)
+            log.info(f"Watchdog enabled: {self._watchdog_usec / 1_000_000:.1f}s interval")
+        else:
+            log.info("Watchdog not configured (no WATCHDOG_USEC)")
+
+    def _sd_notify(self, state: str) -> None:
+        """Send notification to systemd via NOTIFY_SOCKET.
+
+        Implements the sd_notify protocol without requiring the systemd Python package.
+        """
+        addr = os.environ.get("NOTIFY_SOCKET")
+        if not addr:
+            return
+
+        try:
+            if addr.startswith("@"):
+                addr = "\0" + addr[1:]  # abstract socket
+
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+            try:
+                sock.sendto(state.encode(), addr)
+            finally:
+                sock.close()
+        except Exception as e:
+            log.warning(f"sd_notify failed: {e}")
 
     # ── Health Endpoint ──
 

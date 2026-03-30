@@ -22,7 +22,6 @@ StartLimitIntervalSec=300
 StartLimitBurst=5
 
 [Service]
-Type=simple
 User=hassaleh-svc
 Group=hassaleh
 
@@ -38,8 +37,10 @@ Environment=PYTHONPATH=${PROJECT_DIR}/src
 # Main process — global Python 3.13 (neo4j, aiohttp installed system-wide)
 ExecStart=${PYTHON} -m hassaleh.daemon
 
-# Watchdog — disabled until sd_notify is implemented in daemon.py
-# WatchdogSec=30
+# Watchdog — Daemon pings WATCHDOG=1 on every tick via sd_notify
+Type=notify
+WatchdogSec=30
+NotifyAccess=main
 
 # Restart policy
 Restart=on-failure
