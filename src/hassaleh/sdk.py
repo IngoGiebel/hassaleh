@@ -33,6 +33,13 @@ DEFAULT_QUERY_CONFIG = {
     "report_query_timeout_ms": 30000,
 }
 
+# Write operations that agents must NOT execute via query()
+# Agents write ONLY through submit_intent() → Daemon processes
+BLOCKED_KEYWORDS = frozenset({
+    "CREATE", "MERGE", "DELETE", "DETACH", "SET", "REMOVE",
+    "DROP", "CALL", "LOAD CSV", "FOREACH",
+})
+
 
 class HassalehSDK:
     """Agent-facing SDK for Hassaleh graph access.
@@ -127,6 +134,15 @@ class HassalehSDK:
         """
         if params is None:
             params = {}
+
+        # Enforce read-only: reject queries with write keywords
+        cypher_upper = cypher.upper()
+        for keyword in BLOCKED_KEYWORDS:
+            if keyword in cypher_upper:
+                raise PermissionError(
+                    f"Write operation '{keyword}' blocked in SDK query(). "
+                    f"Use submit_intent() for state changes."
+                )
 
         timeout_ms = timeout_ms or self.query_config["default_timeout_ms"]
         max_rows = self.query_config["max_result_rows"]

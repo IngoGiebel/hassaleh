@@ -19,6 +19,7 @@ import sys
 from datetime import datetime, timezone
 from typing import Any
 
+from aiohttp import web
 from neo4j import AsyncGraphDatabase
 
 logging.basicConfig(
@@ -59,6 +60,9 @@ class HassalehDaemon:
         self.tick_count = 0
         self.active_workers: dict[str, asyncio.Task] = {}
         self._shutdown_event = asyncio.Event()
+        self._start_time: float = 0
+        self._health_app: web.Application | None = None
+        self._health_runner: web.AppRunner | None = None
 
     # ── Lifecycle ──
 
@@ -89,8 +93,12 @@ class HassalehDaemon:
         # Recover zombie Intents
         await self._recover_zombies()
 
+        # Start health endpoint
+        await self._start_health_endpoint()
+
         # Start the main loop
         self.running = True
+        self._start_time = asyncio.get_event_loop().time()
         log.info(f"Daemon running (tick interval: {self.config['tick_interval_ms']}ms)")
 
         await self._main_loop()
@@ -117,6 +125,9 @@ class HassalehDaemon:
                         i.completed_at = datetime({timezone: 'UTC'})
                 """)
             log.info("Running Intents marked as failed")
+
+        # Stop health endpoint
+        await self._stop_health_endpoint()
 
         # Close Neo4j
         if self.driver:
@@ -426,6 +437,60 @@ class HassalehDaemon:
             task = self.active_workers.pop(k)
             if task.exception():
                 log.error(f"Worker {k} raised: {task.exception()}")
+
+    # ── Health Endpoint ──
+
+    async def _start_health_endpoint(self) -> None:
+        """Start minimal HTTP health endpoint."""
+        port = self.config.get("health_endpoint_port", 9100)
+        self._health_app = web.Application()
+        self._health_app.router.add_get("/health", self._health_handler)
+
+        self._health_runner = web.AppRunner(self._health_app)
+        await self._health_runner.setup()
+        site = web.TCPSite(self._health_runner, "127.0.0.1", port)
+        await site.start()
+        log.info(f"Health endpoint listening on http://127.0.0.1:{port}/health")
+
+    async def _health_handler(self, request: web.Request) -> web.Response:
+        """Handle GET /health."""
+        uptime = asyncio.get_event_loop().time() - self._start_time if self._start_time else 0
+
+        # Count agents and pending intents
+        agents_running = 0
+        pending_intents = 0
+        try:
+            async with self.driver.session() as session:
+                result = await session.run(
+                    "MATCH (a:Agent {lifecycle: 'running'}) RETURN count(a) AS c"
+                )
+                record = await result.single()
+                agents_running = record["c"] if record else 0
+
+                result = await session.run(
+                    "MATCH (i:Intent {lifecycle: 'pending'}) RETURN count(i) AS c"
+                )
+                record = await result.single()
+                pending_intents = record["c"] if record else 0
+        except Exception as e:
+            log.warning(f"Health check DB query failed: {e}")
+
+        data = {
+            "status": "healthy" if self.running else "shutting_down",
+            "uptime_seconds": round(uptime),
+            "tick_count": self.tick_count,
+            "pending_intents": pending_intents,
+            "active_workers": len(self.active_workers),
+            "agents_running": agents_running,
+            "schema_version": "1.2",
+        }
+        return web.json_response(data)
+
+    async def _stop_health_endpoint(self) -> None:
+        """Stop the health endpoint."""
+        if self._health_runner:
+            await self._health_runner.cleanup()
+            log.info("Health endpoint stopped")
 
     # ── Config Loading ──
 
