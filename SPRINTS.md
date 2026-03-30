@@ -28,7 +28,7 @@
 
 | # | Task | Assignee | Reviewer | Status |
 |---|------|----------|----------|--------|
-| 2.1 | Write `setup_os.sh` — Create OS users (hassaleh-svc, hassaleh-agent, hassaleh-fs, hassaleh-writer, hassaleh-exec, hassaleh-net, hassaleh-pkg), configure `/etc/sudoers.d/hassaleh`, install systemd unit | Codex | Dione | ⬜ todo |
+| 2.1 | Write `setup_os.sh` — Create OS users (hassaleh-svc, hassaleh-agent, hassaleh-fs, hassaleh-writer, hassaleh-exec, hassaleh-net, hassaleh-pkg), configure `/etc/sudoers.d/hassaleh`, install systemd unit | Dione | — | ✅ done |
 | 2.2 | Write `daemon.py` — asyncio event loop, Neo4j connection as `hassaleh_daemon`, read pending Intents | Codex | Dione + Gemini | ⬜ todo |
 | 2.3 | Add async action workers — `asyncio.create_subprocess_exec` with `sudo -n -u` delegation | Codex | Dione | ⬜ todo |
 | 2.4 | Add Intent feedback — write lifecycle/stdout/stderr/error_reason back to Intent nodes | Codex | Dione | ⬜ todo |
@@ -43,17 +43,17 @@
 
 | # | Task | Assignee | Reviewer | Status |
 |---|------|----------|----------|--------|
-| 2.5.1 | Write `sdk.py` — `hassaleh.query()` with parameterized queries, per-query timeout from QueryConfig | Codex | Dione + Gemini | ⬜ todo |
-| 2.5.2 | Add `hassaleh.submit_intent()` — create Intent node via Daemon API or direct write | Codex | Dione | ⬜ todo |
-| 2.5.3 | Add convenience methods: `hassaleh.my_tasks()`, `hassaleh.project_status()` | Codex | Dione | ⬜ todo |
-| 2.5.4 | Credential bootstrapping — read NEO4J_URI/USER/PASSWORD from env vars | Codex | Dione | ⬜ todo |
-| 2.5.5 | Unit tests for SDK (mock Neo4j driver) | Codex | Gemini | ⬜ todo |
+| 2.5.1 | Write `sdk.py` — `hassaleh.query()` with parameterized queries, per-query timeout from QueryConfig | Dione | — | ✅ done |
+| 2.5.2 | Add `hassaleh.submit_intent()` — create Intent node via Daemon API or direct write | Dione | — | ✅ done |
+| 2.5.3 | Add convenience methods: `hassaleh.my_tasks()`, `hassaleh.project_status()` | Dione | — | ✅ done |
+| 2.5.4 | Credential bootstrapping — read NEO4J_URI/USER/PASSWORD from env vars | Dione | — | ✅ done |
+| 2.5.5 | Unit tests for SDK (6 unit + 6 integration, all green) | Dione | — | ✅ done |
 
 ### Phase 3: Blackboard Spike (End-to-End Proof)
 
 | # | Task | Assignee | Reviewer | Status |
 |---|------|----------|----------|--------|
-| 3.1 | Write `agent_dummy.py` — test agent that claims a Task, writes a file to Workspace, submits Intent to execute `ls -la`, reads result | Codex | Dione | ⬜ todo |
+| 3.1 | Write `agent_dummy.py` — test agent that claims a Task, submits Intent to execute `ls -la`, polls result, verifies output | Dione | — | ✅ done |
 | 3.2 | Full loop test: start Daemon, start agent, verify Intent → action → feedback → agent reads stdout | Dione | Gemini | ⬜ todo |
 | 3.3 | Verify: agent cannot write to Neo4j (read-only user enforcement) | Dione | — | ⬜ todo |
 | 3.4 | Verify: agent cannot execute capabilities it doesn't have (HAS_CAPABILITY check) | Dione | — | ⬜ todo |

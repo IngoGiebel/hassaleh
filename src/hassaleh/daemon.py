@@ -466,9 +466,9 @@ class HassalehDaemon:
 # ──────────────────────────────────────────────
 
 async def main():
-    uri = os.environ.get("NEO4J_URI", "bolt://localhost:7687")
-    user = os.environ.get("NEO4J_USER", "hassaleh_daemon")
-    password = os.environ.get("NEO4J_PASSWORD", "hassaleh-rw-2026")
+    uri = os.environ.get("NEO4J_URI", "bolt://localhost:7690")
+    user = os.environ.get("NEO4J_USER", "neo4j")
+    password = os.environ.get("NEO4J_PASSWORD", "hassaleh-dev-2026")
 
     daemon = HassalehDaemon(uri, user, password)
 
