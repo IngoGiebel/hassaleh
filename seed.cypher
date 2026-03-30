@@ -89,7 +89,7 @@ SET cap += {
   invoke_params_schema: '{"args": "string"}',
   version: null,
   source: null,
-  exec_as_user: "hassaleh-exec",
+  exec_as_user: "hassaleh-fs",
   requires_auth: false,
   requires_confirmation: false,
   rate_limit: null,

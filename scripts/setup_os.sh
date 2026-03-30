@@ -173,7 +173,7 @@ CPUQuota=50%
 # Security hardening
 NoNewPrivileges=no
 ProtectSystem=strict
-ProtectHome=read-only
+ProtectHome=no
 ReadWritePaths=${PROJECT_DIR}
 PrivateTmp=true
 
