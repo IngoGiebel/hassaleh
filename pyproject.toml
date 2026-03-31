@@ -17,6 +17,7 @@ authors = [
 dependencies = [
     "neo4j>=5.0",
     "aiohttp>=3.9",
+    "lark>=1.0",
 ]
 
 [project.optional-dependencies]
@@ -26,6 +27,7 @@ dev = [
 ]
 
 [project.scripts]
+hassaleh = "hassaleh.cli:main"
 hassaleh-daemon = "hassaleh.daemon:main"
 
 [tool.pytest.ini_options]
