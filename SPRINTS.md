@@ -392,13 +392,28 @@
 
 ### Sprint 7: Docker Dev-Environment
 
-**Goal:** `docker compose up` for easy onboarding.
+**Goal:** `docker compose up` for instant onboarding — Neo4j + Daemon + CLI ready in 30 seconds.
 
-- Neo4j container with schema + seed
-- Simulated OS-level isolation (hassaleh-svc/agent/exec users)
-- Daemon container
-- Sample agent container
-- Documentation for contributors
+**Lead:** Dione 🌙
+**Duration:** ~1 day
+
+| # | Task | Status |
+|---|------|--------|
+| 7.1 | `Dockerfile` — Python 3.13 + Hassaleh + Daemon | ⬜ todo |
+| 7.2 | `docker-compose.yml` — Neo4j + Hassaleh Daemon + init container | ⬜ todo |
+| 7.3 | Init container: auto-apply schema + seed + rules on first boot | ⬜ todo |
+| 7.4 | Health check for Daemon container | ⬜ todo |
+| 7.5 | `.env.example` with configurable passwords/ports | ⬜ todo |
+| 7.6 | `docs/DOCKER.md` — setup instructions, troubleshooting | ⬜ todo |
+| 7.7 | README section: Docker quick start | ⬜ todo |
+
+### Sprint 7 Acceptance Criteria
+
+- [ ] `docker compose up` starts Neo4j + Daemon from zero
+- [ ] Schema + seed + rules auto-applied on first boot
+- [ ] `hassaleh status` works from host against containerized system
+- [ ] Daemon health endpoint accessible
+- [ ] Documentation covers setup, env vars, troubleshooting
 
 ---
 

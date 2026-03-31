@@ -1,0 +1,81 @@
+version: "3.9"
+
+services:
+  # ── Neo4j Graph Database ──
+  neo4j:
+    image: neo4j:5-community
+    container_name: hassaleh-neo4j
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-hassaleh-dev-2026}
+      NEO4J_PLUGINS: '[]'
+      NEO4J_server_memory_heap_initial__size: 256m
+      NEO4J_server_memory_heap_max__size: 512m
+    ports:
+      - "${NEO4J_BOLT_PORT:-7690}:7687"
+      - "${NEO4J_HTTP_PORT:-7477}:7474"
+    volumes:
+      - neo4j-data:/data
+      - neo4j-logs:/logs
+    healthcheck:
+      test: ["CMD", "neo4j", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  # ── Schema + Seed Init (runs once) ──
+  init:
+    build: .
+    container_name: hassaleh-init
+    user: root  # needs root for cypher-shell, runs once and exits
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    environment:
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-hassaleh-dev-2026}
+    command: >
+      python -c "
+      from hassaleh.cli import cmd_init
+      import types
+      args = types.SimpleNamespace(
+          uri='bolt://neo4j:7687',
+          user='neo4j',
+          password='${NEO4J_PASSWORD:-hassaleh-dev-2026}'
+      )
+      exit(cmd_init(args))
+      "
+    restart: "no"
+
+  # ── Hassaleh Daemon ──
+  daemon:
+    build: .
+    container_name: hassaleh-daemon
+    depends_on:
+      neo4j:
+        condition: service_healthy
+      init:
+        condition: service_completed_successfully
+    environment:
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-hassaleh-dev-2026}
+      OPENCLAW_GATEWAY_URL: ${OPENCLAW_GATEWAY_URL:-}
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
+      HASSALEH_NOTIFY_TARGET: ${HASSALEH_NOTIFY_TARGET:-}
+      HASSALEH_NOTIFY_CHANNEL: ${HASSALEH_NOTIFY_CHANNEL:-telegram}
+    ports:
+      - "${DAEMON_HEALTH_PORT:-9100}:9100"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9100/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  neo4j-data:
+  neo4j-logs:

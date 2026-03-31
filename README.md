@@ -46,31 +46,30 @@ Hassaleh is an agent orchestration framework where all configuration, state, rul
 
 ## Quick Start
 
-```bash
-# Prerequisites: Neo4j 5+, Python 3.13+
+### Docker (recommended)
 
-# Clone
+```bash
 git clone https://github.com/IngoGiebel/hassaleh.git
 cd hassaleh
+cp .env.example .env
+docker compose up -d
+curl http://localhost:9100/health | python3 -m json.tool
+```
 
-# Install
+See [docs/DOCKER.md](docs/DOCKER.md) for details.
+
+### Manual
+
+```bash
+# Prerequisites: Neo4j 5+, Python 3.13+
 pip install -e .
 
-# Initialize Neo4j (schema + seed data + rules)
 export NEO4J_URI=bolt://localhost:7690
 export NEO4J_PASSWORD=your-password
 hassaleh init
-
-# Check status
 hassaleh status
-
-# View rules
 hassaleh rule list
-hassaleh rule compile agent-health-check --dry-run
-
-# Reports
 hassaleh report daily
-hassaleh report agents --format json
 ```
 
 ## GSL-Ops Rule Language
