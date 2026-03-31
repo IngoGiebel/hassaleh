@@ -45,6 +45,7 @@ BLOCKED_KEYWORDS = frozenset({
 ALLOWED_TARGET_LABELS = frozenset({
     "Agent", "Task", "Capability", "Workspace", "Project", "Sprint",
     "DaemonConfig", "QueryConfig", "SystemVersion",
+    "Message", "Discussion",
 })
 
 
@@ -355,6 +356,210 @@ class HassalehSDK:
         """, {"project_id": project_id})
 
         return records[0] if records else {}
+
+    # ── Messaging (Cursor-based) ──
+
+    async def send_message(
+        self,
+        agent_id: str,
+        content: str,
+        context_id: str | None = None,
+        context_label: str = "Task",
+    ) -> str:
+        """Send a message to a context (Task, Discussion, etc.).
+
+        Creates a Message node, links it via SENT from the agent,
+        and appends it to the NEXT linked-list for the context.
+
+        Args:
+            agent_id: Sending agent's ID
+            content: Message content
+            context_id: Optional context node ID (Task, Discussion)
+            context_label: Label of the context node
+
+        Returns:
+            The generated Message ID
+        """
+        message_id = str(uuid.uuid4())
+
+        async with self.driver.session() as session:
+            async def _create_message(tx):
+                # Create message + SENT edge
+                await tx.run("""
+                    MATCH (agent:Agent {id: $agent_id})
+                    CREATE (m:Message {
+                        id: $message_id,
+                        timestamp: datetime({timezone: 'UTC'}),
+                        content: $content
+                    })
+                    CREATE (agent)-[:SENT]->(m)
+                """, agent_id=agent_id, message_id=message_id, content=content)
+
+                # Link to context if provided
+                if context_id and context_label:
+                    if context_label not in ALLOWED_TARGET_LABELS:
+                        return
+                    await tx.run(f"""
+                        MATCH (m:Message {{id: $message_id}})
+                        MATCH (ctx:{context_label} {{id: $context_id}})
+                        CREATE (m)-[:IN_CONTEXT_OF]->(ctx)
+                    """, message_id=message_id, context_id=context_id)
+
+                # Append to NEXT chain: find the latest message in this context
+                # and link our new message as its NEXT
+                if context_id:
+                    await tx.run("""
+                        MATCH (m:Message {id: $message_id})
+                        OPTIONAL MATCH (prev:Message)-[:IN_CONTEXT_OF]->({id: $context_id})
+                        WHERE NOT (prev)-[:NEXT]->()
+                          AND prev.id <> $message_id
+                        WITH m, prev
+                        ORDER BY prev.timestamp DESC
+                        LIMIT 1
+                        FOREACH (_ IN CASE WHEN prev IS NOT NULL THEN [1] ELSE [] END |
+                            CREATE (prev)-[:NEXT]->(m)
+                        )
+                    """, message_id=message_id, context_id=context_id)
+
+            await session.execute_write(_create_message)
+
+        log.info(f"Message {message_id} sent by {agent_id}")
+        return message_id
+
+    async def read_messages(
+        self,
+        agent_id: str,
+        context_id: str | None = None,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        """Read unread messages for an agent (cursor-based).
+
+        Follows the agent's LAST_READ cursor forward through the NEXT
+        chain. If no cursor exists, returns all messages in context.
+
+        Returns:
+            List of message dicts with id, content, timestamp, sender
+        """
+        if context_id:
+            # Read from cursor position in specific context
+            return await self.query("""
+                MATCH (agent:Agent {id: $agent_id})
+                OPTIONAL MATCH (agent)-[:LAST_READ]->(cursor:Message)
+                WITH agent, cursor
+                MATCH (m:Message)-[:IN_CONTEXT_OF]->({id: $context_id})
+                WHERE cursor IS NULL OR m.timestamp > cursor.timestamp
+                MATCH (sender:Agent)-[:SENT]->(m)
+                RETURN m.id AS id, m.content AS content,
+                       m.timestamp AS timestamp, sender.id AS sender_id,
+                       sender.name AS sender_name
+                ORDER BY m.timestamp ASC
+            """, {"agent_id": agent_id, "context_id": context_id},
+                timeout_ms=10000)
+        else:
+            # Read all unread messages across all contexts
+            return await self.query("""
+                MATCH (agent:Agent {id: $agent_id})
+                OPTIONAL MATCH (agent)-[:LAST_READ]->(cursor:Message)
+                WITH agent, cursor
+                MATCH (sender:Agent)-[:SENT]->(m:Message)
+                WHERE cursor IS NULL OR m.timestamp > cursor.timestamp
+                RETURN m.id AS id, m.content AS content,
+                       m.timestamp AS timestamp, sender.id AS sender_id,
+                       sender.name AS sender_name
+                ORDER BY m.timestamp ASC
+            """, {"agent_id": agent_id}, timeout_ms=10000)
+
+    async def advance_cursor(self, agent_id: str, message_id: str) -> None:
+        """Move an agent's LAST_READ cursor to a specific message.
+
+        Deletes the old LAST_READ edge and creates a new one.
+        """
+        async with self.driver.session() as session:
+            async def _advance(tx):
+                await tx.run("""
+                    MATCH (agent:Agent {id: $agent_id})
+                    OPTIONAL MATCH (agent)-[old:LAST_READ]->()
+                    DELETE old
+                    WITH agent
+                    MATCH (m:Message {id: $message_id})
+                    CREATE (agent)-[:LAST_READ]->(m)
+                """, agent_id=agent_id, message_id=message_id)
+            await session.execute_write(_advance)
+
+    # ── Discussions ──
+
+    async def create_discussion(
+        self,
+        topic: str,
+        context_id: str | None = None,
+        context_label: str = "Project",
+    ) -> str:
+        """Create a new discussion for collaborative decision-making."""
+        discussion_id = str(uuid.uuid4())
+
+        async with self.driver.session() as session:
+            async def _create(tx):
+                await tx.run("""
+                    CREATE (d:Discussion {
+                        id: $id,
+                        topic: $topic,
+                        lifecycle: 'pending',
+                        created_at: datetime({timezone: 'UTC'})
+                    })
+                """, id=discussion_id, topic=topic)
+
+                if context_id and context_label in ALLOWED_TARGET_LABELS:
+                    await tx.run(f"""
+                        MATCH (d:Discussion {{id: $id}})
+                        MATCH (ctx:{context_label} {{id: $context_id}})
+                        CREATE (d)-[:IN_CONTEXT_OF]->(ctx)
+                    """, id=discussion_id, context_id=context_id)
+
+            await session.execute_write(_create)
+        return discussion_id
+
+    async def contribute_to_discussion(
+        self,
+        agent_id: str,
+        discussion_id: str,
+        position: str,
+        reasoning: str,
+    ) -> None:
+        """Add an agent's position to a discussion."""
+        async with self.driver.session() as session:
+            async def _contribute(tx):
+                await tx.run("""
+                    MATCH (a:Agent {id: $agent_id})
+                    MATCH (d:Discussion {id: $discussion_id})
+                    CREATE (a)-[:CONTRIBUTED {
+                        position: $position,
+                        reasoning: $reasoning,
+                        timestamp: datetime({timezone: 'UTC'})
+                    }]->(d)
+                    SET d.lifecycle = 'running'
+                """, agent_id=agent_id, discussion_id=discussion_id,
+                   position=position, reasoning=reasoning)
+            await session.execute_write(_contribute)
+
+    async def resolve_discussion(
+        self,
+        agent_id: str,
+        discussion_id: str,
+        resolution: str,
+    ) -> None:
+        """Resolve a discussion (leader decision)."""
+        async with self.driver.session() as session:
+            async def _resolve(tx):
+                await tx.run("""
+                    MATCH (a:Agent {id: $agent_id})
+                    MATCH (d:Discussion {id: $discussion_id})
+                    SET d.lifecycle = 'success',
+                        d.resolution = $resolution,
+                        d.resolved_at = datetime({timezone: 'UTC'})
+                    CREATE (d)-[:DECIDED_BY]->(a)
+                """, agent_id=agent_id, discussion_id=discussion_id,
+                   resolution=resolution)
+            await session.execute_write(_resolve)
 
     async def agent_info(self, agent_id: str) -> dict[str, Any] | None:
         """Get agent details."""

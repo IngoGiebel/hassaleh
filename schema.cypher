@@ -39,6 +39,12 @@ CREATE CONSTRAINT systemversion_id IF NOT EXISTS
 CREATE CONSTRAINT rule_id IF NOT EXISTS
   FOR (r:Rule) REQUIRE r.id IS UNIQUE;
 
+CREATE CONSTRAINT message_id IF NOT EXISTS
+  FOR (m:Message) REQUIRE m.id IS UNIQUE;
+
+CREATE CONSTRAINT discussion_id IF NOT EXISTS
+  FOR (d:Discussion) REQUIRE d.id IS UNIQUE;
+
 // ──────────────────────────────────────────
 // Indexes for frequent queries
 // ──────────────────────────────────────────
@@ -62,3 +68,11 @@ CREATE INDEX capability_kind IF NOT EXISTS
 // Rule lifecycle for loading available rules
 CREATE INDEX rule_lifecycle IF NOT EXISTS
   FOR (r:Rule) ON (r.lifecycle);
+
+// Message timestamp for ordering queries
+CREATE INDEX message_timestamp IF NOT EXISTS
+  FOR (m:Message) ON (m.timestamp);
+
+// Discussion lifecycle
+CREATE INDEX discussion_lifecycle IF NOT EXISTS
+  FOR (d:Discussion) ON (d.lifecycle);

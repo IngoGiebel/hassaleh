@@ -447,6 +447,132 @@ def cmd_intent_list(args) -> int:
 
 
 # ──────────────────────────────────────────────
+# Message + Discussion Commands
+# ──────────────────────────────────────────────
+
+def cmd_message_list(args) -> int:
+    """List messages in a context."""
+    conn = get_connection(args)
+    driver = connect(conn)
+
+    with driver.session() as session:
+        if args.context:
+            result = session.run("""
+                MATCH (sender:Agent)-[:SENT]->(m:Message)-[:IN_CONTEXT_OF]->(ctx {id: $ctx})
+                RETURN m.id AS id, m.content AS content, m.timestamp AS ts,
+                       sender.name AS sender
+                ORDER BY m.timestamp ASC
+                LIMIT $limit
+            """, ctx=args.context, limit=args.limit)
+        else:
+            result = session.run("""
+                MATCH (sender:Agent)-[:SENT]->(m:Message)
+                RETURN m.id AS id, m.content AS content, m.timestamp AS ts,
+                       sender.name AS sender
+                ORDER BY m.timestamp DESC
+                LIMIT $limit
+            """, limit=args.limit)
+
+        messages = [dict(r) for r in result]
+
+    driver.close()
+
+    if not messages:
+        print("No messages found")
+        return 0
+
+    fmt_header("Messages")
+    rows = [[
+        m.get("sender", "?"),
+        (m.get("content", "") or "")[:60],
+        str(m.get("ts", "?"))
+    ] for m in messages]
+    print(fmt_table(["Sender", "Content", "Timestamp"], rows))
+    return 0
+
+
+def cmd_discussion_list(args) -> int:
+    """List discussions."""
+    conn = get_connection(args)
+    driver = connect(conn)
+
+    with driver.session() as session:
+        result = session.run("""
+            MATCH (d:Discussion)
+            OPTIONAL MATCH (a:Agent)-[:CONTRIBUTED]->(d)
+            WITH d, count(a) AS contributors
+            RETURN d.id AS id, d.topic AS topic, d.lifecycle AS lifecycle,
+                   d.resolution AS resolution, contributors
+            ORDER BY d.created_at DESC
+        """)
+        discussions = [dict(r) for r in result]
+
+    driver.close()
+
+    if not discussions:
+        print("No discussions found")
+        return 0
+
+    fmt_header("Discussions")
+    rows = [[
+        d["id"][:12] + "…",
+        (d.get("topic", "") or "")[:40],
+        d.get("lifecycle", "?"),
+        str(d.get("contributors", 0)),
+        (d.get("resolution", "") or "—")[:30],
+    ] for d in discussions]
+    print(fmt_table(["ID", "Topic", "Status", "Contributors", "Resolution"], rows))
+    return 0
+
+
+def cmd_discussion_show(args) -> int:
+    """Show discussion details with all contributions."""
+    conn = get_connection(args)
+    driver = connect(conn)
+
+    with driver.session() as session:
+        # Discussion details
+        result = session.run("""
+            MATCH (d:Discussion {id: $id})
+            OPTIONAL MATCH (d)-[:DECIDED_BY]->(leader:Agent)
+            RETURN d, leader.name AS decided_by
+        """, id=args.discussion_id)
+        record = result.single()
+
+        if not record:
+            print(fmt_error(f"Discussion '{args.discussion_id}' not found"))
+            driver.close()
+            return 1
+
+        disc = dict(record["d"])
+        fmt_header(f"Discussion: {disc.get('topic', '?')}")
+        print(fmt_kv("ID", disc.get("id", "?")))
+        print(fmt_kv("Status", disc.get("lifecycle", "?")))
+        if disc.get("resolution"):
+            print(fmt_kv("Resolution", disc["resolution"]))
+        if record.get("decided_by"):
+            print(fmt_kv("Decided by", record["decided_by"]))
+
+        # Contributions
+        result = session.run("""
+            MATCH (a:Agent)-[c:CONTRIBUTED]->(d:Discussion {id: $id})
+            RETURN a.name AS agent, c.position AS position,
+                   c.reasoning AS reasoning, c.timestamp AS ts
+            ORDER BY c.timestamp ASC
+        """, id=args.discussion_id)
+        contributions = [dict(r) for r in result]
+
+        if contributions:
+            print(fmt_section("Contributions"))
+            for c in contributions:
+                print(fmt_kv(c.get("agent", "?"),
+                            f"{c.get('position', '?')} — {c.get('reasoning', '')}"))
+
+    driver.close()
+    return 0
+
+
+# ──────────────────────────────────────────────
 # Report Commands
 # ──────────────────────────────────────────────
 
@@ -816,6 +942,20 @@ def build_parser() -> argparse.ArgumentParser:
     hb_parser = sub.add_parser("heartbeat", help="Send agent heartbeat to graph")
     hb_parser.add_argument("agent_id", help="Agent ID")
 
+    # message
+    msg_parser = sub.add_parser("message", help="Inter-agent messages")
+    msg_sub = msg_parser.add_subparsers(dest="message_command")
+    msg_list = msg_sub.add_parser("list", help="List messages in a context")
+    msg_list.add_argument("--context", help="Context node ID (Task/Discussion)")
+    msg_list.add_argument("--limit", type=int, default=20)
+
+    # discussion
+    disc_parser = sub.add_parser("discussion", help="Multi-agent discussions")
+    disc_sub = disc_parser.add_subparsers(dest="discussion_command")
+    disc_sub.add_parser("list", help="List discussions")
+    disc_show = disc_sub.add_parser("show", help="Show discussion details")
+    disc_show.add_argument("discussion_id", help="Discussion ID")
+
     # report
     report_parser = sub.add_parser("report", help="Generate reports")
     report_sub = report_parser.add_subparsers(dest="report_command")
@@ -851,6 +991,31 @@ def main() -> int:
         "approve": cmd_approve,
         "heartbeat": cmd_heartbeat,
     }
+
+    # Message subcommands
+    if args.command == "message":
+        handler = {"list": cmd_message_list}.get(args.message_command)
+        if not handler:
+            print("Usage: hassaleh message {list}")
+            return 1
+        try:
+            return handler(args)
+        except Exception as e:
+            print(fmt_error(str(e)))
+            return 1
+
+    # Discussion subcommands
+    if args.command == "discussion":
+        handler = {"list": cmd_discussion_list, "show": cmd_discussion_show}.get(
+            args.discussion_command)
+        if not handler:
+            print("Usage: hassaleh discussion {list|show}")
+            return 1
+        try:
+            return handler(args)
+        except Exception as e:
+            print(fmt_error(str(e)))
+            return 1
 
     # Report subcommands
     if args.command == "report":
