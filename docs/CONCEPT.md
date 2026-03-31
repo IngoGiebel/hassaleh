@@ -714,9 +714,9 @@ Hassaleh ships with a set of built-in Skills that agents can invoke via their ca
 | Skill | ID | Description |
 |-------|-----|-------------|
 | **Rules Author** | `hassaleh-rules-author` | Interactive GSL-Ops rule authoring. Guides the operator through translating operational intent into valid rules: clarifies trigger conditions, actions, and safety constraints in natural language, generates GSL-Ops syntax, compiles and previews the generated Python (`--dry-run`), and commits to the graph only after explicit human approval. Default skill for all rule creation requests. |
-| **Graph Explorer** | `graph-explore` | Interactive graph querying and visualization. Translates natural language questions ("which agents have capabilities for file access?") into Cypher, executes read-only, and formats results. |
-| **Report Builder** | `report-build` | Generates structured reports from graph data. Supports agent activity, rule evaluation, intent statistics, and project progress reports in text, JSON, or Markdown format. |
-| **Health Auditor** | `health-audit` | Analyzes system health: agent heartbeat freshness, rule evaluation success rates, Intent failure patterns, and Neo4j connectivity. Generates recommendations for rule adjustments. |
+| **Graph Explorer** | `hassaleh-graph-explorer` | Interactive graph querying and visualization. Translates natural language questions ("which agents have capabilities for file access?") into Cypher, executes read-only, and formats results. |
+| **Report Builder** | `hassaleh-report-builder` | Generates structured reports from graph data. Supports agent activity, rule evaluation, intent statistics, and project progress reports in text, JSON, or Markdown format. |
+| **Health Auditor** | `hassaleh-health-auditor` | Analyzes system health: agent heartbeat freshness, rule evaluation success rates, Intent failure patterns, and Neo4j connectivity. Generates recommendations for rule adjustments. |
 
 **Skill invocation:** When an agent receives a request that matches a skill's domain (e.g., "create a rule that..."), it automatically invokes the corresponding skill. The skill provides the structured interaction pattern; the agent provides the conversational interface. Skills are implemented as Python modules in `src/hassaleh/skills/` and registered as Capability nodes during `hassaleh init`.
 
