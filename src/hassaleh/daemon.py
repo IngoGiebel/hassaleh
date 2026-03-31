@@ -626,8 +626,10 @@ class HassalehDaemon:
             # Compile to Python code object with restricted namespace
             try:
                 code = compile(python_source, f"<rule:{rule_id}>", "exec")
-                # Restrict builtins to safe subset (no import, open, exec, eval)
+                # Restrict builtins to safe subset (no open, exec, eval)
+                # __import__ is needed for the compiled rule's import statement
                 safe_builtins = {
+                    "__import__": __import__,  # Required for 'from hassaleh.engine.runtime import ...'
                     "True": True, "False": False, "None": None,
                     "abs": abs, "min": min, "max": max, "len": len,
                     "int": int, "float": float, "str": str, "bool": bool,
