@@ -145,13 +145,18 @@ class GSLOpsCompiler:
     # ── LET ──
 
     def _compile_let_stmt(self, node: Tree) -> None:
+        # Grammar: let_stmt: "LET" NAME "=" expr
+        # Children: [NAME_token, ...expr_nodes]
+        # The first NAME token is the variable name; everything after is the expr.
         name = self._get_token(node, "NAME")
-        expr_children = [c for c in node.children
-                         if not (isinstance(c, Token) and str(c) == name
-                                 and c.type == "NAME")]
-        # Skip the "=" token too
-        expr_children = [c for c in expr_children
-                         if not (isinstance(c, Token) and str(c) == "=")]
+        # Find the index of the first NAME token, take everything after it
+        name_idx = 0
+        for i, c in enumerate(node.children):
+            if isinstance(c, Token) and c.type == "NAME":
+                name_idx = i
+                break
+        # Expr is everything after the NAME (Lark strips "LET" and "=" keywords)
+        expr_children = node.children[name_idx + 1:]
         expr = self._compile_expr_list(expr_children)
         self._emit(f"{name} = {expr}")
 
@@ -294,11 +299,17 @@ class GSLOpsCompiler:
             return "None"
 
         if d == "negation":
-            inner = self._compile_expr_tree(node.children[0])
+            # Grammar: not_expr: NOT_OP not_expr -> negation
+            # children[0] = NOT_OP token, children[1] = expression tree
+            tree_children = [c for c in node.children if isinstance(c, Tree)]
+            inner = self._compile_expr_tree(tree_children[0]) if tree_children else "None"
             return f"(not {inner})"
 
         if d == "neg":
-            inner = self._compile_expr_tree(node.children[0])
+            # Grammar: factor: MINUS atom -> neg
+            # children[0] = MINUS token, children[1] = atom tree
+            tree_children = [c for c in node.children if isinstance(c, Tree)]
+            inner = self._compile_expr_tree(tree_children[0]) if tree_children else "0"
             return f"(-{inner})"
 
         if d == "func_call":
@@ -356,12 +367,12 @@ class GSLOpsCompiler:
                     if isinstance(ch, Tree)]
             return f"{mapped}({', '.join(args)})"
 
-        # Unknown function — pass through as ctx method
-        if args_node:
-            args = [self._compile_expr_tree(ch) for ch in args_node.children
-                    if isinstance(ch, Tree)]
-            return f"ctx.{func_name}({', '.join(args)})"
-        return f"ctx.{func_name}()"
+        # Unknown function — reject at compile time (security: prevents
+        # calling arbitrary ctx methods like ctx.session())
+        raise ValueError(
+            f"Unknown function '{func_name}' in rule '{self.rule_id}'. "
+            f"Allowed: {', '.join(sorted(FUNC_MAP.keys()))}"
+        )
 
     def _compile_token(self, token: Token) -> str:
         t = str(token)

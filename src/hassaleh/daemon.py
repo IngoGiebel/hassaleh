@@ -44,6 +44,7 @@ DEFAULT_CONFIG = {
     "max_concurrent_actions": 10,
     "health_endpoint_port": 9100,
     "sweep_interval_min": 15,
+    "rule_eval_interval_sec": 60,  # Evaluate rules every 60s (separate from sweep)
     "circuit_breaker_decay_per_sweep": 1,
 }
 
@@ -169,6 +170,8 @@ class HassalehDaemon:
         tick_interval = self.config["tick_interval_ms"] / 1000.0
         sweep_counter = 0
         sweep_interval_ticks = int(self.config["sweep_interval_min"] * 60 / tick_interval)
+        rule_eval_counter = 0
+        rule_eval_interval_ticks = int(self.config["rule_eval_interval_sec"] / tick_interval)
 
         while self.running:
             tick_start = asyncio.get_event_loop().time()
@@ -183,6 +186,14 @@ class HassalehDaemon:
 
                 # Clean up finished workers
                 self._reap_workers()
+
+                # Rule evaluation (configurable interval, default 60s)
+                rule_eval_counter += 1
+                if rule_eval_counter >= rule_eval_interval_ticks and self._compiled_rules:
+                    await asyncio.get_event_loop().run_in_executor(
+                        None, self._evaluate_rules
+                    )
+                    rule_eval_counter = 0
 
                 # Periodic sweep
                 sweep_counter += 1
@@ -474,12 +485,6 @@ class HassalehDaemon:
                 END
             """, decay=decay)
 
-        # Evaluate rules (runs in executor to avoid blocking event loop)
-        if self._compiled_rules:
-            await asyncio.get_event_loop().run_in_executor(
-                None, self._evaluate_rules
-            )
-
         log.info(f"Sweep complete (tick {self.tick_count})")
 
     # ── Worker Management ──
@@ -543,10 +548,19 @@ class HassalehDaemon:
                     """, id=rule_id, python=python_source, version=COMPILER_VERSION)
                 log.info(f"Rule {rule_id}: compiled and cached (v{COMPILER_VERSION})")
 
-            # Compile to Python code object
+            # Compile to Python code object with restricted namespace
             try:
                 code = compile(python_source, f"<rule:{rule_id}>", "exec")
-                ns: dict[str, Any] = {}
+                # Restrict builtins to safe subset (no import, open, exec, eval)
+                safe_builtins = {
+                    "True": True, "False": False, "None": None,
+                    "abs": abs, "min": min, "max": max, "len": len,
+                    "int": int, "float": float, "str": str, "bool": bool,
+                    "round": round, "isinstance": isinstance,
+                    "range": range, "enumerate": enumerate,
+                    "print": print,  # for debugging
+                }
+                ns: dict[str, Any] = {"__builtins__": safe_builtins}
                 exec(code, ns)
                 self._compiled_rules[rule_id] = {
                     "func": ns["evaluate"],
@@ -594,10 +608,17 @@ class HassalehDaemon:
 
         # Resolve conflicting property intents
         if all_property_intents:
-            self._apply_resolved_intents(all_property_intents)
+            # Fetch current values from the graph for ADD/SUB/MUL operations
+            current_values = self._fetch_current_values(session, all_property_intents)
+            self._apply_resolved_intents(all_property_intents, current_values)
 
     def _create_rule_intent(self, session, submit_action, rule_id: str) -> None:
-        """Create an Intent node from a rule's SUBMIT_INTENT action."""
+        """Create an Intent node from a rule's SUBMIT_INTENT action.
+
+        Creates the Intent node, links it to the target Agent via [:PROPOSED]
+        (required for the Daemon's _process_pending_intents query), and
+        links it to the Capability via [:TARGETS].
+        """
         import uuid
         intent_id = str(uuid.uuid4())
 
@@ -608,19 +629,36 @@ class HassalehDaemon:
 
             args_json = json.dumps(submit_action.args) if submit_action.args else None
 
-            session.run("""
-                CREATE (i:Intent {
-                    id: $intent_id,
-                    submitted_at: datetime({timezone: 'UTC'}),
-                    action: 'execute_capability',
-                    value: $args,
-                    lifecycle: 'pending',
-                    source: 'rule',
-                    source_rule: $rule_id
-                })
-            """, intent_id=intent_id, args=args_json, rule_id=rule_id)
+            # Create Intent + PROPOSED link to the target agent in one query
+            if target_id:
+                session.run("""
+                    MATCH (agent:Agent {id: $target_id})
+                    CREATE (agent)-[:PROPOSED]->(i:Intent {
+                        id: $intent_id,
+                        submitted_at: datetime({timezone: 'UTC'}),
+                        action: 'execute_capability',
+                        value: $args,
+                        lifecycle: 'pending',
+                        source: 'rule',
+                        source_rule: $rule_id
+                    })
+                """, intent_id=intent_id, args=args_json,
+                   rule_id=rule_id, target_id=target_id)
+            else:
+                # No target — create orphaned Intent (will need manual linking)
+                session.run("""
+                    CREATE (i:Intent {
+                        id: $intent_id,
+                        submitted_at: datetime({timezone: 'UTC'}),
+                        action: 'execute_capability',
+                        value: $args,
+                        lifecycle: 'pending',
+                        source: 'rule',
+                        source_rule: $rule_id
+                    })
+                """, intent_id=intent_id, args=args_json, rule_id=rule_id)
 
-            # Link to capability
+            # Link to capability via TARGETS
             if submit_action.capability_id:
                 session.run("""
                     MATCH (i:Intent {id: $intent_id})
@@ -629,29 +667,71 @@ class HassalehDaemon:
                 """, intent_id=intent_id, cap_id=submit_action.capability_id)
 
             log.info(f"Rule {rule_id} created Intent {intent_id} "
-                     f"(capability: {submit_action.capability_id})")
+                     f"(capability: {submit_action.capability_id}, "
+                     f"target: {target_id})")
 
         except Exception as e:
             log.error(f"Failed to create rule Intent: {e}")
 
-    def _apply_resolved_intents(self, intents) -> None:
-        """Apply resolved property intents to the graph."""
-        resolved = resolve_intents(intents)
+    def _fetch_current_values(self, session, intents) -> dict:
+        """Fetch current property values from the graph for resolver base values."""
+        current = {}
+        # Collect unique (node_id, property) pairs
+        keys = set()
+        for intent in intents:
+            keys.add((intent.node_id, intent.property))
+
+        for node_id, prop in keys:
+            try:
+                if not prop.isidentifier():
+                    continue
+                if node_id.startswith("4:"):
+                    result = session.run(
+                        f"MATCH (n) WHERE elementId(n) = $nid RETURN n.{prop} AS val",
+                        nid=node_id,
+                    )
+                else:
+                    result = session.run(
+                        f"MATCH (n {{id: $nid}}) RETURN n.{prop} AS val",
+                        nid=node_id,
+                    )
+                record = result.single()
+                if record and record["val"] is not None:
+                    current[(node_id, prop)] = record["val"]
+            except Exception as e:
+                log.warning(f"Could not fetch current value for {node_id}.{prop}: {e}")
+
+        return current
+
+    def _apply_resolved_intents(self, intents, current_values=None) -> None:
+        """Apply resolved property intents to the graph.
+
+        Note: Neo4j does not support parameterized property keys in SET,
+        so we use f-string for the property name. The property name comes
+        from compiled GSL-Ops rules (validated by Lark grammar, only
+        PROP_ACCESS pattern: /[a-zA-Z_]\\w*\\.[a-zA-Z_]\\w*/).
+        """
+        resolved = resolve_intents(intents, current_values or {})
 
         with self.sync_driver.session() as session:
             for (node_id, prop), value in resolved.items():
                 try:
+                    # Validate prop name (defense-in-depth)
+                    if not prop.isidentifier():
+                        log.error(f"Invalid property name '{prop}', skipping")
+                        continue
+
                     # Use element_id if available, otherwise match by id property
                     if node_id.startswith("4:"):  # Neo4j element_id format
-                        session.run("""
-                            MATCH (n) WHERE elementId(n) = $nid
-                            SET n[$prop] = $value
-                        """, nid=node_id, prop=prop, value=value)
+                        session.run(
+                            f"MATCH (n) WHERE elementId(n) = $nid SET n.{prop} = $value",
+                            nid=node_id, value=value,
+                        )
                     else:
-                        session.run("""
-                            MATCH (n {id: $nid})
-                            SET n[$prop] = $value
-                        """, nid=node_id, prop=prop, value=value)
+                        session.run(
+                            f"MATCH (n {{id: $nid}}) SET n.{prop} = $value",
+                            nid=node_id, value=value,
+                        )
                 except Exception as e:
                     log.error(f"Failed to apply property {prop}={value} "
                               f"on node {node_id}: {e}")

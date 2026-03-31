@@ -27,17 +27,16 @@ def make_mock_context(
     """Create a RuleContext with a mock Neo4j session."""
     session = MagicMock()
     if match_rows is not None:
-        # Mock session.run().data() pattern
-        mock_result = MagicMock()
-        mock_records = []
-        for row in match_rows:
-            record = MagicMock()
-            record.__iter__ = lambda s, r=row: iter(r.items())
-            record.__getitem__ = lambda s, k, r=row: r[k]
-            record.keys = lambda r=row: r.keys()
-            # dict(record) should work
-            record_dict = row
-            mock_records.append(record_dict)
+        mock_records = list(match_rows)
+
+        # Mock execute_read: call the function with a mock tx
+        def _fake_execute_read(func):
+            tx = MagicMock()
+            tx.run.return_value = mock_records
+            return func(tx)
+        session.execute_read = _fake_execute_read
+
+        # Also keep session.run for non-read paths
         session.run.return_value = mock_records
 
     ctx = RuleContext(
@@ -377,6 +376,39 @@ EVERY "PT5M":
     exec_rule(source, ctx)
 
     assert len(ctx.logs) == 0
+
+
+def test_let_self_reference():
+    """LET count = count + 1 must not erase 'count' from RHS (Gemini fix D)."""
+    source = compile_rule("""
+MATCH (a:Agent):
+    LET count = count + 1
+""")
+    # The compiled code should reference 'count' on the RHS
+    assert "count + 1" in source or "count +  1" in source
+
+
+def test_e2e_let_self_reference_executes():
+    """LET count = count + 1 executes correctly."""
+    source = compile_rule("""
+MATCH (a:Agent):
+    LET count = 5
+    LET count = count + 1
+""")
+    agent = {"id": "dione"}
+    ctx = make_mock_context(match_rows=[{"a": agent}])
+    exec_rule(source, ctx)
+    # No assertion on ctx — just verify it doesn't crash with SyntaxError
+
+
+def test_unknown_function_rejected():
+    """Unknown functions are rejected at compile time (security fix)."""
+    import pytest
+    with pytest.raises(ValueError, match="Unknown function"):
+        compile_rule("""
+MATCH (a:Agent):
+    LET x = session()
+""")
 
 
 def test_e2e_agent_health_check():

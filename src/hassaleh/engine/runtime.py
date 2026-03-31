@@ -112,12 +112,17 @@ class RuleContext:
     def match(self, cypher_pattern: str, **params) -> list[dict[str, Any]]:
         """Execute a Cypher MATCH and return rows as dicts.
 
-        The Daemon calls this synchronously within its async loop
-        (via run_in_executor or sync Neo4j session).
+        Uses execute_read() to enforce read-only transactions at the
+        Neo4j protocol level, preventing any Cypher injection that
+        attempts write operations (CREATE, DELETE, SET, etc.).
         """
         query = f"MATCH {cypher_pattern} RETURN *"
-        result = self.session.run(query, **params)
-        return [dict(record) for record in result]
+
+        def _read_tx(tx):
+            result = tx.run(query, **params)
+            return [dict(record) for record in result]
+
+        return self.session.execute_read(_read_tx)
 
     # ── Property Access ──
 
@@ -133,7 +138,11 @@ class RuleContext:
         return getattr(node, name, None)
 
     def node_id(self, node: Any) -> str:
-        """Extract the node ID for intent tracking."""
+        """Extract the node ID for intent tracking.
+
+        Raises ValueError if no stable ID can be determined (prevents
+        silent mismatches in the conflict resolver).
+        """
         if hasattr(node, "element_id"):
             return node.element_id
         if isinstance(node, dict):
@@ -141,7 +150,10 @@ class RuleContext:
                 return node["_element_id"]
             if "id" in node:
                 return str(node["id"])
-        return str(id(node))
+        raise ValueError(
+            f"Cannot determine stable node ID for {type(node).__name__}. "
+            f"Node must have 'element_id', '_element_id', or 'id'."
+        )
 
     # ── Property Modification Intents ──
 
