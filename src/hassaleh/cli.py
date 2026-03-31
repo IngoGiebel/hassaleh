@@ -21,6 +21,7 @@ import json
 import logging
 import os
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -445,6 +446,260 @@ def cmd_intent_list(args) -> int:
     return 0
 
 
+# ──────────────────────────────────────────────
+# Report Commands
+# ──────────────────────────────────────────────
+
+def _report_output(data: dict, fmt: str, title: str) -> None:
+    """Output report in requested format."""
+    if fmt == "json":
+        print(json.dumps(data, indent=2, default=str))
+    elif fmt == "markdown":
+        print(f"# {title}\n")
+        for section, content in data.items():
+            print(f"## {section}\n")
+            if isinstance(content, list):
+                for item in content:
+                    if isinstance(item, dict):
+                        print("| " + " | ".join(str(v) for v in item.values()) + " |")
+                    else:
+                        print(f"- {item}")
+            elif isinstance(content, dict):
+                for k, v in content.items():
+                    print(f"- **{k}:** {v}")
+            else:
+                print(str(content))
+            print()
+    else:
+        fmt_header(title)
+        for section, content in data.items():
+            print(fmt_section(section))
+            if isinstance(content, dict):
+                for k, v in content.items():
+                    print(fmt_kv(k, str(v)))
+            elif isinstance(content, list) and content:
+                if isinstance(content[0], dict):
+                    headers = list(content[0].keys())
+                    rows = [[str(item.get(h, "")) for h in headers] for item in content]
+                    print(fmt_table(headers, rows))
+                else:
+                    for item in content:
+                        print(f"    - {item}")
+            else:
+                print(f"    {content}")
+
+
+def cmd_report_agents(args) -> int:
+    """Agent activity report."""
+    conn = get_connection(args)
+    driver = connect(conn)
+
+    with driver.session() as session:
+        # Agent overview
+        result = session.run("""
+            MATCH (a:Agent)
+            OPTIONAL MATCH (a)-[:PROPOSED]->(i:Intent)
+            WITH a,
+                 count(i) AS total_intents,
+                 sum(CASE WHEN i.lifecycle = 'success' THEN 1 ELSE 0 END) AS success,
+                 sum(CASE WHEN i.lifecycle = 'failed' THEN 1 ELSE 0 END) AS failed,
+                 sum(CASE WHEN i.lifecycle = 'rejected' THEN 1 ELSE 0 END) AS rejected
+            RETURN a.id AS id, a.name AS name, a.lifecycle AS lifecycle,
+                   a.last_heartbeat AS last_hb, a.restart_count_1h AS restarts,
+                   total_intents, success, failed, rejected
+            ORDER BY a.name
+        """)
+        agents = [dict(r) for r in result]
+
+    driver.close()
+
+    data = {
+        "Agents": [{
+            "Name": a.get("name", a["id"]),
+            "Lifecycle": a.get("lifecycle", "?"),
+            "Heartbeat": str(a.get("last_hb", "—")),
+            "Restarts": str(a.get("restarts", 0)),
+            "Intents": str(a.get("total_intents", 0)),
+            "Success": str(a.get("success", 0)),
+            "Failed": str(a.get("failed", 0)),
+            "Rejected": str(a.get("rejected", 0)),
+        } for a in agents]
+    }
+
+    _report_output(data, args.format, "Agent Activity Report")
+    return 0
+
+
+def cmd_report_rules(args) -> int:
+    """Rule evaluation report."""
+    conn = get_connection(args)
+    driver = connect(conn)
+
+    with driver.session() as session:
+        # Rules overview
+        result = session.run("""
+            MATCH (r:Rule)
+            RETURN r.id AS id, r.name AS name, r.lifecycle AS lifecycle,
+                   r.priority AS priority, r.compiler_version AS cv,
+                   r.compiled_at AS compiled_at
+            ORDER BY r.priority ASC
+        """)
+        rules = [dict(r) for r in result]
+
+        # Count rule-generated intents
+        result = session.run("""
+            MATCH (i:Intent {source: 'rule'})
+            RETURN i.source_rule AS rule_id,
+                   count(i) AS total,
+                   sum(CASE WHEN i.lifecycle = 'success' THEN 1 ELSE 0 END) AS success,
+                   sum(CASE WHEN i.lifecycle = 'pending' THEN 1 ELSE 0 END) AS pending
+        """)
+        intent_stats = {r["rule_id"]: dict(r) for r in result}
+
+    driver.close()
+
+    data = {
+        "Rules": [{
+            "Name": r.get("name", r["id"]),
+            "Priority": str(r.get("priority", "?")),
+            "Status": r.get("lifecycle", "?"),
+            "Compiler": r.get("cv", "—"),
+            "Intents Created": str(intent_stats.get(r["id"], {}).get("total", 0)),
+            "Pending": str(intent_stats.get(r["id"], {}).get("pending", 0)),
+        } for r in rules]
+    }
+
+    _report_output(data, args.format, "Rule Evaluation Report")
+    return 0
+
+
+def cmd_report_intents(args) -> int:
+    """Intent statistics report."""
+    conn = get_connection(args)
+    driver = connect(conn)
+
+    with driver.session() as session:
+        # Overall stats
+        result = session.run("""
+            MATCH (i:Intent)
+            RETURN i.lifecycle AS lifecycle, count(i) AS count
+            ORDER BY count DESC
+        """)
+        by_lifecycle = {r["lifecycle"]: r["count"] for r in result}
+
+        # By source
+        result = session.run("""
+            MATCH (i:Intent)
+            RETURN coalesce(i.source, 'agent') AS source, count(i) AS count
+        """)
+        by_source = {r["source"]: r["count"] for r in result}
+
+        # Recent failures
+        result = session.run("""
+            MATCH (i:Intent {lifecycle: 'failed'})
+            RETURN i.id AS id, i.error_reason AS error, i.source_rule AS rule,
+                   i.completed_at AS completed
+            ORDER BY i.completed_at DESC
+            LIMIT 5
+        """)
+        failures = [dict(r) for r in result]
+
+    driver.close()
+
+    total = sum(by_lifecycle.values())
+    success_rate = f"{by_lifecycle.get('success', 0) / total * 100:.0f}%" if total else "—"
+
+    data = {
+        "Summary": {
+            "Total Intents": total,
+            "Success Rate": success_rate,
+        },
+        "By Lifecycle": by_lifecycle,
+        "By Source": by_source,
+        "Recent Failures": [{
+            "ID": f["id"][:12] + "…",
+            "Error": (f.get("error") or "—")[:50],
+            "Rule": f.get("rule", "—"),
+        } for f in failures] if failures else "None",
+    }
+
+    _report_output(data, args.format, "Intent Statistics")
+    return 0
+
+
+def cmd_report_daily(args) -> int:
+    """Combined daily summary."""
+    conn = get_connection(args)
+    driver = connect(conn)
+
+    with driver.session() as session:
+        # Daemon health
+        health_data = {}
+        try:
+            import urllib.request
+            with urllib.request.urlopen(HEALTH_URL, timeout=3) as resp:
+                health_data = json.loads(resp.read())
+        except Exception:
+            health_data = {"status": "unreachable"}
+
+        # Agent count
+        result = session.run("MATCH (a:Agent) RETURN count(a) AS c")
+        agent_count = result.single()["c"]
+
+        # Active agents
+        result = session.run("""
+            MATCH (a:Agent {lifecycle: 'running'})
+            RETURN a.id AS id, a.name AS name
+        """)
+        active_agents = [f"{r['name'] or r['id']}" for r in result]
+
+        # Rule count
+        result = session.run("MATCH (r:Rule {lifecycle: 'available'}) RETURN count(r) AS c")
+        rule_count = result.single()["c"]
+
+        # Today's intents
+        result = session.run("""
+            MATCH (i:Intent)
+            WHERE i.submitted_at >= datetime({timezone: 'UTC'}) - duration('P1D')
+            RETURN i.lifecycle AS lifecycle, count(i) AS count
+        """)
+        today_intents = {r["lifecycle"]: r["count"] for r in result}
+
+        # Today's alerts (from rule-generated intents)
+        result = session.run("""
+            MATCH (i:Intent {source: 'rule'})
+            WHERE i.submitted_at >= datetime({timezone: 'UTC'}) - duration('P1D')
+            RETURN count(i) AS c
+        """)
+        today_alerts = result.single()["c"]
+
+    driver.close()
+
+    data = {
+        "Daemon": {
+            "Status": health_data.get("status", "?"),
+            "Uptime": f"{health_data.get('uptime_seconds', '?')}s",
+            "Rules Loaded": str(health_data.get("rules_loaded", "?")),
+            "Bridge": health_data.get("openclaw_bridge", "?"),
+        },
+        "Agents": {
+            "Total": agent_count,
+            "Active": ", ".join(active_agents) if active_agents else "None",
+        },
+        "Rules": {
+            "Available": rule_count,
+        },
+        "Today's Activity": {
+            "Intents (24h)": sum(today_intents.values()),
+            "By Status": today_intents if today_intents else "None",
+            "Rule-Generated": today_alerts,
+        },
+    }
+
+    _report_output(data, args.format, f"Daily Summary — {datetime.now(timezone.utc).strftime('%Y-%m-%d')}")
+    return 0
+
+
 def cmd_heartbeat(args) -> int:
     """Send agent heartbeat — updates last_heartbeat + lifecycle in graph."""
     conn = get_connection(args)
@@ -561,6 +816,20 @@ def build_parser() -> argparse.ArgumentParser:
     hb_parser = sub.add_parser("heartbeat", help="Send agent heartbeat to graph")
     hb_parser.add_argument("agent_id", help="Agent ID")
 
+    # report
+    report_parser = sub.add_parser("report", help="Generate reports")
+    report_sub = report_parser.add_subparsers(dest="report_command")
+
+    rp_agents = report_sub.add_parser("agents", help="Agent activity report")
+    rp_rules = report_sub.add_parser("rules", help="Rule evaluation report")
+    rp_intents = report_sub.add_parser("intents", help="Intent statistics")
+    rp_daily = report_sub.add_parser("daily", help="Combined daily summary")
+
+    for rp in [rp_agents, rp_rules, rp_intents, rp_daily]:
+        rp.add_argument("--format", choices=["text", "json", "markdown"],
+                        default="text", help="Output format")
+        rp.add_argument("--days", type=int, default=1, help="Lookback period in days")
+
     return parser
 
 
@@ -582,6 +851,24 @@ def main() -> int:
         "approve": cmd_approve,
         "heartbeat": cmd_heartbeat,
     }
+
+    # Report subcommands
+    if args.command == "report":
+        report_handlers = {
+            "agents": cmd_report_agents,
+            "rules": cmd_report_rules,
+            "intents": cmd_report_intents,
+            "daily": cmd_report_daily,
+        }
+        handler = report_handlers.get(args.report_command)
+        if not handler:
+            print("Usage: hassaleh report {agents|rules|intents|daily}")
+            return 1
+        try:
+            return handler(args)
+        except Exception as e:
+            print(fmt_error(str(e)))
+            return 1
 
     if args.command in commands:
         try:

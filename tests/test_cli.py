@@ -131,6 +131,29 @@ def test_parser_global_flags():
     assert args.command == "status"
 
 
+def test_parser_report_daily():
+    parser = build_parser()
+    args = parser.parse_args(["report", "daily", "--format", "json", "--days", "7"])
+    assert args.command == "report"
+    assert args.report_command == "daily"
+    assert args.format == "json"
+    assert args.days == 7
+
+
+def test_parser_report_agents():
+    parser = build_parser()
+    args = parser.parse_args(["report", "agents", "--format", "markdown"])
+    assert args.report_command == "agents"
+    assert args.format == "markdown"
+
+
+def test_parser_report_intents():
+    parser = build_parser()
+    args = parser.parse_args(["report", "intents"])
+    assert args.report_command == "intents"
+    assert args.format == "text"  # default
+
+
 def test_parser_no_command():
     parser = build_parser()
     args = parser.parse_args([])
