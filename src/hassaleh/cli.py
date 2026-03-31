@@ -95,6 +95,9 @@ def cmd_status(args) -> int:
         print(fmt_kv("Ticks", str(health["tick_count"])))
         print(fmt_kv("Active Workers", str(health["active_workers"])))
         print(fmt_kv("Schema", health.get("schema_version", "?")))
+        print(fmt_kv("Rules loaded", str(health.get("rules_loaded", "?"))))
+        print(fmt_kv("OpenClaw Bridge", health.get("openclaw_bridge", "?")))
+        print(fmt_kv("Notifications", health.get("notifications", "?")))
     except Exception as e:
         print(fmt_section("Daemon"))
         print(fmt_kv("Status", fmt_error("UNREACHABLE")))
@@ -442,6 +445,31 @@ def cmd_intent_list(args) -> int:
     return 0
 
 
+def cmd_heartbeat(args) -> int:
+    """Send agent heartbeat — updates last_heartbeat + lifecycle in graph."""
+    conn = get_connection(args)
+    driver = connect(conn)
+
+    with driver.session() as session:
+        result = session.run("""
+            MATCH (a:Agent {id: $id})
+            SET a.last_heartbeat = datetime({timezone: 'UTC'}),
+                a.lifecycle = 'running'
+            RETURN a.id AS id, a.name AS name
+        """, id=args.agent_id)
+        record = result.single()
+
+        if not record:
+            print(fmt_error(f"Agent '{args.agent_id}' not found"))
+            driver.close()
+            return 1
+
+        print(fmt_ok(f"Heartbeat: {record.get('name', args.agent_id)} @ UTC now"))
+
+    driver.close()
+    return 0
+
+
 def cmd_approve(args) -> int:
     """Approve an awaiting_approval intent."""
     conn = get_connection(args)
@@ -529,6 +557,10 @@ def build_parser() -> argparse.ArgumentParser:
     approve_parser = sub.add_parser("approve", help="Approve an intent")
     approve_parser.add_argument("intent_id", help="Intent ID")
 
+    # heartbeat (for agents to report they're alive)
+    hb_parser = sub.add_parser("heartbeat", help="Send agent heartbeat to graph")
+    hb_parser.add_argument("agent_id", help="Agent ID")
+
     return parser
 
 
@@ -548,6 +580,7 @@ def main() -> int:
         "status": cmd_status,
         "init": cmd_init,
         "approve": cmd_approve,
+        "heartbeat": cmd_heartbeat,
     }
 
     if args.command in commands:

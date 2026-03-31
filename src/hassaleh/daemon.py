@@ -26,6 +26,8 @@ from neo4j import AsyncGraphDatabase, GraphDatabase
 from hassaleh.engine.compiler import compile_rule, COMPILER_VERSION
 from hassaleh.engine.runtime import RuleContext
 from hassaleh.engine.resolver import resolve_intents
+from hassaleh.bridge.openclaw import OpenClawBridge
+from hassaleh.bridge.notifications import NotificationDispatcher
 
 logging.basicConfig(
     level=logging.INFO,
@@ -73,6 +75,10 @@ class HassalehDaemon:
         self._watchdog_usec: int = 0  # systemd watchdog interval (0 = disabled)
         self._compiled_rules: dict[str, Any] = {}  # rule_id → compiled function
         self._rule_last_run: dict[str, datetime] = {}  # rule_id → last execution time
+        self._bridge: OpenClawBridge | None = None  # OpenClaw bridge (optional)
+        self._notifier: NotificationDispatcher | None = None
+        self._pending_alerts: list = []  # Alerts from rule evaluation (dispatched async)
+        self._pending_error_logs: list = []
 
     # ── Lifecycle ──
 
@@ -116,6 +122,9 @@ class HassalehDaemon:
         # Start health endpoint
         await self._start_health_endpoint()
 
+        # Initialize OpenClaw bridge (optional — works without it)
+        await self._init_bridge()
+
         # Initialize watchdog
         self._init_watchdog()
 
@@ -153,6 +162,10 @@ class HassalehDaemon:
 
         # Stop health endpoint
         await self._stop_health_endpoint()
+
+        # Close OpenClaw bridge
+        if self._bridge:
+            await self._bridge.__aexit__(None, None, None)
 
         # Close Neo4j
         if self.sync_driver:
@@ -194,6 +207,19 @@ class HassalehDaemon:
                         None, self._evaluate_rules
                     )
                     rule_eval_counter = 0
+
+                    # Dispatch accumulated alerts/error logs via OpenClaw
+                    if self._notifier and (self._pending_alerts or self._pending_error_logs):
+                        try:
+                            sent = await self._notifier.dispatch_all(
+                                self._pending_alerts, self._pending_error_logs
+                            )
+                            if sent:
+                                log.info(f"Dispatched {sent} notification(s)")
+                        except Exception as e:
+                            log.error(f"Notification dispatch failed: {e}")
+                        self._pending_alerts.clear()
+                        self._pending_error_logs.clear()
 
                 # Periodic sweep
                 sweep_counter += 1
@@ -497,6 +523,55 @@ class HassalehDaemon:
             if task.exception():
                 log.error(f"Worker {k} raised: {task.exception()}")
 
+    # ── OpenClaw Bridge ──
+
+    async def _init_bridge(self) -> None:
+        """Initialize the OpenClaw Gateway bridge (optional).
+
+        Reads gateway URL and token from DaemonConfig or env vars.
+        If not configured, the Daemon works without OpenClaw integration.
+        """
+        gateway_url = os.environ.get(
+            "OPENCLAW_GATEWAY_URL",
+            self.config.get("openclaw_gateway_url", ""),
+        )
+        gateway_token = os.environ.get(
+            "OPENCLAW_GATEWAY_TOKEN",
+            self.config.get("openclaw_gateway_token", ""),
+        )
+        notify_target = os.environ.get(
+            "HASSALEH_NOTIFY_TARGET",
+            self.config.get("notify_target", ""),
+        )
+        notify_channel = os.environ.get(
+            "HASSALEH_NOTIFY_CHANNEL",
+            self.config.get("notify_channel", "telegram"),
+        )
+
+        if not gateway_url or not gateway_token:
+            log.info("OpenClaw bridge not configured (set OPENCLAW_GATEWAY_URL + OPENCLAW_GATEWAY_TOKEN)")
+            return
+
+        self._bridge = OpenClawBridge(gateway_url, gateway_token)
+        await self._bridge.__aenter__()
+
+        # Test connectivity
+        if await self._bridge.is_healthy():
+            log.info(f"OpenClaw bridge connected: {gateway_url}")
+        else:
+            log.warning(f"OpenClaw bridge configured but unreachable: {gateway_url}")
+
+        # Set up notification dispatcher
+        if notify_target:
+            self._notifier = NotificationDispatcher(
+                bridge=self._bridge,
+                default_channel=notify_channel,
+                default_target=notify_target,
+            )
+            log.info(f"Notifications → {notify_channel}:{notify_target}")
+        else:
+            log.info("Notification target not configured (set HASSALEH_NOTIFY_TARGET)")
+
     # ── Rule Engine ──
 
     async def _load_rules(self) -> None:
@@ -599,6 +674,12 @@ class HassalehDaemon:
                     # Process submit_intent actions (create Intent nodes)
                     for si in ctx.submit_intents:
                         self._create_rule_intent(session, si, rule_id)
+
+                    # Accumulate alerts and error logs for async dispatch
+                    self._pending_alerts.extend(ctx.alerts)
+                    for l in ctx.logs:
+                        if l.level == "error":
+                            self._pending_error_logs.append(l)
 
                     # Update last run time
                     self._rule_last_run[rule_id] = now
@@ -815,6 +896,9 @@ class HassalehDaemon:
             "pending_intents": pending_intents,
             "active_workers": len(self.active_workers),
             "agents_running": agents_running,
+            "rules_loaded": len(self._compiled_rules),
+            "openclaw_bridge": "connected" if self._bridge else "not configured",
+            "notifications": "enabled" if self._notifier else "disabled",
             "schema_version": "1.2",
         }
         return web.json_response(data)
