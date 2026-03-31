@@ -331,6 +331,18 @@
 - Sequential/parallel/supervised task execution modes
 - Workspace permission management (auto-assign on project join)
 
+### Sprint N: Skill Domain Taxonomy
+
+**Goal:** Organize skills into hierarchical problem domains for discovery, permissions, and ecosystem organization.
+
+- Define domain taxonomy (dot-notation: `orchestration.rules`, `data.graph`, `reporting.activity`, etc.)
+- Add `domain` property to Capability nodes + Neo4j index for prefix queries
+- `hassaleh skill list --domain orchestration` — filter skills by domain
+- `hassaleh skill search <query>` — semantic skill discovery across domains
+- Domain-scoped project permissions: restrict available skill domains per project
+- Conflict resolution: domain specificity determines priority when multiple skills match
+- Documentation: domain taxonomy reference, guidelines for external skill authors
+
 ### Sprint N: List Types + FOREACH
 
 **Goal:** Add list/collection types to GSL-Ops and a `FOREACH var:` iteration construct.
