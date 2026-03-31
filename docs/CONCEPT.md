@@ -558,6 +558,17 @@ A declarative rule governing agent behavior within a project. Uses GSL-Ops (dete
 
 **Resolution order:** SET → ADD/SUB → MUL. SET operations resolve by priority first, then additive modifications are summed (commutative), then multiplicative modifiers scale the result.
 
+**Rule Governance:**
+
+Rules are authored and modified interactively by the responsible human operator, with the agent acting as an intelligent assistant in the process. The key principles:
+
+1. **Human authority:** Only the human admin (via `neo4j` user or `hassaleh rule` CLI) can create, modify, or deactivate Rule nodes. Agents cannot modify rules — they have read-only graph access.
+2. **Interactive authoring:** Hassaleh includes a **Rule Authoring Skill** that guides the operator through rule creation in natural language. The agent helps translate operational intent ("restart agents that haven't checked in for 5 minutes, but stop after 5 retries") into valid GSL-Ops syntax, compiles it, and shows the generated Python for review before committing to the graph.
+3. **Auditability:** Every Rule node tracks `author`, `version`, `compiled_at`, and `compiler_version`. The `hassaleh rule compile --dry-run` command lets operators inspect generated code without affecting the running system.
+4. **Runtime modifiability:** Rules can be updated at any time. The Daemon detects version/compiler mismatches on the next evaluation cycle and automatically recompiles from the authoritative `rule_text`.
+5. **HITL safety net:** Capabilities can be marked `requires_confirmation: true`, which parks Intents in `awaiting_approval` state until a human approves them via `hassaleh approve <id>`. This provides a circuit breaker for sensitive operations that rules might trigger.
+6. **Graceful override:** Any rule can be deactivated by setting `lifecycle: 'disabled'` without deleting it. The `hassaleh rule list` CLI shows all rules including disabled ones for full transparency.
+
 **Relationships:**
 ```
 (Project)-[:GOVERNED_BY]->(Rule)
