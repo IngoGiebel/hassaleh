@@ -167,13 +167,60 @@
 
 ### Sprint 3: CLI
 
-**Goal:** `hassaleh` command-line interface for operators and admins.
+**Goal:** `hassaleh` command-line interface for operators and admins. Single entry point for all Hassaleh management.
 
-- `hassaleh init` — initialize Neo4j schema + seed data
-- `hassaleh status` — show Daemon health, agent states, pending Intents
-- `hassaleh report` — generate project/agent activity report
-- `hassaleh approve <intent-id>` — HITL approval for sensitive actions
-- `hassaleh agent list/start/stop`
+**Lead:** Dione 🌙
+**Team:** Codex (development), Claude Code (review)
+**Duration:** ~1.5 weeks
+
+### Phase 1: Core CLI Framework
+
+| # | Task | Assignee | Reviewer | Status |
+|---|------|----------|----------|--------|
+| 1.1 | CLI entry point (`src/hassaleh/cli.py`) — argparse/click, subcommand routing | Dione | Codex | ⬜ todo |
+| 1.2 | `hassaleh init` — apply schema.cypher + seed.cypher + seed_rules.cypher to a Neo4j instance | Dione | — | ⬜ todo |
+| 1.3 | `hassaleh status` — show Daemon health (via /health endpoint), Neo4j connectivity, agent states, pending intents, loaded rules | Dione | — | ⬜ todo |
+| 1.4 | Connection config — `--uri`, `--user`, `--password` flags + env vars + config file (`~/.hassaleh/config.toml`) | Dione | — | ⬜ todo |
+
+### Phase 2: Operational Commands
+
+| # | Task | Assignee | Reviewer | Status |
+|---|------|----------|----------|--------|
+| 2.1 | `hassaleh agent list` — show all agents with lifecycle, last heartbeat, capabilities | Dione | — | ⬜ todo |
+| 2.2 | `hassaleh agent info <id>` — detailed agent view (tasks, intents, capabilities) | Dione | — | ⬜ todo |
+| 2.3 | `hassaleh rule list` — show all rules with lifecycle, priority, last evaluation | Dione | — | ⬜ todo |
+| 2.4 | `hassaleh rule compile <id>` — force-recompile a rule and show the generated Python | Dione | — | ⬜ todo |
+| 2.5 | `hassaleh intent list` — show recent intents (filterable by lifecycle, agent, source) | Dione | — | ⬜ todo |
+| 2.6 | `hassaleh approve <intent-id>` — HITL approval for awaiting_approval intents | Dione | — | ⬜ todo |
+
+### Phase 3: Packaging + Testing
+
+| # | Task | Assignee | Reviewer | Status |
+|---|------|----------|----------|--------|
+| 3.1 | pyproject.toml `[project.scripts]` entry point → `hassaleh` command | Dione | — | ⬜ todo |
+| 3.2 | Unit tests for CLI output formatting (mocked Neo4j) | Codex | Dione | ⬜ todo |
+| 3.3 | Integration test: `hassaleh init` + `hassaleh status` against test1 DBMS | Dione | — | ⬜ todo |
+| 3.4 | `hassaleh --help` and subcommand help texts | Dione | — | ⬜ todo |
+
+### Sprint 3 Acceptance Criteria
+
+- [ ] `hassaleh init` creates schema + seed data on a fresh Neo4j instance
+- [ ] `hassaleh status` shows Daemon health, agents, rules, pending intents
+- [ ] `hassaleh agent list/info` shows agent details
+- [ ] `hassaleh rule list/compile` shows rules and generated Python
+- [ ] `hassaleh intent list` shows recent intents with filters
+- [ ] `hassaleh approve` transitions intents from awaiting_approval → pending
+- [ ] All commands handle connection errors gracefully
+- [ ] `pip install -e .` makes `hassaleh` available as a command
+- [ ] Tests cover core formatting and error handling
+
+### Sprint 3 Deliverables
+
+| File | Description |
+|------|-------------|
+| `src/hassaleh/cli.py` | Main CLI module (argparse + subcommands) |
+| `src/hassaleh/cli_fmt.py` | Output formatting (tables, colors) |
+| `tests/test_cli.py` | CLI unit tests |
 
 ### Sprint 4: OpenClaw Integration
 
@@ -201,6 +248,16 @@
 - Discussion nodes with voting + leader decision
 - Sequential/parallel/supervised task execution modes
 - Workspace permission management (auto-assign on project join)
+
+### Sprint N: List Types + FOREACH
+
+**Goal:** Add list/collection types to GSL-Ops and a `FOREACH var:` iteration construct.
+
+- Define list literal syntax (e.g. `[a, b, c]`) and list-returning functions
+- `FOREACH item IN collection:` block — iterates over lists from MATCH results, properties, or expressions
+- Type system extension: lists as first-class values in LET bindings
+- Prerequisite: Decide on list representation in Neo4j (native lists vs. relationship chains)
+- Use cases: "Reset all failed tasks", "Notify all agents with capability X", "Iterate agent capabilities"
 
 ### Sprint 7: Docker Dev-Environment
 
