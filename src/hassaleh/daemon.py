@@ -626,18 +626,20 @@ class HassalehDaemon:
             # Compile to Python code object with restricted namespace
             try:
                 code = compile(python_source, f"<rule:{rule_id}>", "exec")
-                # Restrict builtins to safe subset (no open, exec, eval)
-                # __import__ is needed for the compiled rule's import statement
+                # Restrict builtins — NO __import__ (prevents loading
+                # arbitrary modules). RuleContext is pre-injected.
                 safe_builtins = {
-                    "__import__": __import__,  # Required for 'from hassaleh.engine.runtime import ...'
                     "True": True, "False": False, "None": None,
                     "abs": abs, "min": min, "max": max, "len": len,
                     "int": int, "float": float, "str": str, "bool": bool,
                     "round": round, "isinstance": isinstance,
-                    "range": range, "enumerate": enumerate,
-                    "print": print,  # for debugging
+                    "range": range, "enumerate": enumerate, "sorted": sorted,
+                    "list": list, "print": print,
                 }
-                ns: dict[str, Any] = {"__builtins__": safe_builtins}
+                ns: dict[str, Any] = {
+                    "__builtins__": safe_builtins,
+                    "RuleContext": RuleContext,  # Pre-injected, no import needed
+                }
                 exec(code, ns)
                 self._compiled_rules[rule_id] = {
                     "func": ns["evaluate"],
@@ -757,32 +759,55 @@ class HassalehDaemon:
             log.error(f"Failed to create rule Intent: {e}")
 
     def _fetch_current_values(self, session, intents) -> dict:
-        """Fetch current property values from the graph for resolver base values."""
+        """Fetch current property values from the graph for resolver base values.
+
+        Uses batched queries grouped by property name to avoid N+1 overhead.
+        Neo4j doesn't support parameterized property keys, so we group by
+        property and issue one query per unique property name.
+        """
         current = {}
         # Collect unique (node_id, property) pairs
         keys = set()
         for intent in intents:
             keys.add((intent.node_id, intent.property))
 
+        # Group by property name for batched queries
+        from collections import defaultdict
+        by_prop: dict[str, list[str]] = defaultdict(list)
         for node_id, prop in keys:
+            if prop.isidentifier():
+                by_prop[prop].append(node_id)
+
+        for prop, node_ids in by_prop.items():
             try:
-                if not prop.isidentifier():
-                    continue
-                if node_id.startswith("4:"):
+                # Separate element_ids from string ids
+                elem_ids = [nid for nid in node_ids if nid.startswith("4:")]
+                str_ids = [nid for nid in node_ids if not nid.startswith("4:")]
+
+                if elem_ids:
                     result = session.run(
-                        f"MATCH (n) WHERE elementId(n) = $nid RETURN n.{prop} AS val",
-                        nid=node_id,
+                        f"UNWIND $ids AS nid "
+                        f"MATCH (n) WHERE elementId(n) = nid "
+                        f"RETURN elementId(n) AS id, n.{prop} AS val",
+                        ids=elem_ids,
                     )
-                else:
+                    for record in result:
+                        if record["val"] is not None:
+                            current[(record["id"], prop)] = record["val"]
+
+                if str_ids:
                     result = session.run(
-                        f"MATCH (n {{id: $nid}}) RETURN n.{prop} AS val",
-                        nid=node_id,
+                        f"UNWIND $ids AS nid "
+                        f"MATCH (n {{id: nid}}) "
+                        f"RETURN n.id AS id, n.{prop} AS val",
+                        ids=str_ids,
                     )
-                record = result.single()
-                if record and record["val"] is not None:
-                    current[(node_id, prop)] = record["val"]
+                    for record in result:
+                        if record["val"] is not None:
+                            current[(record["id"], prop)] = record["val"]
+
             except Exception as e:
-                log.warning(f"Could not fetch current value for {node_id}.{prop}: {e}")
+                log.warning(f"Batch fetch for property '{prop}' failed: {e}")
 
         return current
 

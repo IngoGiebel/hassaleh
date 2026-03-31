@@ -13,10 +13,13 @@ Reference: docs/CONCEPT.md v1.2, Section 4.14
 
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from typing import Any
 
 from hassaleh.engine.runtime import PropertyOp, RuleIntent
+
+log = logging.getLogger("hassaleh.engine.resolver")
 
 
 def resolve_intents(
@@ -58,6 +61,15 @@ def resolve_intents(
         # 1. SET: lowest priority wins
         if sets:
             winner = min(sets, key=lambda i: i.priority)
+            # Warn on ambiguous same-priority SET conflicts
+            same_prio = [s for s in sets if s.priority == winner.priority]
+            if len(same_prio) > 1:
+                rule_ids = [s.rule_id for s in same_prio]
+                log.warning(
+                    f"SET conflict on ({key[0]}, {key[1]}): "
+                    f"{len(same_prio)} rules at priority {winner.priority} "
+                    f"({rule_ids}). Winner: {winner.rule_id}"
+                )
             current = winner.value
 
         # 2. ADD/SUB: all applied (commutative)

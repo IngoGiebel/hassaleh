@@ -35,11 +35,11 @@ class GSLOpsCompiler:
         self._indent = 0
         self._lines = []
 
-        # Header
-        self._emit("from hassaleh.engine.runtime import RuleContext")
+        # Header — no import statement; RuleContext is pre-injected into
+        # the exec() namespace by the Daemon to avoid needing __import__
         self._emit("")
         self._emit("")
-        self._emit("def evaluate(ctx: RuleContext) -> None:")
+        self._emit("def evaluate(ctx) -> None:")
         self._indent = 1
         self._emit(f'"""Compiled from GSL-Ops rule: {self.rule_id}"""')
 

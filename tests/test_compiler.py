@@ -67,8 +67,7 @@ def test_compile_produces_python():
 MATCH (a:Agent):
     LET x = 42
 """, rule_id="test-1")
-    assert "def evaluate(ctx:" in source
-    assert "RuleContext" in source
+    assert "def evaluate(ctx)" in source
     # Should be valid Python
     compile(source, "<test>", "exec")
 
