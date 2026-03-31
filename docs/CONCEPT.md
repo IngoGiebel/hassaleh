@@ -8,7 +8,8 @@
 *Revised: 2026-03-29 — v1.0: Final review: Capability merge, consistency fixes, graceful shutdown, UTC mandate, Docker dev-env*
 *Revised: 2026-03-29 — v1.1: Consistency audit: 15 fixes (renumbering, cross-refs, terminology, datetime UTC, relationships)*
 *Revised: 2026-03-29 — v1.2: Final 8 fixes from audit + version renaming*
-*Status: v1.2 — Implementation-ready (GO)*
+*Revised: 2026-03-31 — v1.3: GSL-Ops language reference (FOREACH, lists, functions), OpenClaw Bridge, conflict resolution details*
+*Status: v1.3 — Sprint 4 complete*
 
 ---
 
@@ -555,11 +556,145 @@ A declarative rule governing agent behavior within a project. Uses GSL-Ops (dete
 
 **Conflict resolution:** When multiple rules target the same property on the same node, the rule with the **lowest priority number wins** (priority 1 overrides priority 10). For additive/modifier operations (numeric), the GWW3-style commutative reducer is used. For absolute state assignments (enums like `lifecycle`), the highest-priority rule wins.
 
+**Resolution order:** SET → ADD/SUB → MUL. SET operations resolve by priority first, then additive modifications are summed (commutative), then multiplicative modifiers scale the result.
+
 **Relationships:**
 ```
 (Project)-[:GOVERNED_BY]->(Rule)
 (Rule)-[:APPLIES_TO]->(Agent)
 ```
+
+---
+
+### 4.14.1 GSL-Ops Language Reference
+
+GSL-Ops (Graph Symbolic Logic — Operations) is a deterministic subset of GSL, designed for agent orchestration rules. It compiles to Python and executes in a sandboxed `RuleContext`.
+
+**Origin:** Ported from the GWW3 game engine's GSL language (v3), stripped of distributions, truth values, and randomness.
+
+**Parser:** Lark (Earley) with PythonIndenter for Python-style indentation blocks.
+
+#### Block Statements
+
+```
+MATCH (a:Agent {lifecycle: 'running'}):
+    # Body executes for each matching row from Neo4j
+    LET name = a.name
+
+IF condition:
+    # Conditional execution
+    ...
+ELIF other_condition:
+    ...
+ELSE:
+    ...
+
+EVERY "PT5M":
+    # Schedule-triggered block — fires when interval has elapsed since last run
+    # Supports ISO 8601 ("PT5M", "P1D") and shorthands (5m, 1h, 30s)
+    ...
+
+FOREACH item IN collection:
+    # Iterate over a list, property, or function result
+    # collection can be: list literal, node property, RANGE(), KEYS()
+    ...
+```
+
+#### Simple Statements
+
+```
+LET x = expression                     # Variable binding
+
+target.property = expression            # SET (direct assignment)
+target.property += expression           # ADD (additive)
+target.property -= expression           # SUB (subtractive)
+target.property *= expression           # MUL (multiplicative)
+
+SUBMIT_INTENT "capability_id" ON target                      # Create Intent
+SUBMIT_INTENT "capability_id" ON target WITH {key: value}    # With arguments
+
+LOG "message"                           # Structured log (default: info)
+LOG "message" LEVEL "warning"           # With explicit level
+
+ALERT "message"                         # Notification (dispatched via bridge)
+ALERT "message" ON target               # With target context
+```
+
+#### Expressions
+
+```
+# Arithmetic: +, -, *, /, %
+# Comparison: ==, !=, >, <, >=, <=, in, not in
+# Logical: &&, ||, !, and, or, not
+# Literals: 42, 3.14, "string", true, false, null, None
+# Property access: node.property
+# List literals: [a, b, c], []
+# Function calls: NOW(), DURATION("PT5M"), MIN(a, b), MAX(a, b)
+#                 ABS(x), CLAMP(x, lo, hi), LEN(x)
+#                 STR(x), INT(x), FLOAT(x)
+#                 RANGE(start, end), KEYS(node), SORTED(list), LIST(x)
+```
+
+#### Example: Agent Health Check with Circuit Breaker
+
+```
+EVERY "PT5M":
+    MATCH (a:Agent {lifecycle: 'running'}):
+        IF a.last_heartbeat < NOW() - DURATION("PT5M"):
+            IF a.restart_count_1h < 5:
+                a.restart_count_1h += 1
+                SUBMIT_INTENT "restart_agent" ON a
+                LOG "Restarting unresponsive agent" LEVEL "warning"
+            ELSE:
+                a.lifecycle = "circuit_broken"
+                ALERT "Circuit breaker: agent exceeded restart limit" ON a
+                LOG "Circuit breaker triggered" LEVEL "error"
+```
+
+#### Example: Bulk Retry Failed Tasks
+
+```
+EVERY "PT10M":
+    MATCH (t:Task {lifecycle: 'failed'}):
+        FOREACH reason IN ["timeout", "crash", "oom"]:
+            IF t.error_reason == reason:
+                IF t.retry_count < 3:
+                    t.lifecycle = "pending"
+                    t.retry_count += 1
+                    LOG "Retrying task" LEVEL "info"
+```
+
+#### Compilation Pipeline
+
+```
+GSL-Ops text → Lark parse (Earley + PythonIndenter) → AST
+    → GSLOpsCompiler → Python source → compile() → exec(code, safe_builtins)
+    → evaluate(ctx: RuleContext)
+```
+
+- Compiled Python is cached in the Rule node's `compiled_python` property
+- `compiler_version` tracks staleness — version mismatch triggers recompilation
+- `exec()` runs in a restricted namespace (no `open`, `eval`, `exec`)
+- `ctx.match()` uses Neo4j read-only transactions (`execute_read()`)
+
+---
+
+### 4.14.2 OpenClaw Bridge
+
+The Hassaleh Daemon integrates with an OpenClaw Gateway running on the same host.
+
+**Communication:** HTTP API (localhost, bearer token authentication).
+
+**Capabilities:**
+- **Notifications:** Rule ALERT actions are dispatched as Telegram/Discord messages via OpenClaw's messaging infrastructure
+- **Session Management:** Daemon can list, spawn, and communicate with OpenClaw agent sessions
+- **Wake Events:** Daemon can trigger system events to notify the main agent
+
+**Configuration:** Gateway URL, token, and notification target are stored in DaemonConfig or environment variables (`OPENCLAW_GATEWAY_URL`, `OPENCLAW_GATEWAY_TOKEN`, `HASSALEH_NOTIFY_TARGET`).
+
+**Graceful degradation:** The bridge is optional. If not configured or unreachable, the Daemon operates normally — alerts are logged but not dispatched to messaging channels.
+
+---
 
 ### 4.15 Message
 
