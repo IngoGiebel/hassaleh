@@ -405,21 +405,35 @@ class HassalehSDK:
                         CREATE (m)-[:IN_CONTEXT_OF]->(ctx)
                     """, message_id=message_id, context_id=context_id)
 
-                # Append to NEXT chain: find the latest message in this context
-                # and link our new message as its NEXT
+                # Maintain HEAD_OF / TAIL_OF + NEXT chain for the context
                 if context_id:
-                    await tx.run("""
-                        MATCH (m:Message {id: $message_id})
-                        OPTIONAL MATCH (prev:Message)-[:IN_CONTEXT_OF]->({id: $context_id})
-                        WHERE NOT (prev)-[:NEXT]->()
-                          AND prev.id <> $message_id
-                        WITH m, prev
-                        ORDER BY prev.timestamp DESC
-                        LIMIT 1
-                        FOREACH (_ IN CASE WHEN prev IS NOT NULL THEN [1] ELSE [] END |
-                            CREATE (prev)-[:NEXT]->(m)
-                        )
-                    """, message_id=message_id, context_id=context_id)
+                    # Check if context already has a TAIL
+                    result = await tx.run("""
+                        MATCH (ctx {id: $context_id})
+                        OPTIONAL MATCH (ctx)<-[:TAIL_OF]-(tail:Message)
+                        RETURN tail.id AS tail_id, ctx IS NOT NULL AS ctx_exists
+                    """, context_id=context_id)
+                    record = await result.single()
+
+                    if record and record["tail_id"]:
+                        # Append: link old tail → new message, update TAIL_OF
+                        await tx.run("""
+                            MATCH (old_tail:Message {id: $tail_id})
+                            MATCH (m:Message {id: $message_id})
+                            MATCH (ctx {id: $context_id})<-[old_te:TAIL_OF]-(old_tail)
+                            DELETE old_te
+                            CREATE (old_tail)-[:NEXT]->(m)
+                            CREATE (m)-[:TAIL_OF]->(ctx)
+                        """, tail_id=record["tail_id"],
+                           message_id=message_id, context_id=context_id)
+                    else:
+                        # First message: set as both HEAD and TAIL
+                        await tx.run("""
+                            MATCH (m:Message {id: $message_id})
+                            MATCH (ctx {id: $context_id})
+                            CREATE (m)-[:HEAD_OF]->(ctx)
+                            CREATE (m)-[:TAIL_OF]->(ctx)
+                        """, message_id=message_id, context_id=context_id)
 
             await session.execute_write(_create_message)
 
@@ -434,29 +448,46 @@ class HassalehSDK:
     ) -> list[dict[str, Any]]:
         """Read unread messages for an agent (cursor-based).
 
-        Follows the agent's LAST_READ cursor forward through the NEXT
-        chain. If no cursor exists, returns all messages in context.
+        Follows the NEXT chain from the agent's LAST_READ cursor.
+        If no cursor exists, starts from the HEAD of the context.
 
         Returns:
             List of message dicts with id, content, timestamp, sender
         """
         if context_id:
-            # Read from cursor position in specific context
-            return await self.query("""
+            # Two-step read: check cursor, then traverse NEXT chain
+            # Step 1: Get cursor position
+            cursor_records = await self.query("""
                 MATCH (agent:Agent {id: $agent_id})
                 OPTIONAL MATCH (agent)-[:LAST_READ]->(cursor:Message)
-                WITH agent, cursor
-                MATCH (m:Message)-[:IN_CONTEXT_OF]->({id: $context_id})
-                WHERE cursor IS NULL OR m.timestamp > cursor.timestamp
-                MATCH (sender:Agent)-[:SENT]->(m)
-                RETURN m.id AS id, m.content AS content,
-                       m.timestamp AS timestamp, sender.id AS sender_id,
-                       sender.name AS sender_name
-                ORDER BY m.timestamp ASC
-            """, {"agent_id": agent_id, "context_id": context_id},
-                timeout_ms=10000)
+                RETURN cursor.id AS cursor_id
+            """, {"agent_id": agent_id}, timeout_ms=5000)
+
+            cursor_id = cursor_records[0]["cursor_id"] if cursor_records else None
+
+            if cursor_id:
+                # Follow NEXT chain from cursor
+                return await self.query("""
+                    MATCH (cursor:Message {id: $cursor_id})-[:NEXT*1..]->(m:Message)
+                    MATCH (sender:Agent)-[:SENT]->(m)
+                    RETURN m.id AS id, m.content AS content,
+                           m.timestamp AS timestamp, sender.id AS sender_id,
+                           sender.name AS sender_name
+                    ORDER BY m.timestamp ASC
+                """, {"cursor_id": cursor_id}, timeout_ms=10000)
+            else:
+                # No cursor: start from HEAD of context
+                return await self.query("""
+                    MATCH (head:Message)-[:HEAD_OF]->({id: $context_id})
+                    MATCH path = (head)-[:NEXT*0..]->(m:Message)
+                    MATCH (sender:Agent)-[:SENT]->(m)
+                    RETURN m.id AS id, m.content AS content,
+                           m.timestamp AS timestamp, sender.id AS sender_id,
+                           sender.name AS sender_name
+                    ORDER BY m.timestamp ASC
+                """, {"context_id": context_id}, timeout_ms=10000)
         else:
-            # Read all unread messages across all contexts
+            # Fallback: timestamp-based for cross-context reads
             return await self.query("""
                 MATCH (agent:Agent {id: $agent_id})
                 OPTIONAL MATCH (agent)-[:LAST_READ]->(cursor:Message)
@@ -547,9 +578,24 @@ class HassalehSDK:
         discussion_id: str,
         resolution: str,
     ) -> None:
-        """Resolve a discussion (leader decision)."""
+        """Resolve a discussion (leader decision).
+
+        Only agents who have CONTRIBUTED to the discussion can resolve it.
+        """
         async with self.driver.session() as session:
             async def _resolve(tx):
+                # Verify agent has contributed (permission check)
+                result = await tx.run("""
+                    MATCH (a:Agent {id: $agent_id})-[:CONTRIBUTED]->(d:Discussion {id: $did})
+                    RETURN count(*) AS has_contributed
+                """, agent_id=agent_id, did=discussion_id)
+                record = await result.single()
+                if not record or record["has_contributed"] == 0:
+                    raise PermissionError(
+                        f"Agent '{agent_id}' has not contributed to discussion "
+                        f"'{discussion_id}' and cannot resolve it"
+                    )
+
                 await tx.run("""
                     MATCH (a:Agent {id: $agent_id})
                     MATCH (d:Discussion {id: $discussion_id})
