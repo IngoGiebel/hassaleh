@@ -183,26 +183,37 @@ class HassalehDaemon:
                         self._shutdown_event.wait(),
                         timeout=sleep_time,
                     )
-                    break  # shutdown was signaled
+                    # Shutdown was signaled — initiate graceful shutdown
+                    await self.shutdown()
+                    return
                 except asyncio.TimeoutError:
                     pass  # normal tick sleep expired
 
     # ── Intent Processing ──
 
     async def _process_pending_intents(self) -> None:
-        """Find and process all pending Intents."""
+        """Find and process all pending Intents.
+
+        Uses atomic claim: a single transaction MATCHes pending Intents
+        and SETs them to 'claimed' so no other Daemon instance (or fast
+        restart) can pick up the same Intent.  After claim, permission
+        checks run; if they fail the Intent is rejected/parked, otherwise
+        a worker is spawned and the Intent transitions to 'running'.
+        """
         max_workers = self.config["max_concurrent_actions"]
         available_slots = max_workers - len(self.active_workers)
         if available_slots <= 0:
             return
 
+        # ── Atomic claim: pending → claimed in one write transaction ──
         async with self.driver.session() as session:
             result = await session.run("""
                 MATCH (agent:Agent)-[:PROPOSED]->(i:Intent {lifecycle: 'pending'})
-                OPTIONAL MATCH (i)-[:TARGETS]->(target)
-                RETURN i, agent, target
+                WITH i, agent
                 ORDER BY i.submitted_at ASC
                 LIMIT $limit
+                SET i.lifecycle = 'claimed'
+                RETURN i, agent
             """, limit=available_slots)
 
             records = [record async for record in result]
@@ -326,6 +337,12 @@ class HassalehDaemon:
             log.info(f"Intent {intent_id}: exit={proc.returncode}, stdout={len(stdout_str)} bytes")
 
         except asyncio.TimeoutError:
+            # Kill the orphaned subprocess
+            try:
+                proc.kill()
+                await proc.wait()
+            except (ProcessLookupError, OSError):
+                pass
             await self._fail_intent(intent_id, "Execution timed out")
 
     async def _execute_update(self, intent_id: str, intent: dict) -> None:
@@ -407,10 +424,11 @@ class HassalehDaemon:
     # ── Zombie Recovery ──
 
     async def _recover_zombies(self) -> None:
-        """On boot: transition stale 'running' Intents to 'failed'."""
+        """On boot: transition stale 'running' or 'claimed' Intents to 'failed'."""
         async with self.driver.session() as session:
             result = await session.run("""
-                MATCH (i:Intent {lifecycle: 'running'})
+                MATCH (i:Intent)
+                WHERE i.lifecycle IN ['running', 'claimed']
                 SET i.lifecycle = 'failed',
                     i.error_reason = 'Daemon restarted during execution',
                     i.completed_at = datetime({timezone: 'UTC'})
@@ -579,17 +597,18 @@ async def main():
 
     daemon = HassalehDaemon(uri, user, password)
 
-    # Signal handlers for graceful shutdown
+    # Signal handlers: set the shutdown event (lightweight, no double-shutdown)
     loop = asyncio.get_event_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):
-        loop.add_signal_handler(sig, lambda: asyncio.create_task(daemon.shutdown()))
+        loop.add_signal_handler(sig, daemon._shutdown_event.set)
 
     try:
         await daemon.start()
     except KeyboardInterrupt:
         pass
     finally:
-        await daemon.shutdown()
+        if daemon.running:
+            await daemon.shutdown()
 
 
 if __name__ == "__main__":

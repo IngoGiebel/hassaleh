@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -38,6 +39,12 @@ DEFAULT_QUERY_CONFIG = {
 BLOCKED_KEYWORDS = frozenset({
     "CREATE", "MERGE", "DELETE", "DETACH", "SET", "REMOVE",
     "DROP", "CALL", "LOAD CSV", "FOREACH",
+})
+
+# Allowed node labels for Intent TARGETS edges (prevents Cypher injection)
+ALLOWED_TARGET_LABELS = frozenset({
+    "Agent", "Task", "Capability", "Workspace", "Project", "Sprint",
+    "DaemonConfig", "QueryConfig", "SystemVersion",
 })
 
 
@@ -135,10 +142,10 @@ class HassalehSDK:
         if params is None:
             params = {}
 
-        # Enforce read-only: reject queries with write keywords
+        # Enforce read-only: reject queries with write keywords (word-boundary match)
         cypher_upper = cypher.upper()
         for keyword in BLOCKED_KEYWORDS:
-            if keyword in cypher_upper:
+            if re.search(rf'\b{keyword}\b', cypher_upper):
                 raise PermissionError(
                     f"Write operation '{keyword}' blocked in SDK query(). "
                     f"Use submit_intent() for state changes."
@@ -197,50 +204,60 @@ class HassalehSDK:
             The generated Intent ID
         """
         intent_id = str(uuid.uuid4())
-        now = datetime.now(timezone.utc)
+
+        # Validate label early (before any writes)
+        if action == "update_property" and target_label:
+            if target_label not in ALLOWED_TARGET_LABELS:
+                raise ValueError(
+                    f"Invalid target label '{target_label}'. "
+                    f"Allowed: {sorted(ALLOWED_TARGET_LABELS)}"
+                )
 
         async with self.driver.session() as session:
-            # Create Intent node + PROPOSED edge
-            await session.run("""
-                MATCH (agent:Agent {id: $agent_id})
-                CREATE (i:Intent {
-                    id: $intent_id,
-                    submitted_at: datetime({timezone: 'UTC'}),
-                    action: $action,
-                    property: $property_name,
-                    value: $value,
-                    lifecycle: 'pending',
-                    started_at: null,
-                    completed_at: null,
-                    stdout: null,
-                    stderr: null,
-                    error_reason: null,
-                    exit_code: null
-                })
-                CREATE (agent)-[:PROPOSED]->(i)
-            """,
-                agent_id=agent_id,
-                intent_id=intent_id,
-                action=action,
-                property_name=property_name,
-                value=value,
-            )
+            # Use a single write transaction so Intent + TARGETS are atomic
+            async def _create_intent(tx):
+                # Create Intent node + PROPOSED edge
+                await tx.run("""
+                    MATCH (agent:Agent {id: $agent_id})
+                    CREATE (i:Intent {
+                        id: $intent_id,
+                        submitted_at: datetime({timezone: 'UTC'}),
+                        action: $action,
+                        property: $property_name,
+                        value: $value,
+                        lifecycle: 'pending',
+                        started_at: null,
+                        completed_at: null,
+                        stdout: null,
+                        stderr: null,
+                        error_reason: null,
+                        exit_code: null
+                    })
+                    CREATE (agent)-[:PROPOSED]->(i)
+                """,
+                    agent_id=agent_id,
+                    intent_id=intent_id,
+                    action=action,
+                    property_name=property_name,
+                    value=value,
+                )
 
-            # Create TARGETS edge to capability or target node
-            if action == "execute_capability" and capability_id:
-                await session.run("""
-                    MATCH (i:Intent {id: $intent_id})
-                    MATCH (cap:Capability {id: $cap_id})
-                    CREATE (i)-[:TARGETS]->(cap)
-                """, intent_id=intent_id, cap_id=capability_id)
+                # Create TARGETS edge to capability or target node
+                if action == "execute_capability" and capability_id:
+                    await tx.run("""
+                        MATCH (i:Intent {id: $intent_id})
+                        MATCH (cap:Capability {id: $cap_id})
+                        CREATE (i)-[:TARGETS]->(cap)
+                    """, intent_id=intent_id, cap_id=capability_id)
 
-            elif action == "update_property" and target_id and target_label:
-                # Dynamic label matching via APOC or explicit label check
-                await session.run(f"""
-                    MATCH (i:Intent {{id: $intent_id}})
-                    MATCH (target:{target_label} {{id: $target_id}})
-                    CREATE (i)-[:TARGETS]->(target)
-                """, intent_id=intent_id, target_id=target_id)
+                elif action == "update_property" and target_id and target_label:
+                    await tx.run(f"""
+                        MATCH (i:Intent {{id: $intent_id}})
+                        MATCH (target:{target_label} {{id: $target_id}})
+                        CREATE (i)-[:TARGETS]->(target)
+                    """, intent_id=intent_id, target_id=target_id)
+
+            await session.execute_write(_create_intent)
 
         log.info(f"Submitted Intent {intent_id} (action: {action}, agent: {agent_id})")
         return intent_id

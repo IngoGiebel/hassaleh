@@ -126,9 +126,19 @@ async def test_query_respects_existing_limit():
 
 @pytest.mark.asyncio
 async def test_submit_intent_creates_node():
-    """Test that submit_intent calls correct Cypher."""
+    """Test that submit_intent calls correct Cypher via write transaction."""
     driver, session = make_mock_driver()
-    session.run = AsyncMock()
+
+    # Track calls made inside the transaction function
+    tx_calls = []
+    tx_mock = AsyncMock()
+    async def _fake_run(cypher, **kwargs):
+        tx_calls.append((cypher, kwargs))
+    tx_mock.run = _fake_run
+
+    async def _fake_execute_write(func):
+        await func(tx_mock)
+    session.execute_write = _fake_execute_write
 
     sdk = HassalehSDK()
     sdk.driver = driver
@@ -140,20 +150,18 @@ async def test_submit_intent_creates_node():
         value='{"args": "-la"}',
     )
 
-    # Should have made 2 calls: create Intent + create TARGETS edge
-    assert session.run.call_count == 2
+    # Should have made 2 calls inside the transaction
+    assert len(tx_calls) == 2
 
     # First call: create Intent + PROPOSED edge
-    first_call = session.run.call_args_list[0]
-    assert "Intent" in first_call[0][0]
-    assert "PROPOSED" in first_call[0][0]
-    assert first_call[1]["agent_id"] == "dione"
-    assert first_call[1]["action"] == "execute_capability"
+    assert "Intent" in tx_calls[0][0]
+    assert "PROPOSED" in tx_calls[0][0]
+    assert tx_calls[0][1]["agent_id"] == "dione"
+    assert tx_calls[0][1]["action"] == "execute_capability"
 
     # Second call: TARGETS edge to capability
-    second_call = session.run.call_args_list[1]
-    assert "TARGETS" in second_call[0][0]
-    assert second_call[1]["cap_id"] == "exec-ls"
+    assert "TARGETS" in tx_calls[1][0]
+    assert tx_calls[1][1]["cap_id"] == "exec-ls"
 
     # Returns a UUID string
     assert len(intent_id) == 36
