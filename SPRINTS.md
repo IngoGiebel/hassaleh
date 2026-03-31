@@ -285,12 +285,42 @@
 
 ### Sprint 5: Reporting
 
-**Goal:** Graph-based project and agent reporting.
+**Goal:** Graph-based project and agent reporting. CLI commands + formatted output for operator dashboards.
 
-- Reporting agent queries graph for status
-- Project progress reports (sprint/task/milestone)
-- Agent activity reports (uptime, errors, costs)
-- Timeline analysis (planned vs actual)
+**Lead:** Dione 🌙
+**Duration:** ~1 week
+
+### Phase 1: Report Data Queries
+
+| # | Task | Assignee | Status |
+|---|------|----------|--------|
+| 1.1 | `hassaleh report agents` — Agent activity report (uptime, intents processed, errors, restarts) | Dione | ⬜ todo |
+| 1.2 | `hassaleh report rules` — Rule evaluation report (fires, alerts generated, property changes) | Dione | ⬜ todo |
+| 1.3 | `hassaleh report intents` — Intent statistics (success/fail/reject rates, avg duration) | Dione | ⬜ todo |
+
+### Phase 2: Project Reports
+
+| # | Task | Assignee | Status |
+|---|------|----------|--------|
+| 2.1 | `hassaleh report project <id>` — Sprint/task progress, completion rates | Dione | ⬜ todo |
+| 2.2 | `hassaleh report timeline <id>` — Planned vs actual timeline analysis | Dione | ⬜ todo |
+
+### Phase 3: Export + Dashboard
+
+| # | Task | Assignee | Status |
+|---|------|----------|--------|
+| 3.1 | `--format json` flag for machine-readable output | Dione | ⬜ todo |
+| 3.2 | `--format markdown` flag for shareable reports | Dione | ⬜ todo |
+| 3.3 | `hassaleh report daily` — Combined daily summary (agents + rules + intents) | Dione | ⬜ todo |
+
+### Sprint 5 Acceptance Criteria
+
+- [ ] Agent activity reports show meaningful metrics from graph data
+- [ ] Rule reports show evaluation counts and outcomes
+- [ ] Intent reports show success/fail/reject statistics
+- [ ] JSON + Markdown export formats work
+- [ ] Daily summary combines all reports
+- [ ] All commands handle empty data gracefully
 
 ### Sprint 6: Multi-Agent Coordination
 
