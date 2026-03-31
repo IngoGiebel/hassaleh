@@ -707,6 +707,23 @@ The Hassaleh Daemon integrates with an OpenClaw Gateway running on the same host
 
 ---
 
+### 4.14.3 Built-in Skills
+
+Hassaleh ships with a set of built-in Skills that agents can invoke via their capabilities. Skills are stored as Capability nodes in the graph with `kind: 'skill'` and provide structured interaction patterns.
+
+| Skill | ID | Description |
+|-------|-----|-------------|
+| **Rule Forge** | `rule-forge` | Interactive GSL-Ops rule authoring. Guides the operator through translating operational intent into valid rules: clarifies trigger conditions, actions, and safety constraints in natural language, generates GSL-Ops syntax, compiles and previews the generated Python (`--dry-run`), and commits to the graph only after explicit human approval. Default skill for all rule creation requests. |
+| **Graph Explorer** | `graph-explore` | Interactive graph querying and visualization. Translates natural language questions ("which agents have capabilities for file access?") into Cypher, executes read-only, and formats results. |
+| **Report Builder** | `report-build` | Generates structured reports from graph data. Supports agent activity, rule evaluation, intent statistics, and project progress reports in text, JSON, or Markdown format. |
+| **Health Auditor** | `health-audit` | Analyzes system health: agent heartbeat freshness, rule evaluation success rates, Intent failure patterns, and Neo4j connectivity. Generates recommendations for rule adjustments. |
+
+**Skill invocation:** When an agent receives a request that matches a skill's domain (e.g., "create a rule that..."), it automatically invokes the corresponding skill. The skill provides the structured interaction pattern; the agent provides the conversational interface. Skills are implemented as Python modules in `src/hassaleh/skills/` and registered as Capability nodes during `hassaleh init`.
+
+**Rule Forge as default:** Any request to create, modify, or review a GSL-Ops rule is routed through the `rule-forge` skill unless the operator explicitly bypasses it. This ensures consistent rule quality and human-in-the-loop validation.
+
+---
+
 ### 4.15 Message
 
 Inter-agent communication node. Part of a linked-list message queue.
