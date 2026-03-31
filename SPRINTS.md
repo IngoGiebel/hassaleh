@@ -324,12 +324,49 @@
 
 ### Sprint 6: Multi-Agent Coordination
 
-**Goal:** Discussion protocol, consensus mechanism, multi-agent task execution.
+**Goal:** Implement the graph-mediated communication and coordination patterns from CONCEPT.md. Agents exchange messages through the graph, discuss decisions, and execute tasks in configurable modes.
 
-- Message cursor pattern for inter-agent communication
-- Discussion nodes with voting + leader decision
-- Sequential/parallel/supervised task execution modes
-- Workspace permission management (auto-assign on project join)
+**Lead:** Dione 🌙
+**Duration:** ~2 weeks
+
+### Phase 1: Message Cursor System
+
+| # | Task | Assignee | Status |
+|---|------|----------|--------|
+| 1.1 | Message node schema + NEXT linked-list + LAST_READ cursor in schema.cypher | Dione | ⬜ todo |
+| 1.2 | SDK: `sdk.send_message(context, content)` — create Message node + SENT + NEXT edges | Dione | ⬜ todo |
+| 1.3 | SDK: `sdk.read_messages(agent_id)` — follow LAST_READ cursor through NEXT chain | Dione | ⬜ todo |
+| 1.4 | SDK: `sdk.advance_cursor(agent_id, message_id)` — move LAST_READ pointer | Dione | ⬜ todo |
+| 1.5 | CLI: `hassaleh message list <context>` — show messages in a task/discussion context | Dione | ⬜ todo |
+
+### Phase 2: Discussion Protocol
+
+| # | Task | Assignee | Status |
+|---|------|----------|--------|
+| 2.1 | Discussion node schema + CONTRIBUTED edge with position/reasoning | Dione | ⬜ todo |
+| 2.2 | SDK: `sdk.create_discussion(topic, context)` — start a discussion | Dione | ⬜ todo |
+| 2.3 | SDK: `sdk.contribute(discussion_id, position, reasoning)` — add agent's position | Dione | ⬜ todo |
+| 2.4 | SDK: `sdk.resolve_discussion(discussion_id, resolution)` — leader closes discussion | Dione | ⬜ todo |
+| 2.5 | CLI: `hassaleh discussion list/show/resolve` — discussion management | Dione | ⬜ todo |
+
+### Phase 3: Task Execution Modes
+
+| # | Task | Assignee | Status |
+|---|------|----------|--------|
+| 3.1 | Task node: add `execution_mode` property (sequential/parallel/supervised) | Dione | ⬜ todo |
+| 3.2 | Sequential mode: Tasks execute one-by-one, next starts when previous succeeds | Dione | ⬜ todo |
+| 3.3 | Parallel mode: All assigned agents work simultaneously, results merged | Dione | ⬜ todo |
+| 3.4 | Supervised mode: Lead agent reviews sub-agent work before approval | Dione | ⬜ todo |
+| 3.5 | GSL-Ops rule: Task assignment based on agent capabilities | Dione | ⬜ todo |
+
+### Sprint 6 Acceptance Criteria
+
+- [ ] Agents can send and read messages through graph (cursor-based, O(1) check)
+- [ ] Discussions capture positions, reasoning, and resolution from multiple agents
+- [ ] Tasks support sequential, parallel, and supervised execution modes
+- [ ] All coordination is graph-mediated (no direct agent-to-agent messaging)
+- [ ] CLI commands for message and discussion management
+- [ ] Tests cover message ordering, cursor advancement, and discussion lifecycle
 
 ### Sprint N: Skill Domain Taxonomy
 
