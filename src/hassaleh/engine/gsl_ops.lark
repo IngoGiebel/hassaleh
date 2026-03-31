@@ -30,6 +30,7 @@ start: (_NEWLINE | statement)*
           | elif_block
           | else_block
           | every_block
+          | foreach_block
           | let_stmt
           | effect_stmt
           | action_stmt
@@ -49,6 +50,9 @@ else_block: "ELSE" ":" _NEWLINE _INDENT body _DEDENT
 
 // EVERY …:  →  Time-triggered rule (evaluated by Daemon scheduler)
 every_block: "EVERY" duration ":" _NEWLINE _INDENT body _DEDENT
+
+// FOREACH var IN collection:  →  Iterate over a list/collection
+foreach_block: "FOREACH" NAME "IN" expr ":" _NEWLINE _INDENT body _DEDENT
 
 // Body: sequence of statements inside an indented block
 body: (_NEWLINE | statement)*
@@ -133,11 +137,16 @@ DURATION_LITERAL.3: /\d+[smhd]/
      | PROP_ACCESS                        -> prop_access
      | NAME                               -> var_ref
      | func_call
+     | list_literal
      | "(" expr ")"
      | "true"                             -> bool_true
      | "false"                            -> bool_false
      | "null"                             -> null_literal
      | "None"                             -> null_literal
+
+// List literal: [expr, expr, ...]
+list_literal: "[" list_items? "]"
+list_items: expr ("," expr)*
 
 // ──────────────────────────────────────────
 // Built-in functions (deterministic only)

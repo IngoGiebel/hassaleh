@@ -124,6 +124,33 @@ class GSLOpsCompiler:
             self._emit("pass")
         self._indent -= 1
 
+    # ── FOREACH block ──
+
+    def _compile_foreach_block(self, node: Tree) -> None:
+        name = self._get_token(node, "NAME")
+        # Expression is everything between NAME and body
+        expr_children = []
+        body = None
+        found_name = False
+        for child in node.children:
+            if isinstance(child, Tree) and child.data == "body":
+                body = child
+            elif isinstance(child, Token) and child.type == "NAME" and not found_name:
+                found_name = True
+            elif found_name and not (isinstance(child, Tree) and child.data == "body"):
+                expr_children.append(child)
+
+        collection_expr = self._compile_expr_list(expr_children)
+        self._emit(f"for {name} in {collection_expr}:")
+        self._indent += 1
+
+        if body:
+            self._compile_body(body)
+        else:
+            self._emit("pass")
+
+        self._indent -= 1
+
     # ── EVERY block ──
 
     def _compile_every_block(self, node: Tree) -> None:
@@ -312,6 +339,9 @@ class GSLOpsCompiler:
             inner = self._compile_expr_tree(tree_children[0]) if tree_children else "0"
             return f"(-{inner})"
 
+        if d == "list_literal":
+            return self._compile_list_literal(node)
+
         if d == "func_call":
             return self._compile_func_call(node)
 
@@ -333,6 +363,15 @@ class GSLOpsCompiler:
                 parts.append(self._compile_expr_tree(ch))
         return " ".join(parts)
 
+    def _compile_list_literal(self, node: Tree) -> str:
+        """Compile [a, b, c] to a Python list."""
+        items_node = self._find_child(node, "list_items")
+        if not items_node:
+            return "[]"
+        items = [self._compile_expr_tree(ch) for ch in items_node.children
+                 if isinstance(ch, Tree)]
+        return f"[{', '.join(items)}]"
+
     def _compile_func_call(self, node: Tree) -> str:
         """Compile a function call."""
         func_name = self._get_token(node, "NAME")
@@ -350,6 +389,10 @@ class GSLOpsCompiler:
             "STR": "str",
             "INT": "int",
             "FLOAT": "float",
+            "RANGE": "range",
+            "KEYS": "ctx.keys",
+            "SORTED": "sorted",
+            "LIST": "list",
         }
 
         if func_name == "NOW":

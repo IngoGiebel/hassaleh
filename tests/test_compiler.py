@@ -411,6 +411,84 @@ MATCH (a:Agent):
 """)
 
 
+# ══════════════════════════════════════════════
+# 9. FOREACH + Lists
+# ══════════════════════════════════════════════
+
+def test_foreach_compiles():
+    """FOREACH compiles to Python for loop."""
+    source = compile_rule("""
+MATCH (a:Agent):
+    FOREACH tag IN a.tags:
+        LOG "tag found"
+""")
+    assert "for tag in" in source
+    assert 'ctx.prop(a, "tags")' in source
+
+
+def test_list_literal_compiles():
+    """List literal compiles to Python list."""
+    source = compile_rule("""
+MATCH (a:Agent):
+    LET statuses = ["running", "failed", "pending"]
+""")
+    assert '["running", "failed", "pending"]' in source
+
+
+def test_empty_list_compiles():
+    """Empty list compiles correctly."""
+    source = compile_rule("""
+MATCH (a:Agent):
+    LET items = []
+""")
+    assert "[]" in source
+
+
+def test_e2e_foreach_executes():
+    """FOREACH executes over a list."""
+    source = compile_rule("""
+MATCH (a:Agent):
+    FOREACH status IN ["a", "b", "c"]:
+        LOG "item"
+""")
+    agent = {"id": "dione"}
+    ctx = make_mock_context(match_rows=[{"a": agent}])
+    exec_rule(source, ctx)
+
+    # Should log 3 times (one per item)
+    assert len(ctx.logs) == 3
+
+
+def test_e2e_foreach_with_condition():
+    """FOREACH with IF condition inside."""
+    source = compile_rule("""
+MATCH (a:Agent):
+    FOREACH val IN [1, 2, 3, 4, 5]:
+        IF val > 3:
+            LOG "big"
+""")
+    agent = {"id": "dione"}
+    ctx = make_mock_context(match_rows=[{"a": agent}])
+    exec_rule(source, ctx)
+
+    # Only 4 and 5 are > 3
+    assert len(ctx.logs) == 2
+
+
+def test_e2e_foreach_over_property():
+    """FOREACH over a node property that is a list."""
+    source = compile_rule("""
+MATCH (a:Agent):
+    FOREACH tag IN a.tags:
+        LOG "tag"
+""")
+    agent = {"id": "dione", "tags": ["finance", "monitoring", "reporting"]}
+    ctx = make_mock_context(match_rows=[{"a": agent}])
+    exec_rule(source, ctx)
+
+    assert len(ctx.logs) == 3
+
+
 def test_e2e_agent_health_check():
     """Realistic agent health check rule executes correctly."""
     source = compile_rule("""

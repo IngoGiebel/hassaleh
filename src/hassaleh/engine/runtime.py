@@ -297,3 +297,11 @@ class RuleContext:
     def clamp(self, value: float, lo: float, hi: float) -> float:
         """Clamp a value between lo and hi."""
         return max(lo, min(hi, value))
+
+    def keys(self, node: Any) -> list[str]:
+        """Get property keys of a Neo4j node."""
+        if isinstance(node, dict):
+            return list(node.keys())
+        if hasattr(node, "keys"):
+            return list(node.keys())
+        return []

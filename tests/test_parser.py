@@ -389,6 +389,83 @@ EVERY "PT1H":
 # 11. Error cases
 # ══════════════════════════════════════════════
 
+# ══════════════════════════════════════════════
+# 12. FOREACH + List literals
+# ══════════════════════════════════════════════
+
+def test_foreach_simple():
+    """FOREACH with list literal."""
+    assert_parses("""
+MATCH (a:Agent):
+    FOREACH status IN ["running", "failed"]:
+        LOG "checking"
+""")
+
+
+def test_foreach_with_property():
+    """FOREACH iterating over a property (list)."""
+    assert_parses("""
+MATCH (a:Agent):
+    FOREACH tag IN a.tags:
+        LOG "tag"
+""")
+
+
+def test_foreach_with_range():
+    """FOREACH with RANGE function."""
+    assert_parses("""
+FOREACH i IN RANGE(1, 10):
+    LOG "tick"
+""")
+
+
+def test_list_literal_empty():
+    """Empty list literal."""
+    assert_parses("""
+MATCH (a:Agent):
+    LET x = []
+""")
+
+
+def test_list_literal_numbers():
+    """List of numbers."""
+    assert_parses("""
+MATCH (a:Agent):
+    LET thresholds = [1, 5, 10, 50]
+""")
+
+
+def test_list_literal_mixed():
+    """List with mixed expressions."""
+    assert_parses("""
+MATCH (a:Agent):
+    LET items = [a.name, "default", 42]
+""")
+
+
+def test_foreach_nested_in_match():
+    """FOREACH inside MATCH with IF."""
+    assert_parses("""
+MATCH (a:Agent):
+    FOREACH cap IN KEYS(a):
+        IF cap != "id":
+            LOG "property found"
+""")
+
+
+def test_foreach_realistic_rule():
+    """Realistic rule: iterate failed tasks and reset."""
+    assert_parses("""
+EVERY "PT10M":
+    MATCH (t:Task {lifecycle: 'failed'}):
+        FOREACH reason IN ["timeout", "crash", "oom"]:
+            IF t.error_reason == reason:
+                t.lifecycle = "pending"
+                t.retry_count += 1
+                LOG "Retrying task"
+""")
+
+
 def test_missing_colon_fails():
     """Missing colon after MATCH should fail."""
     assert_parse_fails("""
