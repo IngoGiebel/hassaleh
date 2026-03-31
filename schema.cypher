@@ -36,6 +36,9 @@ CREATE CONSTRAINT queryconfig_id IF NOT EXISTS
 CREATE CONSTRAINT systemversion_id IF NOT EXISTS
   FOR (sv:SystemVersion) REQUIRE sv.id IS UNIQUE;
 
+CREATE CONSTRAINT rule_id IF NOT EXISTS
+  FOR (r:Rule) REQUIRE r.id IS UNIQUE;
+
 // ──────────────────────────────────────────
 // Indexes for frequent queries
 // ──────────────────────────────────────────
@@ -55,3 +58,7 @@ CREATE INDEX task_lifecycle IF NOT EXISTS
 // Capability lookup by kind
 CREATE INDEX capability_kind IF NOT EXISTS
   FOR (c:Capability) ON (c.kind);
+
+// Rule lifecycle for loading available rules
+CREATE INDEX rule_lifecycle IF NOT EXISTS
+  FOR (r:Rule) ON (r.lifecycle);

@@ -21,7 +21,11 @@ from datetime import datetime, timezone
 from typing import Any
 
 from aiohttp import web
-from neo4j import AsyncGraphDatabase
+from neo4j import AsyncGraphDatabase, GraphDatabase
+
+from hassaleh.engine.compiler import compile_rule, COMPILER_VERSION
+from hassaleh.engine.runtime import RuleContext
+from hassaleh.engine.resolver import resolve_intents
 
 logging.basicConfig(
     level=logging.INFO,
@@ -56,6 +60,7 @@ class HassalehDaemon:
         self.neo4j_user = neo4j_user
         self.neo4j_password = neo4j_password
         self.driver: Any = None
+        self.sync_driver: Any = None  # Sync driver for rule evaluation
         self.config: dict = dict(DEFAULT_CONFIG)
         self.running = False
         self.tick_count = 0
@@ -65,6 +70,8 @@ class HassalehDaemon:
         self._health_app: web.Application | None = None
         self._health_runner: web.AppRunner | None = None
         self._watchdog_usec: int = 0  # systemd watchdog interval (0 = disabled)
+        self._compiled_rules: dict[str, Any] = {}  # rule_id → compiled function
+        self._rule_last_run: dict[str, datetime] = {}  # rule_id → last execution time
 
     # ── Lifecycle ──
 
@@ -91,6 +98,16 @@ class HassalehDaemon:
 
         # Check schema version
         await self._check_schema_version()
+
+        # Create sync driver for rule evaluation (rules use sync Neo4j)
+        self.sync_driver = GraphDatabase.driver(
+            self.neo4j_uri,
+            auth=(self.neo4j_user, self.neo4j_password),
+        )
+        log.info("Sync Neo4j driver created for rule evaluation")
+
+        # Load and compile rules
+        await self._load_rules()
 
         # Recover zombie Intents
         await self._recover_zombies()
@@ -137,6 +154,8 @@ class HassalehDaemon:
         await self._stop_health_endpoint()
 
         # Close Neo4j
+        if self.sync_driver:
+            self.sync_driver.close()
         if self.driver:
             await self.driver.close()
             log.info("Neo4j connection closed")
@@ -442,7 +461,7 @@ class HassalehDaemon:
     # ── Sweep ──
 
     async def _sweep(self) -> None:
-        """Periodic maintenance: decay circuit breakers, clean stale memory."""
+        """Periodic maintenance: decay circuit breakers, evaluate rules."""
         decay = self.config.get("circuit_breaker_decay_per_sweep", 1)
         async with self.driver.session() as session:
             # Decay circuit breaker counters
@@ -454,6 +473,13 @@ class HassalehDaemon:
                     ELSE a.restart_count_1h - $decay
                 END
             """, decay=decay)
+
+        # Evaluate rules (runs in executor to avoid blocking event loop)
+        if self._compiled_rules:
+            await asyncio.get_event_loop().run_in_executor(
+                None, self._evaluate_rules
+            )
+
         log.info(f"Sweep complete (tick {self.tick_count})")
 
     # ── Worker Management ──
@@ -465,6 +491,173 @@ class HassalehDaemon:
             task = self.active_workers.pop(k)
             if task.exception():
                 log.error(f"Worker {k} raised: {task.exception()}")
+
+    # ── Rule Engine ──
+
+    async def _load_rules(self) -> None:
+        """Load and compile all available Rule nodes from the graph."""
+        async with self.driver.session() as session:
+            result = await session.run("""
+                MATCH (r:Rule {lifecycle: 'available'})
+                RETURN r.id AS id, r.rule_text AS rule_text,
+                       r.compiled_python AS compiled_python,
+                       r.compiler_version AS compiler_version,
+                       r.priority AS priority
+            """)
+            rules = [dict(record) async for record in result]
+
+        if not rules:
+            log.info("No rules found in graph")
+            return
+
+        compiled_count = 0
+        for rule in rules:
+            rule_id = rule["id"]
+            rule_text = rule.get("rule_text")
+            cached_python = rule.get("compiled_python")
+            cached_version = rule.get("compiler_version")
+
+            if not rule_text:
+                log.warning(f"Rule {rule_id} has no rule_text, skipping")
+                continue
+
+            # Use cached compilation if version matches
+            if cached_python and cached_version == COMPILER_VERSION:
+                python_source = cached_python
+                log.info(f"Rule {rule_id}: using cached compilation")
+            else:
+                # Compile from source
+                try:
+                    python_source = compile_rule(rule_text, rule_id=rule_id)
+                except Exception as e:
+                    log.error(f"Rule {rule_id}: compilation failed: {e}")
+                    continue
+
+                # Cache the compiled Python back to the graph
+                async with self.driver.session() as session:
+                    await session.run("""
+                        MATCH (r:Rule {id: $id})
+                        SET r.compiled_python = $python,
+                            r.compiled_at = datetime({timezone: 'UTC'}),
+                            r.compiler_version = $version
+                    """, id=rule_id, python=python_source, version=COMPILER_VERSION)
+                log.info(f"Rule {rule_id}: compiled and cached (v{COMPILER_VERSION})")
+
+            # Compile to Python code object
+            try:
+                code = compile(python_source, f"<rule:{rule_id}>", "exec")
+                ns: dict[str, Any] = {}
+                exec(code, ns)
+                self._compiled_rules[rule_id] = {
+                    "func": ns["evaluate"],
+                    "priority": rule.get("priority", 100),
+                }
+                compiled_count += 1
+            except Exception as e:
+                log.error(f"Rule {rule_id}: exec failed: {e}")
+
+        log.info(f"Loaded {compiled_count}/{len(rules)} rules")
+
+    def _evaluate_rules(self) -> None:
+        """Evaluate all compiled rules (runs in thread executor).
+
+        Uses a sync Neo4j session since rules call ctx.match() synchronously.
+        """
+        now = datetime.now(timezone.utc)
+        all_property_intents = []
+
+        with self.sync_driver.session() as session:
+            for rule_id, rule_data in self._compiled_rules.items():
+                try:
+                    ctx = RuleContext(
+                        neo4j_session=session,
+                        rule_id=rule_id,
+                        priority=rule_data.get("priority", 100),
+                        now=now,
+                        last_run=self._rule_last_run.get(rule_id),
+                    )
+
+                    rule_data["func"](ctx)
+
+                    # Collect outputs
+                    all_property_intents.extend(ctx.property_intents)
+
+                    # Process submit_intent actions (create Intent nodes)
+                    for si in ctx.submit_intents:
+                        self._create_rule_intent(session, si, rule_id)
+
+                    # Update last run time
+                    self._rule_last_run[rule_id] = now
+
+                except Exception as e:
+                    log.error(f"Rule {rule_id} evaluation failed: {e}", exc_info=True)
+
+        # Resolve conflicting property intents
+        if all_property_intents:
+            self._apply_resolved_intents(all_property_intents)
+
+    def _create_rule_intent(self, session, submit_action, rule_id: str) -> None:
+        """Create an Intent node from a rule's SUBMIT_INTENT action."""
+        import uuid
+        intent_id = str(uuid.uuid4())
+
+        try:
+            target_id = None
+            if isinstance(submit_action.target_node, dict):
+                target_id = submit_action.target_node.get("id")
+
+            args_json = json.dumps(submit_action.args) if submit_action.args else None
+
+            session.run("""
+                CREATE (i:Intent {
+                    id: $intent_id,
+                    submitted_at: datetime({timezone: 'UTC'}),
+                    action: 'execute_capability',
+                    value: $args,
+                    lifecycle: 'pending',
+                    source: 'rule',
+                    source_rule: $rule_id
+                })
+            """, intent_id=intent_id, args=args_json, rule_id=rule_id)
+
+            # Link to capability
+            if submit_action.capability_id:
+                session.run("""
+                    MATCH (i:Intent {id: $intent_id})
+                    MATCH (cap:Capability {id: $cap_id})
+                    CREATE (i)-[:TARGETS]->(cap)
+                """, intent_id=intent_id, cap_id=submit_action.capability_id)
+
+            log.info(f"Rule {rule_id} created Intent {intent_id} "
+                     f"(capability: {submit_action.capability_id})")
+
+        except Exception as e:
+            log.error(f"Failed to create rule Intent: {e}")
+
+    def _apply_resolved_intents(self, intents) -> None:
+        """Apply resolved property intents to the graph."""
+        resolved = resolve_intents(intents)
+
+        with self.sync_driver.session() as session:
+            for (node_id, prop), value in resolved.items():
+                try:
+                    # Use element_id if available, otherwise match by id property
+                    if node_id.startswith("4:"):  # Neo4j element_id format
+                        session.run("""
+                            MATCH (n) WHERE elementId(n) = $nid
+                            SET n[$prop] = $value
+                        """, nid=node_id, prop=prop, value=value)
+                    else:
+                        session.run("""
+                            MATCH (n {id: $nid})
+                            SET n[$prop] = $value
+                        """, nid=node_id, prop=prop, value=value)
+                except Exception as e:
+                    log.error(f"Failed to apply property {prop}={value} "
+                              f"on node {node_id}: {e}")
+
+        if resolved:
+            log.info(f"Applied {len(resolved)} resolved property change(s)")
 
     # ── Watchdog (sd_notify) ──
 
