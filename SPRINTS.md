@@ -225,12 +225,63 @@
 
 ### Sprint 4: OpenClaw Integration
 
-**Goal:** Connect Hassaleh to OpenClaw for real agent orchestration.
+**Goal:** Bridge Hassaleh Daemon ↔ OpenClaw Gateway. Dione as first Hassaleh-managed agent. Rules drive real actions via OpenClaw messaging and session management.
 
-- Daemon spawns agents via OpenClaw ACP runtime
-- Notification dispatch via OpenClaw messaging
-- Dione as first real Hassaleh-managed agent
-- First operational rules running in production
+**Lead:** Dione 🌙
+**Team:** Codex (development), Claude Code (review)
+**Duration:** ~2 weeks
+
+**Architecture:**
+- Hassaleh Daemon runs as systemd service alongside OpenClaw Gateway
+- Bridge layer communicates with OpenClaw via its HTTP API (localhost:18789)
+- Notifications (ALERT actions from rules) dispatch via OpenClaw → Telegram
+- Agent heartbeats: Dione writes last_heartbeat to Neo4j via SDK on every main-session heartbeat
+- Agent task dispatch: Daemon creates Intents → OpenClaw spawns sub-agent sessions
+
+### Phase 1: OpenClaw Bridge Layer
+
+| # | Task | Assignee | Reviewer | Status |
+|---|------|----------|----------|--------|
+| 1.1 | `src/hassaleh/bridge/openclaw.py` — HTTP client for OpenClaw Gateway API (health, sessions, messages) | Dione | Codex | ⬜ todo |
+| 1.2 | Bridge config in Neo4j DaemonConfig: `openclaw_gateway_url`, `openclaw_gateway_token` | Dione | — | ⬜ todo |
+| 1.3 | Notification dispatcher: route rule ALERT actions → OpenClaw messaging → Telegram | Dione | — | ⬜ todo |
+| 1.4 | Agent spawn dispatcher: route SUBMIT_INTENT "spawn_agent" → OpenClaw sessions_spawn | Dione | — | ⬜ todo |
+
+### Phase 2: Dione as Hassaleh Agent
+
+| # | Task | Assignee | Reviewer | Status |
+|---|------|----------|----------|--------|
+| 2.1 | Heartbeat integration: Dione updates `last_heartbeat` in Neo4j on every HEARTBEAT.md check | Dione | — | ⬜ todo |
+| 2.2 | Agent lifecycle sync: Daemon reads OpenClaw session status → updates Agent.lifecycle in graph | Dione | — | ⬜ todo |
+| 2.3 | `hassaleh agent heartbeat <id>` CLI command for manual heartbeat | Dione | — | ⬜ todo |
+| 2.4 | Update Agent Health Check rule to work with real heartbeat data | Dione | — | ⬜ todo |
+
+### Phase 3: Production Validation
+
+| # | Task | Assignee | Reviewer | Status |
+|---|------|----------|----------|--------|
+| 3.1 | Integration test: rule fires ALERT → Daemon → OpenClaw → Telegram message received | Dione | — | ⬜ todo |
+| 3.2 | Integration test: Dione heartbeat → Neo4j → health check rule evaluates correctly | Dione | — | ⬜ todo |
+| 3.3 | `hassaleh status` shows OpenClaw connectivity + bridge status | Dione | — | ⬜ todo |
+| 3.4 | Documentation: architecture diagram, setup instructions | Dione | — | ⬜ todo |
+
+### Sprint 4 Acceptance Criteria
+
+- [ ] Rule ALERT actions send notifications via Telegram
+- [ ] Dione's heartbeat is tracked in Neo4j graph
+- [ ] Health check rule correctly evaluates real heartbeat data
+- [ ] `hassaleh status` shows OpenClaw bridge connectivity
+- [ ] Bridge handles OpenClaw Gateway unavailability gracefully
+- [ ] All code reviewed
+
+### Sprint 4 Deliverables
+
+| File | Description |
+|------|-------------|
+| `src/hassaleh/bridge/__init__.py` | Bridge package |
+| `src/hassaleh/bridge/openclaw.py` | OpenClaw Gateway HTTP client |
+| `src/hassaleh/bridge/notifications.py` | ALERT → messaging dispatcher |
+| `tests/test_bridge.py` | Bridge unit tests |
 
 ### Sprint 5: Reporting
 
