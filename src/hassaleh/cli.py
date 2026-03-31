@@ -185,6 +185,7 @@ def cmd_init(args) -> int:
         ("Seed Rules", PROJECT_DIR / "seed_rules.cypher"),
     ]
 
+    errors = 0
     with driver.session() as session:
         for label, path in files:
             if not path.exists():
@@ -194,6 +195,7 @@ def cmd_init(args) -> int:
             cypher = path.read_text()
             # Split on semicolons and execute each statement
             statements = [s.strip() for s in cypher.split(";") if s.strip()]
+            file_errors = 0
             for stmt in statements:
                 # Skip comments-only blocks
                 lines = [l for l in stmt.split("\n") if l.strip() and not l.strip().startswith("//")]
@@ -203,10 +205,18 @@ def cmd_init(args) -> int:
                     session.run(stmt)
                 except Exception as e:
                     print(fmt_warn(f"{label}: {e}"))
+                    file_errors += 1
 
-            print(fmt_ok(f"{label}: applied ({len(statements)} statements)"))
+            if file_errors:
+                print(fmt_warn(f"{label}: {file_errors} error(s) in {len(statements)} statements"))
+                errors += file_errors
+            else:
+                print(fmt_ok(f"{label}: applied ({len(statements)} statements)"))
 
     driver.close()
+    if errors:
+        print(fmt_error(f"Init completed with {errors} error(s)"))
+        return 1
     print(fmt_ok("Init complete"))
     return 0
 
@@ -508,8 +518,11 @@ def build_parser() -> argparse.ArgumentParser:
     intent_parser = sub.add_parser("intent", help="Intent management")
     intent_sub = intent_parser.add_subparsers(dest="intent_command")
     list_parser = intent_sub.add_parser("list", help="List intents")
-    list_parser.add_argument("--lifecycle", help="Filter by lifecycle")
-    list_parser.add_argument("--source", help="Filter by source (agent/rule)")
+    list_parser.add_argument("--lifecycle", help="Filter by lifecycle",
+                             choices=["pending", "claimed", "running", "success",
+                                      "failed", "rejected", "awaiting_approval"])
+    list_parser.add_argument("--source", help="Filter by source",
+                             choices=["agent", "rule"])
     list_parser.add_argument("--limit", type=int, default=20, help="Max results")
 
     # approve
@@ -545,32 +558,31 @@ def main() -> int:
             return 1
 
     if args.command == "agent":
-        if args.agent_command == "list":
-            return cmd_agent_list(args)
-        elif args.agent_command == "info":
-            return cmd_agent_info(args)
-        else:
+        handler = {"list": cmd_agent_list, "info": cmd_agent_info}.get(
+            args.agent_command)
+        if not handler:
             print("Usage: hassaleh agent {list|info}")
             return 1
-
-    if args.command == "rule":
-        if args.rule_command == "list":
-            return cmd_rule_list(args)
-        elif args.rule_command == "compile":
-            return cmd_rule_compile(args)
-        else:
+    elif args.command == "rule":
+        handler = {"list": cmd_rule_list, "compile": cmd_rule_compile}.get(
+            args.rule_command)
+        if not handler:
             print("Usage: hassaleh rule {list|compile}")
             return 1
-
-    if args.command == "intent":
-        if args.intent_command == "list":
-            return cmd_intent_list(args)
-        else:
+    elif args.command == "intent":
+        handler = {"list": cmd_intent_list}.get(args.intent_command)
+        if not handler:
             print("Usage: hassaleh intent {list}")
             return 1
+    else:
+        parser.print_help()
+        return 0
 
-    parser.print_help()
-    return 0
+    try:
+        return handler(args)
+    except Exception as e:
+        print(fmt_error(str(e)))
+        return 1
 
 
 if __name__ == "__main__":
