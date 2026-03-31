@@ -102,9 +102,9 @@ comment_line: COMMENT
 // ISO 8601 durations: "PT5M", "PT1H", "P1D"
 // Also support human-readable: 5m, 1h, 30s, 1d
 duration: STRING
-        | NUMBER DURATION_UNIT
+        | DURATION_LITERAL
 
-DURATION_UNIT.3: "s" | "m" | "h" | "d"
+DURATION_LITERAL.3: /\d+[smhd]/
 
 // ──────────────────────────────────────────
 // Expressions (precedence: low → high)

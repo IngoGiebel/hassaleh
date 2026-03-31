@@ -115,9 +115,9 @@
 
 | # | Task | Assignee | Reviewer | Status |
 |---|------|----------|----------|--------|
-| 1.1 | Copy GWW3 `gsl.lark` → strip distributions, Truth Values, game-specific constructs. Keep: MATCH, IF/ELIF/ELSE, SET, numeric ops, comparisons, string ops, EVERY (schedule) | Dione | Codex | ⬜ todo |
-| 1.2 | Add Hassaleh-specific constructs: `SUBMIT_INTENT`, `LOG`, `ALERT` actions | Dione | Codex | ⬜ todo |
-| 1.3 | Write parser tests (target: 20+ tests covering all GSL-Ops constructs) | Codex | Dione | ⬜ todo |
+| 1.1 | Copy GWW3 `gsl.lark` → strip distributions, Truth Values, game-specific constructs. Keep: MATCH, IF/ELIF/ELSE, SET, numeric ops, comparisons, string ops, EVERY (schedule) | Dione | — | ✅ done |
+| 1.2 | Add Hassaleh-specific constructs: `SUBMIT_INTENT`, `LOG`, `ALERT` actions + `WITH` clause, `ELIF/ELSE`, duration literals, built-in functions | Dione | — | ✅ done |
+| 1.3 | Write parser tests (target: 20+ tests covering all GSL-Ops constructs) → 37 tests | Dione | — | ✅ done |
 
 ### Phase 2: Compiler + Runtime
 
