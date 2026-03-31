@@ -104,14 +104,65 @@
 
 ### Sprint 2: Rule Engine (GSL-Ops)
 
-**Goal:** Port GSL-Ops from GWW3. Compile rules on boot. Priority-based conflict resolution.
+**Goal:** Port GSL-Ops from GWW3. Deterministic rule subset for agent orchestration. Compile rules on boot, evaluate in Daemon tick loop.
 
-- Port Lark grammar (stripped of distributions/Truth Values)
-- GSL-Ops → Python compiler
-- Priority-based rule conflict resolution (enums)
-- Additive reduction for numeric properties
-- Rule evaluation in Daemon tick loop
-- First operational rules: agent health check, task timeout sweep
+**Lead:** Dione 🌙
+**Team:** Codex (development), Gemini CLI (review)
+**Duration:** ~2 weeks
+**Source:** GWW3 GSL engine (`projects/games-of-ww3/src/gww3/engine/`) — 785 lines to port/adapt
+
+### Phase 1: Grammar Port
+
+| # | Task | Assignee | Reviewer | Status |
+|---|------|----------|----------|--------|
+| 1.1 | Copy GWW3 `gsl.lark` → strip distributions, Truth Values, game-specific constructs. Keep: MATCH, IF/ELIF/ELSE, SET, numeric ops, comparisons, string ops, EVERY (schedule) | Dione | Codex | ⬜ todo |
+| 1.2 | Add Hassaleh-specific constructs: `SUBMIT_INTENT`, `LOG`, `ALERT` actions | Dione | Codex | ⬜ todo |
+| 1.3 | Write parser tests (target: 20+ tests covering all GSL-Ops constructs) | Codex | Dione | ⬜ todo |
+
+### Phase 2: Compiler + Runtime
+
+| # | Task | Assignee | Reviewer | Status |
+|---|------|----------|----------|--------|
+| 2.1 | Port `compiler.py` — GSL-Ops AST → Python code generator (strip GWW3-specific code generation) | Codex | Dione | ⬜ todo |
+| 2.2 | Port `runtime.py` — Rule execution context with Neo4j graph access (read-only via SDK) | Dione | Codex | ⬜ todo |
+| 2.3 | Add priority-based conflict resolution: lowest priority number wins for same-property-same-node | Dione | Codex | ⬜ todo |
+| 2.4 | Add additive reducer for numeric properties (commutative merge) | Codex | Dione | ⬜ todo |
+| 2.5 | Rule compilation cache: compile `rule_text` → `compiled_python` on boot, cache in Rule node | Dione | — | ⬜ todo |
+| 2.6 | Version check: `compiler_version` mismatch triggers recompilation from `rule_text` | Dione | — | ⬜ todo |
+
+### Phase 3: Daemon Integration
+
+| # | Task | Assignee | Reviewer | Status |
+|---|------|----------|----------|--------|
+| 3.1 | Add rule evaluation to Daemon tick loop (after Intent processing, before sweep) | Dione | Codex | ⬜ todo |
+| 3.2 | Add Rule node schema to `schema.cypher` (constraints + indexes) | Dione | — | ⬜ todo |
+| 3.3 | First operational rule: **Agent Health Check** — check `last_heartbeat`, restart if >5min stale, circuit breaker after 5 failures | Dione | Gemini | ⬜ todo |
+| 3.4 | Second operational rule: **Task Timeout Sweep** — fail Tasks past `expires_at` | Codex | Dione | ⬜ todo |
+| 3.5 | Integration test: rule fires, generates Intent, Daemon processes it | Dione | — | ⬜ todo |
+| 3.6 | Stress test: 10 rules evaluated per tick, verify no performance regression | Codex | Dione | ⬜ todo |
+
+### Sprint 2 Acceptance Criteria
+
+- [ ] GSL-Ops grammar parses all valid rule constructs (20+ tests)
+- [ ] Compiler generates executable Python from GSL-Ops source
+- [ ] Rules compile on Daemon boot and cache in graph
+- [ ] Priority-based conflict resolution works (lower number wins)
+- [ ] Agent health check rule fires and generates restart Intent
+- [ ] Task timeout sweep rule fires and fails expired Tasks
+- [ ] No performance regression: 10 rules evaluated in <100ms per tick
+- [ ] All code reviewed
+
+### Sprint 2 Deliverables
+
+| File | Description |
+|------|-------------|
+| `src/hassaleh/engine/gsl_ops.lark` | GSL-Ops Lark grammar |
+| `src/hassaleh/engine/compiler.py` | GSL-Ops → Python compiler |
+| `src/hassaleh/engine/runtime.py` | Rule execution context |
+| `src/hassaleh/engine/resolver.py` | Priority-based conflict resolution |
+| `tests/test_parser.py` | Grammar/parser tests |
+| `tests/test_compiler.py` | Compilation tests |
+| `tests/test_rules_integration.py` | End-to-end rule tests |
 
 ### Sprint 3: CLI
 
