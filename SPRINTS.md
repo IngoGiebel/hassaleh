@@ -353,17 +353,17 @@
 
 | # | Task | Assignee | Status |
 |---|------|----------|--------|
-| 3.1 | Task node: add `execution_mode` property (sequential/parallel/supervised) | Dione | ⬜ todo |
-| 3.2 | Sequential mode: Tasks execute one-by-one, next starts when previous succeeds | Dione | ⬜ todo |
-| 3.3 | Parallel mode: All assigned agents work simultaneously, results merged | Dione | ⬜ todo |
-| 3.4 | Supervised mode: Lead agent reviews sub-agent work before approval | Dione | ⬜ todo |
-| 3.5 | GSL-Ops rule: Task assignment based on agent capabilities | Dione | ⬜ todo |
+| 3.1 | Task node: add `execution_mode` property (sequential/parallel/supervised) | Dione | ✅ done |
+| 3.2 | Sequential mode: Tasks execute one-by-one, next starts when previous succeeds | Dione | ✅ done |
+| 3.3 | Parallel mode: All assigned agents work simultaneously, results merged | Dione | ✅ done |
+| 3.4 | Supervised mode: Lead agent reviews sub-agent work before approval | Dione | ✅ done |
+| 3.5 | GSL-Ops rule: Task assignment based on agent capabilities | Dione | ✅ done |
 
 ### Sprint 6 Acceptance Criteria
 
 - [ ] Agents can send and read messages through graph (cursor-based, O(1) check)
 - [ ] Discussions capture positions, reasoning, and resolution from multiple agents
-- [ ] Tasks support sequential, parallel, and supervised execution modes
+- [x] Tasks support sequential, parallel, and supervised execution modes
 - [ ] All coordination is graph-mediated (no direct agent-to-agent messaging)
 - [ ] CLI commands for message and discussion management
 - [ ] Tests cover message ordering, cursor advancement, and discussion lifecycle
