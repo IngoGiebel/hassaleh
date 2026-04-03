@@ -885,6 +885,78 @@ def cmd_approve(args) -> int:
     return 0
 
 
+def cmd_task_review(args) -> int:
+    """Approve or reject a supervised task review."""
+    conn = get_connection(args)
+    driver = connect(conn)
+
+    with driver.session() as session:
+        result = session.run("""
+            MATCH (t:Task {id: $id})
+            OPTIONAL MATCH (t)-[:SUPERVISED_BY]->(lead:Agent)
+            RETURN t.execution_mode AS execution_mode,
+                   t.lifecycle AS lifecycle,
+                   collect(lead.id) AS lead_agent_ids
+        """, id=args.task_id)
+        record = result.single()
+
+        if not record:
+            print(fmt_error(f"Task '{args.task_id}' not found"))
+            driver.close()
+            return 1
+
+        if record["execution_mode"] != "supervised":
+            print(fmt_error(f"Task '{args.task_id}' is not supervised"))
+            driver.close()
+            return 1
+
+        if record["lifecycle"] != "awaiting_review":
+            print(fmt_error(
+                f"Task is '{record['lifecycle']}', not 'awaiting_review'"
+            ))
+            driver.close()
+            return 1
+
+        lead_agent_ids = [lead_id for lead_id in record["lead_agent_ids"] if lead_id]
+        reviewer_id = args.agent_id
+        if not reviewer_id:
+            if len(lead_agent_ids) == 1:
+                reviewer_id = lead_agent_ids[0]
+            else:
+                print(fmt_error(
+                    "Task review requires --agent-id when multiple or no supervisors are linked"
+                ))
+                driver.close()
+                return 1
+        elif reviewer_id not in lead_agent_ids:
+            print(fmt_error(f"Agent '{reviewer_id}' is not linked via SUPERVISED_BY"))
+            driver.close()
+            return 1
+
+        approved = bool(args.approve)
+        lifecycle = "success" if approved else "failed"
+        session.run("""
+            MATCH (t:Task {id: $id})
+            SET t.lifecycle = $lifecycle,
+                t.completed_at = datetime({timezone: 'UTC'}),
+                t.reviewed_at = datetime({timezone: 'UTC'}),
+                t.reviewed_by = $reviewer_id,
+                t.review_comment = $comment
+        """,
+            id=args.task_id,
+            lifecycle=lifecycle,
+            reviewer_id=reviewer_id,
+            comment=args.comment,
+        )
+
+        print(fmt_ok(
+            f"Task {args.task_id} reviewed by {reviewer_id} → {lifecycle}"
+        ))
+
+    driver.close()
+    return 0
+
+
 # ──────────────────────────────────────────────
 # Argument Parser
 # ──────────────────────────────────────────────
@@ -937,6 +1009,17 @@ def build_parser() -> argparse.ArgumentParser:
     # approve
     approve_parser = sub.add_parser("approve", help="Approve an intent")
     approve_parser.add_argument("intent_id", help="Intent ID")
+
+    # task
+    task_parser = sub.add_parser("task", help="Task management")
+    task_sub = task_parser.add_subparsers(dest="task_command")
+    task_review = task_sub.add_parser("review", help="Review a supervised task")
+    task_review.add_argument("task_id", help="Task ID")
+    task_review_group = task_review.add_mutually_exclusive_group(required=True)
+    task_review_group.add_argument("--approve", action="store_true", help="Approve the task")
+    task_review_group.add_argument("--reject", action="store_true", help="Reject the task")
+    task_review.add_argument("--agent-id", help="Supervising lead agent ID")
+    task_review.add_argument("--comment", default="", help="Optional review comment")
 
     # heartbeat (for agents to report they're alive)
     hb_parser = sub.add_parser("heartbeat", help="Send agent heartbeat to graph")
@@ -1028,6 +1111,17 @@ def main() -> int:
         handler = report_handlers.get(args.report_command)
         if not handler:
             print("Usage: hassaleh report {agents|rules|intents|daily}")
+            return 1
+        try:
+            return handler(args)
+        except Exception as e:
+            print(fmt_error(str(e)))
+            return 1
+
+    if args.command == "task":
+        handler = {"review": cmd_task_review}.get(args.task_command)
+        if not handler:
+            print("Usage: hassaleh task {review}")
             return 1
         try:
             return handler(args)

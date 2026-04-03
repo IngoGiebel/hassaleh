@@ -18,7 +18,7 @@ import signal
 import socket
 import sys
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Sequence
 
 from aiohttp import web
 from neo4j import AsyncGraphDatabase, GraphDatabase
@@ -48,7 +48,64 @@ DEFAULT_CONFIG = {
     "sweep_interval_min": 15,
     "rule_eval_interval_sec": 60,  # Evaluate rules every 60s (separate from sweep)
     "circuit_breaker_decay_per_sweep": 1,
+    "parallel_fail_fast": True,
 }
+
+TASK_TERMINAL_LIFECYCLES = frozenset({"success", "failed"})
+
+
+def _next_sequential_task_id(tasks: Sequence[dict[str, Any]]) -> str | None:
+    """Return the next sequential task that may transition to ready."""
+    for task in tasks:
+        lifecycle = task.get("lifecycle")
+        if lifecycle == "success":
+            continue
+        if lifecycle == "pending":
+            return task.get("id")
+        return None
+    return None
+
+
+def _parallel_group_should_activate(
+    lifecycles: Sequence[str],
+    *,
+    fail_fast: bool,
+) -> bool:
+    """Return True if pending parallel tasks should transition to ready."""
+    if not lifecycles or "pending" not in lifecycles:
+        return False
+    if fail_fast and "failed" in lifecycles:
+        return False
+    return True
+
+
+def _parent_group_lifecycle(
+    lifecycles: Sequence[str],
+    *,
+    fail_fast: bool,
+) -> str | None:
+    """Resolve parent/group lifecycle from child task lifecycles."""
+    if not lifecycles:
+        return None
+    if "awaiting_review" in lifecycles:
+        return None
+    if "failed" in lifecycles and (fail_fast or all(
+        lifecycle in TASK_TERMINAL_LIFECYCLES for lifecycle in lifecycles
+    )):
+        return "failed"
+    if all(lifecycle == "success" for lifecycle in lifecycles):
+        return "success"
+    return None
+
+
+def _normalize_task_lifecycle_update(
+    execution_mode: str | None,
+    requested_lifecycle: str,
+) -> str:
+    """Apply execution-mode-specific task lifecycle transitions."""
+    if execution_mode == "supervised" and requested_lifecycle == "success":
+        return "awaiting_review"
+    return requested_lifecycle
 
 
 # ──────────────────────────────────────────────
@@ -197,6 +254,9 @@ class HassalehDaemon:
                 # Hot path: process pending Intents
                 await self._process_pending_intents()
 
+                # Task orchestration path: execution modes + parent state sync
+                await self._orchestrate_task_execution_modes()
+
                 # Clean up finished workers
                 self._reap_workers()
 
@@ -317,6 +377,10 @@ class HassalehDaemon:
                 await self._execute_capability(intent_id, intent)
             elif action == "update_property":
                 await self._execute_update(intent_id, intent)
+            elif action == "review_task":
+                await self._execute_task_review(intent_id, agent)
+            elif action == "assign_task":
+                await self._execute_assign_task(intent_id, agent)
             else:
                 await self._reject_intent(intent_id, f"Unknown action: {action}")
                 return
@@ -411,6 +475,19 @@ class HassalehDaemon:
             return
 
         async with self.driver.session() as session:
+            if prop == "lifecycle":
+                result = await session.run("""
+                    MATCH (i:Intent {id: $id})-[:TARGETS]->(target)
+                    RETURN labels(target) AS labels,
+                           target.execution_mode AS execution_mode
+                """, id=intent_id)
+                record = await result.single()
+                if record and "Task" in record["labels"]:
+                    value = _normalize_task_lifecycle_update(
+                        record.get("execution_mode"),
+                        str(value),
+                    )
+
             await session.run("""
                 MATCH (i:Intent {id: $id})-[:TARGETS]->(target)
                 SET target[$prop] = $value
@@ -423,6 +500,133 @@ class HassalehDaemon:
             """, id=intent_id)
 
         log.info(f"Intent {intent_id}: updated property '{prop}'")
+
+    async def _execute_task_review(self, intent_id: str, agent: dict) -> None:
+        """Approve or reject a supervised task awaiting review."""
+        async with self.driver.session() as session:
+            result = await session.run("""
+                MATCH (i:Intent {id: $id})-[:TARGETS]->(t:Task)
+                OPTIONAL MATCH (t)-[:SUPERVISED_BY]->(lead:Agent)
+                RETURN t.id AS task_id,
+                       t.lifecycle AS lifecycle,
+                       collect(lead.id) AS lead_agent_ids,
+                       i.value AS review_payload
+            """, id=intent_id)
+            record = await result.single()
+
+            if not record or not record["task_id"]:
+                await self._fail_intent(intent_id, "No Task linked to review Intent")
+                return
+
+            lead_agent_ids = [lead_id for lead_id in record["lead_agent_ids"] if lead_id]
+            if agent["id"] not in lead_agent_ids:
+                await self._reject_intent(intent_id, "Agent is not the supervising lead")
+                return
+
+            if record["lifecycle"] != "awaiting_review":
+                await self._reject_intent(
+                    intent_id,
+                    f"Task is '{record['lifecycle']}', not 'awaiting_review'",
+                )
+                return
+
+            approved = True
+            comment = ""
+            payload = record.get("review_payload")
+            if payload:
+                try:
+                    parsed = json.loads(payload)
+                    approved = bool(parsed.get("approved", False))
+                    comment = str(parsed.get("comment", ""))
+                except (TypeError, json.JSONDecodeError):
+                    await self._fail_intent(intent_id, "Invalid review payload")
+                    return
+
+            target_lifecycle = "success" if approved else "failed"
+            await session.run("""
+                MATCH (t:Task {id: $task_id})
+                SET t.lifecycle = $lifecycle,
+                    t.completed_at = datetime({timezone: 'UTC'}),
+                    t.reviewed_at = datetime({timezone: 'UTC'}),
+                    t.reviewed_by = $agent_id,
+                    t.review_comment = $comment
+            """,
+                task_id=record["task_id"],
+                lifecycle=target_lifecycle,
+                agent_id=agent["id"],
+                comment=comment,
+            )
+            await session.run("""
+                MATCH (i:Intent {id: $id})
+                SET i.lifecycle = 'success',
+                    i.completed_at = datetime({timezone: 'UTC'})
+            """, id=intent_id)
+
+        log.info(
+            "Intent %s: reviewed task %s as %s",
+            intent_id,
+            record["task_id"],
+            target_lifecycle,
+        )
+
+    async def _execute_assign_task(self, intent_id: str, agent: dict) -> None:
+        """Create ASSIGNED_TO edge for a rule-generated task assignment intent."""
+        async with self.driver.session() as session:
+            result = await session.run("""
+                MATCH (i:Intent {id: $id})
+                RETURN i.value AS payload
+            """, id=intent_id)
+            record = await result.single()
+            if not record or not record.get("payload"):
+                await self._fail_intent(intent_id, "Missing assignment payload")
+                return
+
+            try:
+                payload = json.loads(record["payload"])
+            except (TypeError, json.JSONDecodeError):
+                await self._fail_intent(intent_id, "Invalid assignment payload")
+                return
+
+            task_id = payload.get("task_id")
+            if not task_id:
+                await self._fail_intent(intent_id, "Assignment payload missing task_id")
+                return
+
+            task_result = await session.run("""
+                MATCH (t:Task {id: $task_id})
+                OPTIONAL MATCH (t)-[:ASSIGNED_TO]->(existing:Agent)
+                RETURN t.id AS task_id,
+                       collect(existing.id) AS assigned_agent_ids
+            """, task_id=task_id)
+            task_record = await task_result.single()
+            if not task_record or not task_record["task_id"]:
+                await self._fail_intent(intent_id, f"Task '{task_id}' not found")
+                return
+
+            assigned_agent_ids = [
+                assigned_id
+                for assigned_id in task_record["assigned_agent_ids"]
+                if assigned_id
+            ]
+            if assigned_agent_ids and agent["id"] not in assigned_agent_ids:
+                await self._reject_intent(
+                    intent_id,
+                    f"Task already assigned to {', '.join(assigned_agent_ids)}",
+                )
+                return
+
+            await session.run("""
+                MATCH (t:Task {id: $task_id})
+                MATCH (a:Agent {id: $agent_id})
+                MERGE (t)-[:ASSIGNED_TO]->(a)
+            """, task_id=task_id, agent_id=agent["id"])
+            await session.run("""
+                MATCH (i:Intent {id: $id})
+                SET i.lifecycle = 'success',
+                    i.completed_at = datetime({timezone: 'UTC'})
+            """, id=intent_id)
+
+        log.info("Intent %s: assigned task %s to %s", intent_id, task_id, agent["id"])
 
     # ── Permission Checks ──
 
@@ -494,6 +698,123 @@ class HassalehDaemon:
             count = record["recovered"]
             if count > 0:
                 log.warning(f"Recovered {count} zombie Intent(s)")
+
+    # ── Task Orchestration ──
+
+    async def _orchestrate_task_execution_modes(self) -> None:
+        """Advance grouped tasks according to their execution mode."""
+        await self._activate_sequential_task_groups()
+        await self._activate_parallel_task_groups()
+        await self._sync_parent_task_states()
+
+    async def _activate_sequential_task_groups(self) -> None:
+        """Promote only the next eligible task in each sequential group."""
+        async with self.driver.session() as session:
+            result = await session.run("""
+                MATCH (t:Task)
+                WHERE t.execution_mode = 'sequential'
+                  AND t.parent_task_id IS NOT NULL
+                RETURN DISTINCT t.parent_task_id AS parent_task_id
+            """)
+            parent_task_ids = [
+                record["parent_task_id"]
+                async for record in result
+                if record["parent_task_id"]
+            ]
+
+            for parent_task_id in parent_task_ids:
+                tasks_result = await session.run("""
+                    MATCH (t:Task {execution_mode: 'sequential', parent_task_id: $parent_task_id})
+                    RETURN t.id AS id,
+                           t.lifecycle AS lifecycle,
+                           t.execution_order AS execution_order
+                    ORDER BY coalesce(t.execution_order, 0) ASC, t.id ASC
+                """, parent_task_id=parent_task_id)
+                tasks = [dict(record) async for record in tasks_result]
+                next_task_id = _next_sequential_task_id(tasks)
+                if not next_task_id:
+                    continue
+
+                await session.run("""
+                    MATCH (t:Task {id: $task_id})
+                    WHERE t.lifecycle = 'pending'
+                    SET t.lifecycle = 'ready'
+                """, task_id=next_task_id)
+
+    async def _activate_parallel_task_groups(self) -> None:
+        """Promote pending tasks in parallel groups to ready together."""
+        fail_fast = bool(self.config.get("parallel_fail_fast", True))
+        async with self.driver.session() as session:
+            result = await session.run("""
+                MATCH (t:Task)
+                WHERE t.execution_mode = 'parallel'
+                  AND t.parent_task_id IS NOT NULL
+                RETURN DISTINCT t.parent_task_id AS parent_task_id
+            """)
+            parent_task_ids = [
+                record["parent_task_id"]
+                async for record in result
+                if record["parent_task_id"]
+            ]
+
+            for parent_task_id in parent_task_ids:
+                states_result = await session.run("""
+                    MATCH (t:Task {execution_mode: 'parallel', parent_task_id: $parent_task_id})
+                    RETURN t.lifecycle AS lifecycle
+                """, parent_task_id=parent_task_id)
+                lifecycles = [
+                    record["lifecycle"]
+                    async for record in states_result
+                    if record["lifecycle"]
+                ]
+                if not _parallel_group_should_activate(lifecycles, fail_fast=fail_fast):
+                    continue
+
+                await session.run("""
+                    MATCH (t:Task {execution_mode: 'parallel', parent_task_id: $parent_task_id})
+                    WHERE t.lifecycle = 'pending'
+                    SET t.lifecycle = 'ready'
+                """, parent_task_id=parent_task_id)
+
+    async def _sync_parent_task_states(self) -> None:
+        """Sync parent task status from grouped child task state."""
+        fail_fast = bool(self.config.get("parallel_fail_fast", True))
+        async with self.driver.session() as session:
+            result = await session.run("""
+                MATCH (t:Task)
+                WHERE t.parent_task_id IS NOT NULL
+                RETURN DISTINCT t.parent_task_id AS parent_task_id
+            """)
+            parent_task_ids = [
+                record["parent_task_id"]
+                async for record in result
+                if record["parent_task_id"]
+            ]
+
+            for parent_task_id in parent_task_ids:
+                states_result = await session.run("""
+                    MATCH (t:Task {parent_task_id: $parent_task_id})
+                    RETURN t.lifecycle AS lifecycle
+                    ORDER BY coalesce(t.execution_order, 0) ASC, t.id ASC
+                """, parent_task_id=parent_task_id)
+                lifecycles = [
+                    record["lifecycle"]
+                    async for record in states_result
+                    if record["lifecycle"]
+                ]
+                parent_lifecycle = _parent_group_lifecycle(
+                    lifecycles,
+                    fail_fast=fail_fast,
+                )
+                if not parent_lifecycle:
+                    continue
+
+                await session.run("""
+                    MATCH (parent:Task {id: $parent_task_id})
+                    WHERE parent.lifecycle <> $lifecycle
+                    SET parent.lifecycle = $lifecycle,
+                        parent.completed_at = datetime({timezone: 'UTC'})
+                """, parent_task_id=parent_task_id, lifecycle=parent_lifecycle)
 
     # ── Sweep ──
 
@@ -702,7 +1023,7 @@ class HassalehDaemon:
 
         Creates the Intent node, links it to the target Agent via [:PROPOSED]
         (required for the Daemon's _process_pending_intents query), and
-        links it to the Capability via [:TARGETS].
+        links it to the Capability via [:TARGETS] when applicable.
         """
         import uuid
         intent_id = str(uuid.uuid4())
@@ -713,6 +1034,7 @@ class HassalehDaemon:
                 target_id = submit_action.target_node.get("id")
 
             args_json = json.dumps(submit_action.args) if submit_action.args else None
+            action = "assign_task" if submit_action.capability_id == "assign-task" else "execute_capability"
 
             # Create Intent + PROPOSED link to the target agent in one query
             if target_id:
@@ -721,30 +1043,30 @@ class HassalehDaemon:
                     CREATE (agent)-[:PROPOSED]->(i:Intent {
                         id: $intent_id,
                         submitted_at: datetime({timezone: 'UTC'}),
-                        action: 'execute_capability',
+                        action: $action,
                         value: $args,
                         lifecycle: 'pending',
                         source: 'rule',
                         source_rule: $rule_id
                     })
                 """, intent_id=intent_id, args=args_json,
-                   rule_id=rule_id, target_id=target_id)
+                   rule_id=rule_id, target_id=target_id, action=action)
             else:
                 # No target — create orphaned Intent (will need manual linking)
                 session.run("""
                     CREATE (i:Intent {
                         id: $intent_id,
                         submitted_at: datetime({timezone: 'UTC'}),
-                        action: 'execute_capability',
+                        action: $action,
                         value: $args,
                         lifecycle: 'pending',
                         source: 'rule',
                         source_rule: $rule_id
                     })
-                """, intent_id=intent_id, args=args_json, rule_id=rule_id)
+                """, intent_id=intent_id, args=args_json, rule_id=rule_id, action=action)
 
             # Link to capability via TARGETS
-            if submit_action.capability_id:
+            if action == "execute_capability" and submit_action.capability_id:
                 session.run("""
                     MATCH (i:Intent {id: $intent_id})
                     MATCH (cap:Capability {id: $cap_id})

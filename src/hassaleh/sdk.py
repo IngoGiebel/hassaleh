@@ -13,6 +13,7 @@ Reference: docs/CONCEPT.md v1.2, Section 3.3
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import re
@@ -356,6 +357,62 @@ class HassalehSDK:
         """, {"project_id": project_id})
 
         return records[0] if records else {}
+
+    async def task_group_status(self, parent_task_id: str) -> list[dict[str, Any]]:
+        """Get ordered status for all tasks in a task group."""
+        return await self.query("""
+            MATCH (t:Task {parent_task_id: $parent_task_id})
+            RETURN t.id AS id,
+                   t.name AS name,
+                   t.lifecycle AS lifecycle,
+                   t.execution_mode AS execution_mode,
+                   t.execution_order AS execution_order,
+                   t.parent_task_id AS parent_task_id
+            ORDER BY coalesce(t.execution_order, 0) ASC, t.id ASC
+        """, {"parent_task_id": parent_task_id})
+
+    async def review_task(
+        self,
+        task_id: str,
+        agent_id: str,
+        approved: bool,
+        comment: str = "",
+    ) -> None:
+        """Submit a supervised task review intent."""
+        intent_id = str(uuid.uuid4())
+        payload = json.dumps({
+            "approved": approved,
+            "comment": comment,
+        })
+
+        async with self.driver.session() as session:
+            async def _create_review_intent(tx):
+                await tx.run("""
+                    MATCH (agent:Agent {id: $agent_id})
+                    CREATE (i:Intent {
+                        id: $intent_id,
+                        submitted_at: datetime({timezone: 'UTC'}),
+                        action: 'review_task',
+                        value: $payload,
+                        lifecycle: 'pending',
+                        started_at: null,
+                        completed_at: null,
+                        stdout: null,
+                        stderr: null,
+                        error_reason: null,
+                        exit_code: null
+                    })
+                    CREATE (agent)-[:PROPOSED]->(i)
+                """, agent_id=agent_id, intent_id=intent_id, payload=payload)
+                await tx.run("""
+                    MATCH (i:Intent {id: $intent_id})
+                    MATCH (t:Task {id: $task_id})
+                    CREATE (i)-[:TARGETS]->(t)
+                """, intent_id=intent_id, task_id=task_id)
+
+            await session.execute_write(_create_review_intent)
+
+        log.info("Submitted review_task Intent %s for task %s", intent_id, task_id)
 
     # ── Messaging (Cursor-based) ──
 

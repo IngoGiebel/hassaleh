@@ -54,3 +54,25 @@ SET r2 += {
             t.error_reason = "Task timed out"
             LOG "Task timed out" LEVEL "warning"'
 };
+
+// ──────────────────────────────────────────
+// Rule 3: Task Assignment
+// ──────────────────────────────────────────
+// Assigns pending tasks to agents whose capabilities match the task's
+// required capability edge. The assign_task intent is idempotent and
+// will no-op if the task is already assigned.
+
+MERGE (r3:Rule {id: "task-assignment"})
+SET r3 += {
+  name: "Task Assignment",
+  version: 1,
+  category: "operations",
+  priority: 30,
+  lifecycle: "available",
+  description: "Assign pending unclaimed tasks to agents with matching capabilities.",
+  author: "dione",
+  rule_text: 'EVERY "PT1M":
+    MATCH (t:Task {lifecycle: \'pending\'})-[:REQUIRES_CAPABILITY]->(c:Capability)<-[:HAS_CAPABILITY]-(a:Agent):
+        SUBMIT_INTENT "assign-task" ON a WITH {task_id: t.id}
+        LOG "Queued task assignment" LEVEL "info"'
+};

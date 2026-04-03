@@ -61,6 +61,15 @@ CREATE INDEX agent_lifecycle IF NOT EXISTS
 CREATE INDEX task_lifecycle IF NOT EXISTS
   FOR (t:Task) ON (t.lifecycle);
 
+CREATE INDEX task_execution_mode IF NOT EXISTS
+  FOR (t:Task) ON (t.execution_mode);
+
+CREATE INDEX task_parent_group IF NOT EXISTS
+  FOR (t:Task) ON (t.parent_task_id);
+
+CREATE INDEX task_execution_order IF NOT EXISTS
+  FOR (t:Task) ON (t.execution_order);
+
 // Capability lookup by kind
 CREATE INDEX capability_kind IF NOT EXISTS
   FOR (c:Capability) ON (c.kind);
