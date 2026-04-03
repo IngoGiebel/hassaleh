@@ -368,46 +368,160 @@
 - [ ] CLI commands for message and discussion management
 - [ ] Tests cover message ordering, cursor advancement, and discussion lifecycle
 
-### Sprint N: Skill Domain Taxonomy
+### Sprint 7: Advanced List Types + FOREACH
 
-**Goal:** Organize skills into hierarchical problem domains for discovery, permissions, and ecosystem organization.
+**Goal:** Extend the existing GSL-Ops list support (basic FOREACH, list literals, LET) with advanced list operations, list-returning built-in functions, and comprehensive type handling. Make lists first-class citizens in GSL-Ops.
 
-- Define domain taxonomy (dot-notation: `orchestration.rules`, `data.graph`, `reporting.activity`, etc.)
-- Add `domain` property to Capability nodes + Neo4j index for prefix queries
-- `hassaleh skill list --domain orchestration` — filter skills by domain
-- `hassaleh skill search <query>` — semantic skill discovery across domains
-- Domain-scoped project permissions: restrict available skill domains per project
-- Conflict resolution: domain specificity determines priority when multiple skills match
-- Documentation: domain taxonomy reference, guidelines for external skill authors
+**Lead:** Dione 🌙
+**Team:** Codex (development), Gemini CLI (review)
+**Duration:** ~1 week
 
-### Sprint N: List Types + FOREACH
+**Already implemented (Sprint 4):**
+- `FOREACH item IN collection:` block
+- List literals `[a, b, c]`, empty `[]`
+- `LET` variable bindings
+- Basic functions: `LEN`, `RANGE`, `SORTED`, `LIST`, `KEYS`
 
-**Goal:** Add list/collection types to GSL-Ops and a `FOREACH var:` iteration construct.
+### Phase 1: List Functions
 
-- Define list literal syntax (e.g. `[a, b, c]`) and list-returning functions
-- `FOREACH item IN collection:` block — iterates over lists from MATCH results, properties, or expressions
-- Type system extension: lists as first-class values in LET bindings
-- Prerequisite: Decide on list representation in Neo4j (native lists vs. relationship chains)
-- Use cases: "Reset all failed tasks", "Notify all agents with capability X", "Iterate agent capabilities"
+| # | Task | Assignee | Reviewer | Status |
+|---|------|----------|----------|--------|
+| 1.1 | Add `FILTER(list, lambda)` — filter list by predicate | Dione | Codex | ⬜ todo |
+| 1.2 | Add `MAP(list, lambda)` — transform list elements | Dione | Codex | ⬜ todo |
+| 1.3 | Add `FLATTEN(list)` — flatten nested lists one level | Dione | — | ⬜ todo |
+| 1.4 | Add `CONTAINS(list, item)` — membership test | Dione | — | ⬜ todo |
+| 1.5 | Add `APPEND(list, item)`, `CONCAT(list1, list2)` — constructors | Dione | — | ⬜ todo |
+| 1.6 | Add `UNIQUE(list)` — deduplicate preserving order | Dione | — | ⬜ todo |
+| 1.7 | Add `SLICE(list, start, end)` — sub-list extraction | Dione | — | ⬜ todo |
+| 1.8 | Add `SUM(list)`, `AVG(list)` — numeric aggregations | Dione | — | ⬜ todo |
 
-### Sprint 7: Docker Dev-Environment
+### Phase 2: List Type System
+
+| # | Task | Assignee | Reviewer | Status |
+|---|------|----------|----------|--------|
+| 2.1 | List-typed LET bindings: `LET items = [1, 2, 3]` with type inference | Dione | — | ⬜ todo |
+| 2.2 | Property access on list elements in FOREACH: `FOREACH t IN tasks: t.name` | Dione | — | ⬜ todo |
+| 2.3 | Nested FOREACH support: `FOREACH a IN agents: FOREACH c IN a.capabilities:` | Dione | — | ⬜ todo |
+| 2.4 | List comprehension syntax: `[x.name FOR x IN agents IF x.lifecycle == "running"]` | Dione | Codex | ⬜ todo |
+| 2.5 | Neo4j list property read/write: store/retrieve native Neo4j lists | Dione | — | ⬜ todo |
+
+### Phase 3: Integration + Tests
+
+| # | Task | Assignee | Reviewer | Status |
+|---|------|----------|----------|--------|
+| 3.1 | Parser tests for all new functions (target: 15+ new tests) | Dione | — | ⬜ todo |
+| 3.2 | Compiler tests: each function compiles correctly (target: 15+ tests) | Dione | — | ⬜ todo |
+| 3.3 | E2E tests: functions execute with real data in RuleContext (target: 10+ tests) | Dione | — | ⬜ todo |
+| 3.4 | Operational rule: "Bulk reset failed tasks" using FOREACH + FILTER | Dione | — | ⬜ todo |
+| 3.5 | Operational rule: "Notify agents with specific capabilities" using MAP + FOREACH | Dione | — | ⬜ todo |
+| 3.6 | Update GSL-Ops Language Reference in CONCEPT.md | Dione | — | ⬜ todo |
+
+### Sprint 7 Acceptance Criteria
+
+- [ ] All 8 list functions implemented and tested (FILTER, MAP, FLATTEN, CONTAINS, APPEND, CONCAT, UNIQUE, SLICE, SUM, AVG)
+- [ ] Nested FOREACH works (2 levels deep)
+- [ ] List comprehension syntax parses and compiles
+- [ ] Neo4j native lists can be read/written via rules
+- [ ] Two new operational rules demonstrate list usage
+- [ ] 40+ new tests covering all list operations
+- [ ] CONCEPT.md GSL-Ops reference updated
+
+---
+
+### Sprint 8: Skill Domain Taxonomy
+
+**Goal:** Organize skills/capabilities into hierarchical problem domains for discovery, permissions, and ecosystem organization.
+
+**Lead:** Dione 🌙
+**Team:** Codex (development), Gemini CLI (review)
+**Duration:** ~1 week
+
+### Phase 1: Domain Model
+
+| # | Task | Assignee | Reviewer | Status |
+|---|------|----------|----------|--------|
+| 1.1 | Define domain taxonomy (dot-notation: `orchestration.rules`, `data.graph`, `reporting.activity`, etc.) | Dione | Gemini | ⬜ todo |
+| 1.2 | Add `domain` property to Capability nodes + Neo4j index for prefix queries | Dione | — | ⬜ todo |
+| 1.3 | Seed data: assign domains to existing capabilities | Dione | — | ⬜ todo |
+| 1.4 | Schema.cypher: domain index on Capability | Dione | — | ⬜ todo |
+
+### Phase 2: Discovery + Permissions
+
+| # | Task | Assignee | Reviewer | Status |
+|---|------|----------|----------|--------|
+| 2.1 | `hassaleh skill list --domain orchestration` — filter by domain prefix | Dione | Codex | ⬜ todo |
+| 2.2 | `hassaleh skill search <query>` — semantic skill discovery across domains | Dione | Codex | ⬜ todo |
+| 2.3 | Domain-scoped project permissions: restrict available skill domains per project | Dione | — | ⬜ todo |
+| 2.4 | Conflict resolution: domain specificity determines priority when multiple skills match | Dione | — | ⬜ todo |
+
+### Phase 3: Documentation + Tests
+
+| # | Task | Assignee | Status |
+|---|------|----------|--------|
+| 3.1 | Domain taxonomy reference document | Dione | ⬜ todo |
+| 3.2 | Guidelines for external skill authors | Dione | ⬜ todo |
+| 3.3 | Unit + integration tests (target: 20+ tests) | Dione | ⬜ todo |
+| 3.4 | Update CONCEPT.md with Skill Domain section | Dione | ⬜ todo |
+
+### Sprint 8 Acceptance Criteria
+
+- [ ] Domain taxonomy defined with at least 10 top-level domains
+- [ ] Capabilities have domain property in Neo4j
+- [ ] CLI commands for domain-based skill discovery
+- [ ] Domain-scoped permissions enforced
+- [ ] Documentation complete
+- [ ] 20+ tests
+
+---
+
+### Sprint 9: Comprehensive Code Review
+
+**Goal:** Full codebase review by multiple AI models. Fix all findings. Harden for production.
+
+**Lead:** Dione 🌙
+**Team:** Codex (review round 1), Gemini Deep Think (review round 2)
+**Duration:** ~1 week
+
+| # | Task | Assignee | Status |
+|---|------|----------|--------|
+| 9.1 | Codex full review: security, correctness, performance, style | Codex | ⬜ todo |
+| 9.2 | Document Codex findings in `docs/REVIEW_SPRINT9_CODEX.md` | Dione | ⬜ todo |
+| 9.3 | Fix all Critical + High issues from Codex review | Dione | ⬜ todo |
+| 9.4 | Gemini Deep Think review: architecture, edge cases, Neo4j patterns | Gemini | ⬜ todo |
+| 9.5 | Document Gemini findings in `docs/REVIEW_SPRINT9_GEMINI.md` | Dione | ⬜ todo |
+| 9.6 | Fix all Critical + High issues from Gemini review | Dione | ⬜ todo |
+| 9.7 | Run full test suite, ensure 0 regressions | Dione | ⬜ todo |
+| 9.8 | Update changelog / version bump | Dione | ⬜ todo |
+
+### Sprint 9 Acceptance Criteria
+
+- [ ] Two independent reviews completed (Codex + Gemini)
+- [ ] All Critical issues fixed
+- [ ] All High issues fixed or documented as known limitations
+- [ ] Full test suite green
+- [ ] Review documents archived in docs/
+
+---
+
+### Sprint 10: Docker Dev-Environment
 
 **Goal:** `docker compose up` for instant onboarding — Neo4j + Daemon + CLI ready in 30 seconds.
 
 **Lead:** Dione 🌙
+**Team:** Codex (development)
 **Duration:** ~1 day
 
 | # | Task | Status |
 |---|------|--------|
-| 7.1 | `Dockerfile` — Python 3.13 + Hassaleh + Daemon | ⬜ todo |
-| 7.2 | `docker-compose.yml` — Neo4j + Hassaleh Daemon + init container | ⬜ todo |
-| 7.3 | Init container: auto-apply schema + seed + rules on first boot | ⬜ todo |
-| 7.4 | Health check for Daemon container | ⬜ todo |
-| 7.5 | `.env.example` with configurable passwords/ports | ⬜ todo |
-| 7.6 | `docs/DOCKER.md` — setup instructions, troubleshooting | ⬜ todo |
-| 7.7 | README section: Docker quick start | ⬜ todo |
+| 10.1 | `Dockerfile` — Python 3.13 + Hassaleh + Daemon | ⬜ todo |
+| 10.2 | `docker-compose.yml` — Neo4j + Hassaleh Daemon + init container | ⬜ todo |
+| 10.3 | Init container: auto-apply schema + seed + rules on first boot | ⬜ todo |
+| 10.4 | Health check for Daemon container | ⬜ todo |
+| 10.5 | `.env.example` with configurable passwords/ports | ⬜ todo |
+| 10.6 | `docs/DOCKER.md` — setup instructions, troubleshooting | ⬜ todo |
+| 10.7 | README section: Docker quick start | ⬜ todo |
 
-### Sprint 7 Acceptance Criteria
+### Sprint 10 Acceptance Criteria
 
 - [ ] `docker compose up` starts Neo4j + Daemon from zero
 - [ ] Schema + seed + rules auto-applied on first boot
@@ -425,7 +539,12 @@
 | 2 (Rules) | GSL-Ops grammar + compiler | Rule evaluator, conflict resolution | Review rule semantics |
 | 3 (CLI) | CLI design | CLI implementation | UX review |
 | 4 (Integration) | OpenClaw integration lead | Agent lifecycle code | Architecture review |
-| 5+ | Orchestrate | Develop | Review |
+| 5 (Reporting) | Report design | Implementation | — |
+| 6 (Multi-Agent) | Coordination design | Messages + Tasks implementation | Sprint 6 review |
+| 7 (Lists) | Grammar + compiler lead | Implementation | Review |
+| 8 (Domains) | Taxonomy design | Implementation | Review |
+| 9 (Review) | Fix orchestration | Review round 1 | Review round 2 (Deep Think) |
+| 10 (Docker) | Orchestrate | Implementation | — |
 
 ---
 

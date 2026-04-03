@@ -137,6 +137,7 @@ DURATION_LITERAL.3: /\d+[smhd]/
      | PROP_ACCESS                        -> prop_access
      | NAME                               -> var_ref
      | func_call
+     | list_comp
      | list_literal
      | "(" expr ")"
      | "true"                             -> bool_true
@@ -145,6 +146,7 @@ DURATION_LITERAL.3: /\d+[smhd]/
      | "None"                             -> null_literal
 
 // List literal: [expr, expr, ...]
+list_comp: "[" expr "FOR" NAME "IN" expr ("IF" expr)? "]"
 list_literal: "[" list_items? "]"
 list_items: expr ("," expr)*
 

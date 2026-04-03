@@ -342,6 +342,9 @@ class GSLOpsCompiler:
         if d == "list_literal":
             return self._compile_list_literal(node)
 
+        if d == "list_comp":
+            return self._compile_list_comp(node)
+
         if d == "func_call":
             return self._compile_func_call(node)
 
@@ -372,6 +375,37 @@ class GSLOpsCompiler:
                  if isinstance(ch, Tree)]
         return f"[{', '.join(items)}]"
 
+    def _compile_list_comp(self, node: Tree) -> str:
+        """Compile [expr FOR name IN iterable IF cond] to Python."""
+        expr_tree = next((ch for ch in node.children if isinstance(ch, Tree)), None)
+        if expr_tree is None:
+            return "[]"
+
+        names = [str(ch) for ch in node.children
+                 if isinstance(ch, Token) and ch.type == "NAME"]
+        comp_var = names[0] if names else "_item"
+
+        tree_count = 0
+        iterable_tree = None
+        cond_tree = None
+
+        for ch in node.children:
+            if isinstance(ch, Tree):
+                tree_count += 1
+                if tree_count == 2:
+                    iterable_tree = ch
+                elif tree_count == 3:
+                    cond_tree = ch
+
+        expr = self._compile_expr_tree(expr_tree)
+        iterable = self._compile_expr_tree(iterable_tree) if iterable_tree else "[]"
+        if_clause = ""
+        if cond_tree is not None:
+            condition = self._compile_expr_tree(cond_tree)
+            if_clause = f" if {condition}"
+
+        return f"[{expr} for {comp_var} in {iterable}{if_clause}]"
+
     def _compile_func_call(self, node: Tree) -> str:
         """Compile a function call."""
         func_name = self._get_token(node, "NAME")
@@ -393,6 +427,19 @@ class GSLOpsCompiler:
             "KEYS": "ctx.keys",
             "SORTED": "sorted",
             "LIST": "list",
+            "CONTAINS": "ctx.contains",
+            "APPEND": "ctx.append",
+            "CONCAT": "ctx.concat",
+            "FLATTEN": "ctx.flatten",
+            "UNIQUE": "ctx.unique",
+            "SLICE": "ctx.slice",
+            "SUM": "sum",
+            "AVG": "ctx.avg",
+            "FIRST": "ctx.first",
+            "LAST": "ctx.last",
+            "COUNT": "len",
+            "ZIP": "ctx.zip",
+            "ENUMERATE": "list(enumerate",
         }
 
         if func_name == "NOW":
@@ -408,6 +455,8 @@ class GSLOpsCompiler:
         if mapped and args_node:
             args = [self._compile_expr_tree(ch) for ch in args_node.children
                     if isinstance(ch, Tree)]
+            if func_name == "ENUMERATE":
+                return f"{mapped}({', '.join(args)}))"
             return f"{mapped}({', '.join(args)})"
 
         # Unknown function — reject at compile time (security: prevents

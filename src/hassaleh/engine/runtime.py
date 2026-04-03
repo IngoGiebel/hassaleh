@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -305,3 +306,84 @@ class RuleContext:
         if hasattr(node, "keys"):
             return list(node.keys())
         return []
+
+    def contains(self, items: Any, value: Any) -> bool:
+        """Return True if value is present in items."""
+        for item in self._to_list(items):
+            if item == value:
+                return True
+        return False
+
+    def append(self, items: Any, value: Any) -> list[Any]:
+        """Return a new list with value appended."""
+        result = self._to_list(items)
+        result.append(value)
+        return result
+
+    def concat(self, left: Any, right: Any) -> list[Any]:
+        """Return two list-like values merged into a new list."""
+        return self._to_list(left) + self._to_list(right)
+
+    def flatten(self, items: Any) -> list[Any]:
+        """Flatten one nesting level from a list-like value."""
+        flattened: list[Any] = []
+        for item in self._to_list(items):
+            if self._is_flattenable(item):
+                flattened.extend(list(item))
+            else:
+                flattened.append(item)
+        return flattened
+
+    def unique(self, items: Any) -> list[Any]:
+        """Deduplicate while preserving original order."""
+        result: list[Any] = []
+        for item in self._to_list(items):
+            if item not in result:
+                result.append(item)
+        return result
+
+    def slice(self, items: Any, start: Any, end: Any) -> list[Any]:
+        """Return a Python-style slice of a list-like value."""
+        values = self._to_list(items)
+        return values[start:end]
+
+    def avg(self, items: Any) -> float | None:
+        """Return the arithmetic mean, or None for an empty list."""
+        values = self._to_list(items)
+        if not values:
+            return None
+        return sum(values) / len(values)
+
+    def first(self, items: Any) -> Any:
+        """Return the first element, or None if empty."""
+        values = self._to_list(items)
+        return values[0] if values else None
+
+    def last(self, items: Any) -> Any:
+        """Return the last element, or None if empty."""
+        values = self._to_list(items)
+        return values[-1] if values else None
+
+    def zip(self, left: Any, right: Any) -> list[tuple[Any, Any]]:
+        """Return paired items from two list-like values."""
+        return list(zip(self._to_list(left), self._to_list(right)))
+
+    def _to_list(self, value: Any) -> list[Any]:
+        """Coerce list-like runtime values into a list without mutating input."""
+        if value is None:
+            return []
+        if isinstance(value, list):
+            return list(value)
+        if isinstance(value, tuple):
+            return list(value)
+        if isinstance(value, range):
+            return list(value)
+        if isinstance(value, Iterable) and not isinstance(value, (str, bytes, dict)):
+            return list(value)
+        return [value]
+
+    def _is_flattenable(self, value: Any) -> bool:
+        """Return True when flatten() should expand the value one level."""
+        return isinstance(value, Iterable) and not isinstance(
+            value, (str, bytes, dict)
+        )

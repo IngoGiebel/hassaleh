@@ -76,3 +76,46 @@ SET r3 += {
         SUBMIT_INTENT "assign-task" ON a WITH {task_id: t.id}
         LOG "Queued task assignment" LEVEL "info"'
 };
+
+// ──────────────────────────────────────────
+// Rule 4: Bulk Reset Failed Tasks
+// ──────────────────────────────────────────
+// Re-queues retryable failed tasks in a batch sweep.
+
+MERGE (r4:Rule {id: "bulk-reset-failed-tasks"})
+SET r4 += {
+  name: "Bulk Reset Failed Tasks",
+  version: 1,
+  category: "operations",
+  priority: 25,
+  lifecycle: "available",
+  description: "Reset retryable failed tasks back to pending during scheduled sweeps.",
+  author: "dione",
+  rule_text: 'EVERY "PT10M":
+    MATCH (t:Task {lifecycle: \'failed\'}):
+        FOREACH reset_state IN ["pending"]:
+            IF t.retry_count < 3 && CONTAINS(["timeout", "crash", "oom"], t.error_reason):
+                t.lifecycle = reset_state
+                t.retry_count += 1
+                LOG "Bulk reset failed task" LEVEL "warning"'
+};
+
+// ──────────────────────────────────────────
+// Rule 5: Capability Alert
+// ──────────────────────────────────────────
+// Alerts when an assigned agent does not have the task's required capability.
+
+MERGE (r5:Rule {id: "capability-alert"})
+SET r5 += {
+  name: "Capability Alert",
+  version: 1,
+  category: "operations",
+  priority: 15,
+  lifecycle: "available",
+  description: "Notify when an assigned task requires a capability the agent does not have.",
+  author: "dione",
+  rule_text: 'EVERY "PT5M":
+    MATCH (t:Task)-[:ASSIGNED_TO]->(a:Agent), (t)-[:REQUIRES_CAPABILITY]->(c:Capability) WHERE NOT (a)-[:HAS_CAPABILITY]->(c):
+        ALERT "Assigned task requires missing capability" ON a
+        LOG "Capability mismatch detected" LEVEL "error"'
+};
