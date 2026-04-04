@@ -154,6 +154,37 @@ def test_parser_report_intents():
     assert args.format == "text"  # default
 
 
+def test_parser_skill_list():
+    parser = build_parser()
+    args = parser.parse_args(["skill", "list", "--domain", "orchestration"])
+    assert args.command == "skill"
+    assert args.skill_command == "list"
+    assert args.domain == "orchestration"
+
+
+def test_parser_skill_search():
+    parser = build_parser()
+    args = parser.parse_args(["skill", "search", "graph"])
+    assert args.command == "skill"
+    assert args.skill_command == "search"
+    assert args.query == "graph"
+
+
+def test_parser_skill_info():
+    parser = build_parser()
+    args = parser.parse_args(["skill", "info", "exec-ls"])
+    assert args.command == "skill"
+    assert args.skill_command == "info"
+    assert args.skill_id == "exec-ls"
+
+
+def test_parser_domain_list():
+    parser = build_parser()
+    args = parser.parse_args(["domain", "list"])
+    assert args.command == "domain"
+    assert args.domain_command == "list"
+
+
 def test_parser_no_command():
     parser = build_parser()
     args = parser.parse_args([])

@@ -720,13 +720,32 @@ Hassaleh ships with a set of built-in Skills that agents can invoke via their ca
 
 **Skill invocation:** When an agent receives a request that matches a skill's domain (e.g., "create a rule that..."), it automatically invokes the corresponding skill. The skill provides the structured interaction pattern; the agent provides the conversational interface. Skills are implemented as Python modules in `src/hassaleh/skills/` and registered as Capability nodes during `hassaleh init`.
 
-**Problem Domain Taxonomy (planned):** As the skill database grows, skills will be organized into problem domains — hierarchical categories that describe what area of work a skill addresses (e.g., `orchestration.rules`, `orchestration.monitoring`, `data.graph`, `reporting.activity`). Domain assignment enables:
+### 4.14.4 Skill Domain Taxonomy
+
+Skills and executable capabilities are organized into problem domains: hierarchical dot-notation categories such as `orchestration.rules`, `data.query`, or `system.health`. The full taxonomy is defined in `docs/DOMAIN_TAXONOMY.md`.
+
+Domain assignment enables:
 - **Skill discovery:** Agents can search for relevant skills by domain rather than exact name.
 - **Domain-scoped permissions:** Projects can restrict which skill domains are available to their agents.
 - **Conflict resolution:** When multiple skills match a request, domain specificity determines priority.
 - **Ecosystem organization:** External skill authors publish to specific domains, making the skill DB browsable and curated.
 
-Domains are stored as a `domain` property on Capability nodes (dot-notation string, e.g., `"orchestration.rules"`) and indexed for fast prefix queries.
+**Storage model:** Domains are stored as a `domain` property on `Capability` nodes and indexed for fast prefix lookups. Hassaleh also materializes optional `SkillDomain` nodes so the taxonomy itself is queryable:
+
+```
+(:Capability {id: "rule-author-basic", domain: "orchestration.rules"})
+-[:IN_DOMAIN]->
+(:SkillDomain {
+    id: "orchestration.rules",
+    name: "Rule Management",
+    description: "Authoring, compiling, and managing rules.",
+    parent: "orchestration"
+})
+```
+
+**CLI discovery:** Operators can browse the taxonomy with `hassaleh skill list`, `hassaleh skill search`, `hassaleh skill info`, and `hassaleh domain list`.
+
+**Permissions:** Agents may optionally declare `allowed_domains` as a list of domain prefixes. When set, the Daemon only executes capabilities whose `domain` matches one of those prefixes. Agents with `null` or empty `allowed_domains` remain unrestricted, and unscoped legacy capabilities remain executable for backward compatibility.
 
 **Rules Author as default:** Any request to create, modify, or review a GSL-Ops rule is routed through the `hassaleh-rules-author` skill unless the operator explicitly bypasses it. This ensures consistent rule quality and human-in-the-loop validation.
 

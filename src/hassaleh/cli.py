@@ -34,6 +34,10 @@ from hassaleh.cli_fmt import (
     fmt_table, fmt_header, fmt_ok, fmt_warn, fmt_error,
     fmt_kv, fmt_section, fmt_code,
 )
+from hassaleh.domain import (
+    domain_matches_prefix,
+    format_domain_hierarchy,
+)
 
 
 # ──────────────────────────────────────────────
@@ -75,6 +79,69 @@ def connect(conn: dict):
     driver = GraphDatabase.driver(conn["uri"], auth=(conn["user"], conn["password"]))
     driver.verify_connectivity()
     return driver
+
+
+def _score_skill_match(query: str, capability: dict[str, Any]) -> tuple[int, str]:
+    """Return a sortable relevance tuple for skill search."""
+    query_lc = query.casefold()
+    name = str(capability.get("name", "")).casefold()
+    description = str(capability.get("description", "")).casefold()
+    cap_id = str(capability.get("id", ""))
+
+    if not query_lc:
+        return (0, cap_id)
+    if name == query_lc:
+        return (0, cap_id)
+    if query_lc == cap_id.casefold():
+        return (1, cap_id)
+    if description == query_lc:
+        return (2, cap_id)
+    if query_lc in name:
+        return (3, cap_id)
+    if query_lc in description:
+        return (4, cap_id)
+    return (5, cap_id)
+
+
+def _build_domain_tree(domain_rows: list[dict[str, Any]]) -> list[str]:
+    """Build a tree-like domain listing with aggregated capability counts."""
+    if not domain_rows:
+        return ["    (empty)"]
+
+    by_parent: dict[str | None, list[dict[str, Any]]] = {}
+    exact_counts = {
+        row["id"]: int(row.get("exact_count", 0) or 0)
+        for row in domain_rows
+    }
+    row_by_id = {row["id"]: row for row in domain_rows}
+
+    for row in domain_rows:
+        by_parent.setdefault(row.get("parent"), []).append(row)
+
+    def aggregate_count(domain_id: str) -> int:
+        total = exact_counts.get(domain_id, 0)
+        for child in by_parent.get(domain_id, []):
+            total += aggregate_count(child["id"])
+        return total
+
+    lines: list[str] = []
+
+    def walk(parent: str | None, depth: int) -> None:
+        for row in sorted(by_parent.get(parent, []), key=lambda item: item["id"]):
+            indent = "    " + "  " * depth
+            label = row["id"].split(".")[-1]
+            lines.append(f"{indent}{label} ({aggregate_count(row['id'])})")
+            walk(row["id"], depth + 1)
+
+    root_nodes = [
+        row for row in domain_rows
+        if row.get("parent") is None or row.get("parent") not in row_by_id
+    ]
+    for row in sorted(root_nodes, key=lambda item: item["id"]):
+        lines.append(f"    {row['id']} ({aggregate_count(row['id'])})")
+        walk(row["id"], 1)
+
+    return lines
 
 
 # ──────────────────────────────────────────────
@@ -443,6 +510,170 @@ def cmd_intent_list(args) -> int:
         str(i.get("exit_code", "—")), (i.get("error", "") or "")[:40]
     ] for i in intents]
     print(fmt_table(["ID", "Status", "Action", "Submitted", "Source", "Exit", "Error"], rows))
+    return 0
+
+
+def cmd_skill_list(args) -> int:
+    """List all capabilities with optional domain filtering."""
+    conn = get_connection(args)
+    driver = connect(conn)
+
+    with driver.session() as session:
+        result = session.run("""
+            MATCH (c:Capability)
+            RETURN c.id AS id,
+                   c.name AS name,
+                   c.domain AS domain,
+                   c.kind AS kind,
+                   c.lifecycle AS lifecycle
+            ORDER BY c.name, c.id
+        """)
+        capabilities = [dict(r) for r in result]
+
+    driver.close()
+
+    if args.domain:
+        capabilities = [
+            cap for cap in capabilities
+            if domain_matches_prefix(cap.get("domain"), args.domain)
+        ]
+
+    if not capabilities:
+        print("No skills found")
+        return 0
+
+    fmt_header("Skills")
+    rows = [[
+        cap["id"],
+        cap.get("name", ""),
+        cap.get("domain", "—"),
+        cap.get("kind", "?"),
+        cap.get("lifecycle", "?"),
+    ] for cap in capabilities]
+    print(fmt_table(["ID", "Name", "Domain", "Kind", "Lifecycle"], rows))
+    return 0
+
+
+def cmd_skill_search(args) -> int:
+    """Search capabilities by name and description."""
+    conn = get_connection(args)
+    driver = connect(conn)
+    query_lc = args.query.casefold()
+
+    with driver.session() as session:
+        result = session.run("""
+            MATCH (c:Capability)
+            WHERE toLower(coalesce(c.name, '')) CONTAINS $query
+               OR toLower(coalesce(c.description, '')) CONTAINS $query
+               OR toLower(coalesce(c.id, '')) CONTAINS $query
+            RETURN c.id AS id,
+                   c.name AS name,
+                   c.domain AS domain,
+                   c.kind AS kind,
+                   c.lifecycle AS lifecycle,
+                   c.description AS description
+        """, query=query_lc)
+        capabilities = [dict(r) for r in result]
+
+    driver.close()
+
+    capabilities.sort(key=lambda cap: _score_skill_match(args.query, cap))
+
+    if not capabilities:
+        print("No skills found")
+        return 0
+
+    fmt_header(f"Skill Search: {args.query}")
+    rows = [[
+        cap["id"],
+        cap.get("name", ""),
+        cap.get("domain", "—"),
+        cap.get("kind", "?"),
+        (cap.get("description", "") or "")[:50],
+    ] for cap in capabilities]
+    print(fmt_table(["ID", "Name", "Domain", "Kind", "Description"], rows))
+    return 0
+
+
+def cmd_skill_info(args) -> int:
+    """Show detailed information for a single capability."""
+    conn = get_connection(args)
+    driver = connect(conn)
+
+    with driver.session() as session:
+        result = session.run("""
+            MATCH (c:Capability {id: $id})
+            OPTIONAL MATCH (c)-[:IN_DOMAIN]->(sd:SkillDomain)
+            RETURN c AS capability,
+                   sd.id AS skill_domain_id,
+                   sd.name AS skill_domain_name,
+                   sd.description AS skill_domain_description
+        """, id=args.skill_id)
+        record = result.single()
+
+        if not record or not record["capability"]:
+            print(fmt_error(f"Skill '{args.skill_id}' not found"))
+            driver.close()
+            return 1
+
+        capability = dict(record["capability"])
+
+        agents_result = session.run("""
+            MATCH (a:Agent)-[:HAS_CAPABILITY]->(c:Capability {id: $id})
+            RETURN a.id AS id, a.name AS name, a.lifecycle AS lifecycle
+            ORDER BY a.name, a.id
+        """, id=args.skill_id)
+        agents = [dict(r) for r in agents_result]
+
+    driver.close()
+
+    fmt_header(f"Skill: {capability.get('name', capability.get('id'))}")
+    for key, value in sorted(capability.items()):
+        print(fmt_kv(key, str(value)))
+
+    print(fmt_section("Domain"))
+    print(fmt_kv("Hierarchy", format_domain_hierarchy(capability.get("domain"))))
+    if record.get("skill_domain_id"):
+        print(fmt_kv("Node ID", record["skill_domain_id"]))
+    if record.get("skill_domain_name"):
+        print(fmt_kv("Node Name", record["skill_domain_name"]))
+    if record.get("skill_domain_description"):
+        print(fmt_kv("Description", record["skill_domain_description"]))
+
+    if agents:
+        print(fmt_section("Agents"))
+        rows = [[
+            agent["id"],
+            agent.get("name", ""),
+            agent.get("lifecycle", "?"),
+        ] for agent in agents]
+        print(fmt_table(["ID", "Name", "Lifecycle"], rows))
+
+    return 0
+
+
+def cmd_domain_list(args) -> int:
+    """List the skill domain hierarchy with capability counts."""
+    conn = get_connection(args)
+    driver = connect(conn)
+
+    with driver.session() as session:
+        result = session.run("""
+            MATCH (sd:SkillDomain)
+            OPTIONAL MATCH (c:Capability)-[:IN_DOMAIN]->(sd)
+            RETURN sd.id AS id,
+                   sd.name AS name,
+                   sd.parent AS parent,
+                   count(c) AS exact_count
+            ORDER BY sd.id
+        """)
+        domains = [dict(r) for r in result]
+
+    driver.close()
+
+    fmt_header("Domains")
+    for line in _build_domain_tree(domains):
+        print(line)
     return 0
 
 
@@ -1006,6 +1237,21 @@ def build_parser() -> argparse.ArgumentParser:
                              choices=["agent", "rule"])
     list_parser.add_argument("--limit", type=int, default=20, help="Max results")
 
+    # skill
+    skill_parser = sub.add_parser("skill", help="Skill and capability discovery")
+    skill_sub = skill_parser.add_subparsers(dest="skill_command")
+    skill_list = skill_sub.add_parser("list", help="List available skills")
+    skill_list.add_argument("--domain", help="Filter by domain prefix")
+    skill_search = skill_sub.add_parser("search", help="Search skills")
+    skill_search.add_argument("query", help="Search query")
+    skill_info = skill_sub.add_parser("info", help="Show skill details")
+    skill_info.add_argument("skill_id", help="Skill or capability ID")
+
+    # domain
+    domain_parser = sub.add_parser("domain", help="Skill domain taxonomy")
+    domain_sub = domain_parser.add_subparsers(dest="domain_command")
+    domain_sub.add_parser("list", help="List all domains")
+
     # approve
     approve_parser = sub.add_parser("approve", help="Approve an intent")
     approve_parser.add_argument("intent_id", help="Intent ID")
@@ -1111,6 +1357,32 @@ def main() -> int:
         handler = report_handlers.get(args.report_command)
         if not handler:
             print("Usage: hassaleh report {agents|rules|intents|daily}")
+            return 1
+        try:
+            return handler(args)
+        except Exception as e:
+            print(fmt_error(str(e)))
+            return 1
+
+    if args.command == "skill":
+        handler = {
+            "list": cmd_skill_list,
+            "search": cmd_skill_search,
+            "info": cmd_skill_info,
+        }.get(args.skill_command)
+        if not handler:
+            print("Usage: hassaleh skill {list|search|info}")
+            return 1
+        try:
+            return handler(args)
+        except Exception as e:
+            print(fmt_error(str(e)))
+            return 1
+
+    if args.command == "domain":
+        handler = {"list": cmd_domain_list}.get(args.domain_command)
+        if not handler:
+            print("Usage: hassaleh domain {list}")
             return 1
         try:
             return handler(args)

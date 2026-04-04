@@ -28,6 +28,7 @@ from hassaleh.engine.runtime import RuleContext
 from hassaleh.engine.resolver import resolve_intents
 from hassaleh.bridge.openclaw import OpenClawBridge
 from hassaleh.bridge.notifications import NotificationDispatcher
+from hassaleh.domain import domain_matches_any
 
 logging.basicConfig(
     level=logging.INFO,
@@ -106,6 +107,18 @@ def _normalize_task_lifecycle_update(
     if execution_mode == "supervised" and requested_lifecycle == "success":
         return "awaiting_review"
     return requested_lifecycle
+
+
+def _is_domain_allowed(
+    allowed_domains: Sequence[str] | None,
+    capability_domain: str | None,
+) -> bool:
+    """Return True when the capability domain is permitted for the agent."""
+    return domain_matches_any(
+        capability_domain,
+        allowed_domains,
+        allow_unscoped=True,
+    )
 
 
 # ──────────────────────────────────────────────
@@ -341,9 +354,9 @@ class HassalehDaemon:
 
             # Check capability permission
             if intent["action"] == "execute_capability":
-                has_cap = await self._check_capability(agent["id"], intent)
+                has_cap, reason = await self._check_capability(agent["id"], intent)
                 if not has_cap:
-                    await self._reject_intent(intent_id, "Agent lacks required capability")
+                    await self._reject_intent(intent_id, reason)
                     continue
 
                 # Check if capability requires confirmation
@@ -630,16 +643,27 @@ class HassalehDaemon:
 
     # ── Permission Checks ──
 
-    async def _check_capability(self, agent_id: str, intent: dict) -> bool:
-        """Verify the agent has the required capability."""
+    async def _check_capability(self, agent_id: str, intent: dict) -> tuple[bool, str]:
+        """Verify the agent has the required capability and domain access."""
         async with self.driver.session() as session:
             result = await session.run("""
                 MATCH (a:Agent {id: $agent_id})-[:HAS_CAPABILITY]->(cap:Capability)
                 MATCH (i:Intent {id: $intent_id})-[:TARGETS]->(cap)
-                RETURN count(*) AS has_cap
+                RETURN a.allowed_domains AS allowed_domains,
+                       cap.domain AS capability_domain
             """, agent_id=agent_id, intent_id=intent["id"])
             record = await result.single()
-            return record["has_cap"] > 0
+            if not record:
+                return False, "Agent lacks required capability"
+
+            if not _is_domain_allowed(
+                record.get("allowed_domains"),
+                record.get("capability_domain"),
+            ):
+                domain = record.get("capability_domain") or "unscoped"
+                return False, f"Capability domain '{domain}' is not allowed for agent"
+
+            return True, ""
 
     async def _needs_approval(self, intent: dict) -> bool:
         """Check if the targeted capability requires human confirmation."""

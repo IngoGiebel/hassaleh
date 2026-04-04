@@ -41,7 +41,8 @@ Hassaleh is an agent orchestration framework where all configuration, state, rul
 - **Triple-layer Security:** Graph permissions → Daemon enforcement → OS-level sudo users per capability.
 - **Intent Lifecycle:** `pending → claimed → running → success/failed/rejected` with zombie recovery on crash.
 - **OpenClaw Bridge:** Notifications dispatched via Telegram/Discord. Optional — degrades gracefully.
-- **CLI:** `hassaleh status/init/agent/rule/intent/report/approve/heartbeat` for operators.
+- **CLI:** `hassaleh status/init/agent/rule/intent/skill/domain/report/approve/heartbeat` for operators.
+- **Skill Domain Taxonomy:** Hierarchical capability domains enable discovery and domain-scoped execution permissions.
 - **systemd-native:** Watchdog, graceful shutdown, journald logging, resource limits.
 
 ## Quick Start
@@ -105,6 +106,8 @@ EVERY "PT10M":
 | `hassaleh agent list\|info` | Agent management |
 | `hassaleh rule list\|compile` | Rule management with code preview |
 | `hassaleh intent list` | Intent browser (filterable) |
+| `hassaleh skill list\|search\|info` | Capability discovery by domain and text |
+| `hassaleh domain list` | Skill taxonomy tree with capability counts |
 | `hassaleh approve <id>` | HITL intent approval |
 | `hassaleh heartbeat <id>` | Agent heartbeat |
 | `hassaleh report daily\|agents\|rules\|intents` | Reporting (text/json/markdown) |

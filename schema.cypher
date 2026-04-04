@@ -2,7 +2,7 @@
 // Hassaleh — Neo4j Schema (MVP)
 // ═══════════════════════════════════════════════════════════════
 //
-// Node types: Agent, Capability, Workspace, Intent, Task,
+// Node types: Agent, Capability, SkillDomain, Workspace, Intent, Task,
 //             DaemonConfig, QueryConfig, SystemVersion
 //
 // Reference: docs/CONCEPT.md v1.2
@@ -17,6 +17,9 @@ CREATE CONSTRAINT agent_id IF NOT EXISTS
 
 CREATE CONSTRAINT capability_id IF NOT EXISTS
   FOR (c:Capability) REQUIRE c.id IS UNIQUE;
+
+CREATE CONSTRAINT skilldomain_id IF NOT EXISTS
+  FOR (sd:SkillDomain) REQUIRE sd.id IS UNIQUE;
 
 CREATE CONSTRAINT workspace_id IF NOT EXISTS
   FOR (w:Workspace) REQUIRE w.id IS UNIQUE;
@@ -73,6 +76,10 @@ CREATE INDEX task_execution_order IF NOT EXISTS
 // Capability lookup by kind
 CREATE INDEX capability_kind IF NOT EXISTS
   FOR (c:Capability) ON (c.kind);
+
+// Capability lookup by problem domain
+CREATE INDEX capability_domain IF NOT EXISTS
+  FOR (c:Capability) ON (c.domain);
 
 // Rule lifecycle for loading available rules
 CREATE INDEX rule_lifecycle IF NOT EXISTS
