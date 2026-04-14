@@ -47,7 +47,7 @@ from hassaleh.domain import (
 DEFAULT_URI = "bolt://localhost:7690"
 DEFAULT_USER = "neo4j"
 DEFAULT_PASSWORD = ""
-HEALTH_URL = "http://127.0.0.1:9100/health"
+HEALTH_URL = os.environ.get("HASSALEH_HEALTH_URL", "http://127.0.0.1:9100/health")
 PROJECT_DIR = Path(__file__).parent.parent.parent  # hassaleh project root
 
 

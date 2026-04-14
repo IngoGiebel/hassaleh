@@ -14,8 +14,8 @@ services:
       - "${NEO4J_BOLT_PORT:-7690}:7687"
       - "${NEO4J_HTTP_PORT:-7477}:7474"
     volumes:
-      - neo4j-data:/data
-      - neo4j-logs:/logs
+      - ./neo4j/data:/data
+      - ./neo4j/logs:/logs
     healthcheck:
       test: ["CMD", "neo4j", "status"]
       interval: 10s
@@ -28,7 +28,6 @@ services:
   init:
     build: .
     container_name: hassaleh-init
-    user: root  # needs root for cypher-shell, runs once and exits
     depends_on:
       neo4j:
         condition: service_healthy
@@ -36,17 +35,7 @@ services:
       NEO4J_URI: bolt://neo4j:7687
       NEO4J_USER: neo4j
       NEO4J_PASSWORD: ${NEO4J_PASSWORD:-hassaleh-dev-2026}
-    command: >
-      python -c "
-      from hassaleh.cli import cmd_init
-      import types
-      args = types.SimpleNamespace(
-          uri='bolt://neo4j:7687',
-          user='neo4j',
-          password='${NEO4J_PASSWORD:-hassaleh-dev-2026}'
-      )
-      exit(cmd_init(args))
-      "
+    command: ["sh", "-c", "sleep 10 && hassaleh --uri bolt://neo4j:7687 --user neo4j --password ${NEO4J_PASSWORD:-hassaleh-dev-2026} init"]
     restart: "no"
 
   # ── Hassaleh Daemon ──
@@ -58,6 +47,8 @@ services:
         condition: service_healthy
       init:
         condition: service_completed_successfully
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       NEO4J_URI: bolt://neo4j:7687
       NEO4J_USER: neo4j
@@ -76,6 +67,26 @@ services:
       start_period: 10s
     restart: unless-stopped
 
-volumes:
-  neo4j-data:
-  neo4j-logs:
+  # ── Neo4j Test Instance (ephemeral) ──
+  neo4j-test:
+    image: neo4j:5-community
+    container_name: hassaleh-neo4j-test
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_TEST_PASSWORD:-hassaleh-test}
+      NEO4J_PLUGINS: '[]'
+      NEO4J_server_memory_heap_initial__size: 128m
+      NEO4J_server_memory_heap_max__size: 256m
+    ports:
+      - "${NEO4J_TEST_BOLT_PORT:-7691}:7687"
+      - "${NEO4J_TEST_HTTP_PORT:-7478}:7474"
+    tmpfs:
+      - /data
+      - /logs
+    healthcheck:
+      test: ["CMD", "neo4j", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    profiles:
+      - test

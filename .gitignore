@@ -31,6 +31,7 @@ htmlcov/
 
 # Neo4j data (local dev)
 data/neo4j/
+neo4j/
 
 # Secrets
 .env

@@ -1230,14 +1230,15 @@ class HassalehDaemon:
     async def _start_health_endpoint(self) -> None:
         """Start minimal HTTP health endpoint."""
         port = self.config.get("health_endpoint_port", 9100)
+        bind = self.config.get("health_endpoint_bind", "0.0.0.0")
         self._health_app = web.Application()
         self._health_app.router.add_get("/health", self._health_handler)
 
         self._health_runner = web.AppRunner(self._health_app)
         await self._health_runner.setup()
-        site = web.TCPSite(self._health_runner, "127.0.0.1", port)
+        site = web.TCPSite(self._health_runner, bind, port)
         await site.start()
-        log.info(f"Health endpoint listening on http://127.0.0.1:{port}/health")
+        log.info(f"Health endpoint listening on http://{bind}:{port}/health")
 
     async def _health_handler(self, request: web.Request) -> web.Response:
         """Handle GET /health."""
