@@ -1,0 +1,102 @@
+{
+  "sprint": 10,
+  "updated_at": "2026-04-14T20:36:00Z",
+  "cycle": 5,
+  "tasks": {
+    "mvp-test": {
+      "current_phase": "write-tests",
+      "phase_code": "A4",
+      "phase_agent": "codex",
+      "phase_worker": "worker-codex",
+      "phase_status": "failed",
+      "dispatched_at": "2026-04-14T19:35:00Z",
+      "failed_at": "2026-04-14T20:12:00Z",
+      "failure_reason": "worker-codex unreachable — ACP agent policy forbids dispatch from worker-opus cron. No output produced.",
+      "retry_count": 1,
+      "note": "Escalated to Ingo. Proposed fallback: Dione writes tests on worker-opus.",
+      "completed_phases": [
+        { "code": "A1", "phase": "concept", "agent": "dione", "completed_at": "2026-04-14T15:30:00Z", "output": "docs/spec-mvp-test.md" },
+        { "code": "A2", "phase": "concept-review", "agent": "inanna", "completed_at": "2026-04-14T17:44:00Z", "output": "docs/spec-mvp-test.md (review appended)", "findings": "10 findings: 2 CRITICAL (F1 path traversal, F2 no auth), 3 HIGH (F3 TOCTOU, F4 orphan recovery, F5 access control), 3 MEDIUM, 2 LOW" },
+        { "code": "A3", "phase": "concept-revision", "agent": "dione", "completed_at": "2026-04-14T19:48:00Z", "output": "docs/spec-mvp-test.md v1.1 — F1,F2,F3,F4,F5,F8 addressed; F6,F7,F9,F10 deferred" }
+      ]
+    },
+    "heartbeat": {
+      "current_phase": "write-tests",
+      "phase_code": "B3",
+      "phase_agent": "codex",
+      "phase_worker": "worker-codex",
+      "phase_status": "blocked",
+      "dispatched_at": null,
+      "blocked_reason": "worker-codex unreachable (same policy issue as A4). Needs Ingo to fix agent allowlist or reassign to worker-opus.",
+      "completed_phases": [
+        { "code": "B1", "phase": "concept", "agent": "dione", "completed_at": "2026-04-14T15:30:00Z", "output": "docs/spec-heartbeat.md" },
+        { "code": "B2", "phase": "concept-review", "agent": "inanna", "completed_at": "2026-04-14T21:52:00Z", "output": "docs/spec-heartbeat.md (review appended)", "findings": "F1 CRITICAL: no auth on heartbeat endpoint (backdoor bypasses SDK auth). F3 HIGH: cron-driven heartbeats mask agent failures by design." }
+      ]
+    },
+    "ci": {
+      "current_phase": "done",
+      "phase_code": "C3",
+      "phase_agent": "dione",
+      "phase_worker": "worker-opus",
+      "phase_status": "completed",
+      "dispatched_at": "2026-04-14T20:36:00Z",
+      "review_findings": "C2 reviewed by Dione at 20:36. Findings: (1) Integration test step hardcodes file list — should use 'pytest tests -m integration' to auto-discover new tests (A4/B3 outputs won't run otherwise). (2) --ignore-requires-python flag warrants checking pyproject.toml version constraint. (3) Overall solid: Neo4j health check, uv caching, minimal permissions, separate unit/integration runs.",
+      "completed_phases": [
+        { "code": "C1", "phase": "setup", "agent": "codex", "completed_at": "2026-04-14T17:44:00Z", "output": ".github/workflows/ci.yml" },
+        { "code": "C2", "phase": "review", "agent": "dione", "completed_at": "2026-04-14T20:36:00Z", "output": "Review findings in state file. Minor issues only." },
+        { "code": "C3", "phase": "fix", "agent": "dione", "completed_at": "2026-04-14T20:36:00Z", "output": "ci.yml: replaced hardcoded integration test file list with marker-based discovery (pytest -m integration)" }
+      ]
+    },
+    "architecture": {
+      "current_phase": "write",
+      "phase_code": "D1",
+      "phase_agent": "gemini",
+      "phase_worker": "worker-gemini",
+      "phase_status": "blocked",
+      "dispatched_at": null,
+      "blocked_reason": "worker-gemini missing Google API key + worker-gemini unreachable from orchestrator (agent policy). Double-blocked.",
+      "completed_phases": []
+    },
+    "security-audit": {
+      "current_phase": "audit",
+      "phase_code": "E1",
+      "phase_agent": "inanna",
+      "phase_worker": "worker-opus",
+      "phase_status": "queued",
+      "dispatched_at": null,
+      "note": "Scheduled for Day 3 (2026-04-16). Waiting for worker-opus availability.",
+      "completed_phases": []
+    }
+  },
+  "blockers": [
+    {
+      "type": "worker-auth",
+      "worker": "worker-gemini",
+      "detail": "No Google API key configured. Auth store: /home/uranus/.openclaw/agents/worker-gemini/agent/auth-profiles.json",
+      "reported_at": "2026-04-14T15:34:00Z",
+      "status": "open — needs Ingo"
+    },
+    {
+      "type": "worker-dns",
+      "worker": "worker-codex",
+      "detail": "DNS resolved as of 17:35. Retry dispatched.",
+      "reported_at": "2026-04-14T15:40:00Z",
+      "resolved_at": "2026-04-14T17:35:00Z",
+      "status": "resolved"
+    },
+    {
+      "type": "agent-policy",
+      "worker": "worker-codex",
+      "detail": "ACP agent 'worker-codex' is not allowed by policy when spawning from worker-opus cron session. agents_list shows only worker-opus is reachable. This blocks ALL Codex-assigned tasks (A4, B3, A8).",
+      "reported_at": "2026-04-14T20:12:00Z",
+      "status": "open — needs Ingo to update agent allowlist"
+    },
+    {
+      "type": "agent-policy",
+      "worker": "worker-gemini",
+      "detail": "worker-gemini not in agent allowlist for worker-opus. Blocks all Gemini-assigned tasks (D1, A6, B4, A9, E3).",
+      "reported_at": "2026-04-14T20:12:00Z",
+      "status": "open — needs Ingo to update agent allowlist"
+    }
+  ]
+}

@@ -1,0 +1,103 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEO4J_TEST_URI: bolt://127.0.0.1:7687
+      NEO4J_TEST_USER: ""
+      NEO4J_TEST_PASSWORD: ""
+      NEO4J_URI: bolt://127.0.0.1:7687
+      NEO4J_USER: ""
+      NEO4J_PASSWORD: ""
+    services:
+      neo4j:
+        image: neo4j:5-community
+        env:
+          NEO4J_AUTH: none
+        ports:
+          - 7687:7687
+        options: >-
+          --health-cmd="cypher-shell -a bolt://localhost:7687 'RETURN 1;' || exit 1"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v8
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            uv.lock
+
+      - name: Install dependencies
+        run: |
+          uv venv --python 3.12
+          uv pip install --python .venv/bin/python --ignore-requires-python -e ".[dev]" ruff mypy
+
+      - name: Wait for Neo4j
+        run: |
+          .venv/bin/python - <<'PY'
+          import asyncio
+          import os
+          import sys
+          from neo4j import AsyncGraphDatabase
+
+          URI = os.environ["NEO4J_TEST_URI"]
+          USER = os.environ["NEO4J_TEST_USER"]
+          PASSWORD = os.environ["NEO4J_TEST_PASSWORD"]
+          AUTH = None if not USER and not PASSWORD else (USER, PASSWORD)
+
+          async def main() -> None:
+              driver = AsyncGraphDatabase.driver(URI, auth=AUTH)
+              try:
+                  for _ in range(30):
+                      try:
+                          async with driver.session() as session:
+                              result = await session.run("RETURN 1 AS ok")
+                              record = await result.single()
+                              if record and record["ok"] == 1:
+                                  return
+                      except Exception:
+                          await asyncio.sleep(2)
+                  print(f"Neo4j did not become ready at {URI}", file=sys.stderr)
+                  raise SystemExit(1)
+              finally:
+                  await driver.close()
+
+          asyncio.run(main())
+          PY
+
+      - name: Lint
+        run: .venv/bin/ruff check src tests
+
+      - name: Type check
+        run: .venv/bin/mypy --ignore-missing-imports src
+
+      - name: Run unit tests
+        run: .venv/bin/pytest tests -m "not integration"
+
+      - name: Run Neo4j integration tests
+        run: .venv/bin/pytest tests -m integration
