@@ -316,9 +316,9 @@ def cmd_agent_list(args) -> int:
 
     fmt_header("Agents")
     rows = [[
-        a.get("emoji", "") + " " + a.get("name", a["id"]),
-        a["id"], a.get("lifecycle", "?"), str(a["caps"]),
-        a.get("runtime", "—"), str(a.get("hb", "—"))
+        (a.get("emoji") or "") + " " + (a.get("name") or a["id"]),
+        a["id"], a.get("lifecycle") or "?", str(a["caps"]),
+        a.get("runtime") or "—", str(a.get("hb") or "—")
     ] for a in agents]
     print(fmt_table(["Name", "ID", "Lifecycle", "Caps", "Runtime", "Last HB"], rows))
     return 0
