@@ -1,16 +1,16 @@
 {
   "sprint": 10,
-  "updated_at": "2026-04-15T20:21:00Z",
-  "cycle": 21,
+  "updated_at": "2026-04-15T23:00:00Z",
+  "cycle": 22,
   "tasks": {
     "mvp-test": {
       "current_phase": "security-review",
-      "phase_code": "A7",
+      "phase_code": "A8",
       "phase_agent": "inanna",
       "phase_worker": "worker-opus",
-      "phase_status": "dispatched",
+      "phase_status": "pending",
       "dispatched_at": "2026-04-15T20:21:00Z",
-      "retry_count": 2,
+      "retry_count": 0,
       "note": "Cycle 21: A7 re-dispatched to worker-opus (retry 2). Cycles 19-20 produced no output files.",
       "completed_phases": [
         {
@@ -56,17 +56,24 @@
           "agent": "opus (fallback from gemini)",
           "completed_at": "2026-04-15T12:21:00Z",
           "output": "src/hassaleh/intent_sdk.py, intent_daemon.py, auth.py, errors.py, capabilities/ (644 lines total)"
+        },
+        {
+          "code": "A7",
+          "phase": "code-review-security",
+          "agent": "inanna",
+          "completed_at": "2026-04-15T22:25:00Z",
+          "output": "docs/review-a7-security-code-review.md"
         }
       ]
     },
     "heartbeat": {
       "current_phase": "implementation",
-      "phase_code": "B4",
+      "phase_code": "B5",
       "phase_agent": "opus (fallback from gemini)",
       "phase_worker": "worker-opus",
-      "phase_status": "dispatched",
+      "phase_status": "pending",
       "dispatched_at": "2026-04-15T18:21:00Z",
-      "retry_count": 1,
+      "retry_count": 0,
       "note": "Cycle 20 dispatch. No output yet as of cycle 21. Will check next cycle.",
       "completed_phases": [
         {
@@ -96,6 +103,13 @@
           "agent": "opus (fallback from codex)",
           "completed_at": "2026-04-15T14:21:00Z",
           "output": "tests/test_heartbeat.py (1088 lines, TDD-style)"
+        },
+        {
+          "code": "B4",
+          "phase": "implement",
+          "agent": "dione",
+          "completed_at": "2026-04-15T22:00:00Z",
+          "output": "src/hassaleh/sdk.py (heartbeat method added)"
         }
       ]
     },
@@ -152,20 +166,20 @@
     {
       "type": "dispatch-reliability",
       "worker": "worker-gemini",
-      "detail": "Bootstrap identity confusion — enters setup instead of executing tasks. Needs workspace BOOTSTRAP.md removed or identity pre-configured.",
+      "detail": "Bootstrap identity confusion \u2014 enters setup instead of executing tasks. Needs workspace BOOTSTRAP.md removed or identity pre-configured.",
       "reported_at": "2026-04-15T09:22:00Z",
-      "status": "broken — identity/bootstrap issue"
+      "status": "broken \u2014 identity/bootstrap issue"
     },
     {
       "type": "dispatch-reliability",
       "worker": "worker-codex",
       "detail": "Returns HTML error page instead of executing. Auth or capacity failure.",
       "reported_at": "2026-04-15T09:22:00Z",
-      "status": "broken — HTML error response"
+      "status": "broken \u2014 HTML error response"
     },
     {
       "type": "single-worker-bottleneck",
-      "detail": "worker-opus is the only reliable worker. All tasks serialized through it. Queue: A7 (dispatched) → B4 (awaiting output) → D2 → E1.",
+      "detail": "worker-opus is the only reliable worker. All tasks serialized through it. Queue: A7 (dispatched) \u2192 B4 (awaiting output) \u2192 D2 \u2192 E1.",
       "reported_at": "2026-04-15T20:21:00Z",
       "status": "active"
     },
@@ -176,5 +190,5 @@
       "status": "investigating"
     }
   ],
-  "notes": "Cycle 21: Re-dispatched A7 security code review to worker-opus (retry 2). B4 heartbeat impl still awaiting output from cycle 20. Concern: A7 has failed to produce output across 3 dispatch attempts."
+  "notes": "Manual state correction: A7 review found on disk, B4 impl detected in sdk.py changes. All committed."
 }
