@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Graph-native agentic framework — everything lives in Neo4j"
 readme = "README.md"
 license = { text = "MIT" }
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 authors = [
     { name = "Ingo Giebel" },
     { name = "Dione", email = "dione@alpha-auriga.com" },

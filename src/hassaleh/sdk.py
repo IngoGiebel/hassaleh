@@ -83,9 +83,13 @@ class HassalehSDK:
 
     async def connect(self) -> None:
         """Connect to Neo4j and load query config."""
+        auth = None if not self.neo4j_user and not self.neo4j_password else (
+            self.neo4j_user,
+            self.neo4j_password,
+        )
         self.driver = AsyncGraphDatabase.driver(
             self.neo4j_uri,
-            auth=(self.neo4j_user, self.neo4j_password),
+            auth=auth,
         )
         # Verify connection
         async with self.driver.session() as session:

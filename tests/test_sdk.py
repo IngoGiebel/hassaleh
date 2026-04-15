@@ -93,6 +93,26 @@ async def test_query_parameterized():
 
 
 @pytest.mark.asyncio
+async def test_connect_omits_auth_when_credentials_are_blank():
+    """Test connect() disables auth when both credentials are blank."""
+    driver, session = make_mock_driver()
+    session.run = AsyncMock(return_value=make_mock_result([{"ping": 1}]))
+
+    sdk = HassalehSDK(
+        neo4j_uri="bolt://localhost:7687",
+        neo4j_user="",
+        neo4j_password="",
+    )
+    sdk._load_query_config = AsyncMock()
+
+    with patch("hassaleh.sdk.AsyncGraphDatabase.driver", return_value=driver) as driver_factory:
+        await sdk.connect()
+
+    driver_factory.assert_called_once_with("bolt://localhost:7687", auth=None)
+    sdk._load_query_config.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_query_adds_limit():
     """Test that query adds LIMIT if not present."""
     driver, session = make_mock_driver()
