@@ -1,7 +1,4 @@
-"""Hassaleh custom exceptions for the MVP Intent Pipeline.
-
-Reference: docs/spec-mvp-test.md v1.1, Section 4.1
-"""
+"""Hassaleh custom exceptions."""
 
 
 class AuthenticationError(Exception):

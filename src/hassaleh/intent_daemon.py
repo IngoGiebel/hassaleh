@@ -15,12 +15,11 @@ import os
 import socket
 import subprocess
 import time
-from typing import Any
 
-from neo4j import AsyncGraphDatabase
+from neo4j import AsyncDriver, AsyncGraphDatabase
 
 from hassaleh.capabilities.exec_ls import (
-    OUTPUT_TRUNCATION_LIMIT,
+    execute_ls,
     validate_exec_ls_path,
 )
 from hassaleh.errors import CapabilityParamError
@@ -69,7 +68,14 @@ class IntentDaemon:
         self.instance_id = instance_id or f"daemon-{socket.gethostname()}-{os.getpid()}"
         self.intent_timeout_sec = intent_timeout_sec
         self.max_concurrent = max_concurrent
-        self.driver: Any = None
+        self.driver: AsyncDriver | None = None
+
+    async def __aenter__(self) -> IntentDaemon:
+        await self.connect()
+        return self
+
+    async def __aexit__(self, *exc) -> None:
+        await self.close()
 
     async def connect(self) -> None:
         """Connect to Neo4j."""
@@ -80,7 +86,8 @@ class IntentDaemon:
         async with self.driver.session() as session:
             result = await session.run("RETURN 1 AS ping")
             record = await result.single()
-            assert record and record["ping"] == 1
+            if not record or record["ping"] != 1:
+                raise ConnectionError("Neo4j connection verification failed")
         log.info("IntentDaemon connected (%s)", self.instance_id)
 
     async def close(self) -> None:
@@ -89,23 +96,20 @@ class IntentDaemon:
             await self.driver.close()
             self.driver = None
 
-    def _get_driver(self) -> Any:
-        """Return the active driver, or create a temporary one."""
-        if self.driver:
-            return self.driver
-        # For stateless calls (e.g. transition_intent without connect)
-        return AsyncGraphDatabase.driver(
-            self.neo4j_uri,
-            auth=(self.neo4j_user, self.neo4j_password),
-        )
-
     async def transition_intent(self, intent_id: str, to_state: str) -> bool:
-        """Validate and apply a state transition.
+        """Validate and apply a state transition atomically.
 
         Enforces the state machine defined in spec §5.1.
-        Raises ValueError for invalid transitions.
+        Uses a single Cypher write transaction to prevent TOCTOU races (A7-S1):
+        the atomic CAS runs first; a diagnostic read happens only on failure.
+        Raises ValueError for invalid transitions or missing intents.
         Returns True on success.
         """
+        # Build the set of states that may transition to to_state
+        allowed_from = [s for s, targets in VALID_TRANSITIONS.items() if to_state in targets]
+        if not allowed_from:
+            raise ValueError(f"No state can transition to '{to_state}'")
+
         temp_driver = None
         driver = self.driver
         if driver is None:
@@ -116,6 +120,25 @@ class IntentDaemon:
             temp_driver = driver
 
         try:
+            # Atomic check-and-set: single write transaction (A7-S1).
+            # No pre-read — the CAS query is the source of truth.
+            async with driver.session() as session:
+                result = await session.run(
+                    "MATCH (i:Intent {id: $id}) "
+                    "WHERE i.status IN $allowed_from "
+                    "SET i.status = $state, i.updated_at = datetime() "
+                    "RETURN i.id AS id",
+                    id=intent_id,
+                    allowed_from=allowed_from,
+                    state=to_state,
+                )
+                record = await result.single()
+
+            if record is not None:
+                return True
+
+            # CAS failed — read current state for diagnostic error reporting only.
+            # This read does not influence any mutation, so no TOCTOU risk.
             async with driver.session() as session:
                 result = await session.run(
                     "MATCH (i:Intent {id: $id}) RETURN i.status AS status",
@@ -126,23 +149,9 @@ class IntentDaemon:
             if record is None:
                 raise ValueError(f"Intent '{intent_id}' not found")
 
-            current = record["status"]
-            allowed = VALID_TRANSITIONS.get(current, set())
-
-            if to_state not in allowed:
-                raise ValueError(
-                    f"Invalid transition: {current} → {to_state}"
-                )
-
-            async with driver.session() as session:
-                await session.run(
-                    "MATCH (i:Intent {id: $id}) "
-                    "SET i.status = $state, i.updated_at = datetime()",
-                    id=intent_id,
-                    state=to_state,
-                )
-
-            return True
+            raise ValueError(
+                f"Invalid transition: {record['status']} → {to_state}"
+            )
         finally:
             if temp_driver:
                 await temp_driver.close()
@@ -225,16 +234,25 @@ class IntentDaemon:
             if not claimed:
                 return  # rejected or already claimed
 
-        # Transition to running
+        # Transition to running (verify claimed_by to prevent hijacking — A7-S4)
         start_time = time.monotonic()
         async with self.driver.session() as session:
-            await session.run(
-                "MATCH (i:Intent {id: $id, status: 'claimed'}) "
-                "SET i.status = 'running', i.updated_at = datetime()",
+            result = await session.run(
+                "MATCH (i:Intent {id: $id, status: 'claimed', claimed_by: $daemon_id}) "
+                "SET i.status = 'running', i.updated_at = datetime() "
+                "RETURN i.id AS id",
                 id=intent_id,
+                daemon_id=self.instance_id,
             )
+            record = await result.single()
+        if record is None:
+            log.warning("Intent %s not claimed by this daemon, skipping", intent_id)
+            return
 
-        # Step 2: Validate params
+        # Step 2: Validate params + Step 3: Execute via capability module
+        # MVP: single capability handler. For multi-capability dispatch:
+        #   handlers = {"exec-ls": exec_ls_handler, "graph-query": ...}
+        #   handler = self.handlers[capability_id]
         if capability_id == "exec-ls":
             path = params.get("path", "")
             try:
@@ -244,21 +262,12 @@ class IntentDaemon:
                 await self._fail_intent(intent_id, f"Parameter validation failed: {e}", elapsed_ms)
                 return
 
-            # Step 3: Execute
+            # Execute via capability module (Q1: single source of truth)
             try:
-                result_data = await asyncio.wait_for(
-                    asyncio.get_event_loop().run_in_executor(
-                        None,
-                        lambda: subprocess.run(
-                            ["ls", "-la", resolved_path],
-                            capture_output=True,
-                            text=True,
-                            timeout=self.intent_timeout_sec,
-                        ),
-                    ),
-                    timeout=self.intent_timeout_sec,
+                stdout = await asyncio.get_event_loop().run_in_executor(
+                    None, lambda: execute_ls(resolved_path, self.intent_timeout_sec)
                 )
-            except asyncio.TimeoutError:
+            except subprocess.TimeoutExpired:
                 elapsed_ms = int((time.monotonic() - start_time) * 1000)
                 await self._fail_intent(
                     intent_id,
@@ -266,21 +275,12 @@ class IntentDaemon:
                     elapsed_ms,
                 )
                 return
-
-            elapsed_ms = int((time.monotonic() - start_time) * 1000)
-
-            if result_data.returncode != 0:
-                await self._fail_intent(
-                    intent_id,
-                    result_data.stderr.strip() or f"ls exited with code {result_data.returncode}",
-                    elapsed_ms,
-                )
+            except RuntimeError as e:
+                elapsed_ms = int((time.monotonic() - start_time) * 1000)
+                await self._fail_intent(intent_id, str(e), elapsed_ms)
                 return
 
-            # Step 4: Store result (with truncation)
-            stdout = result_data.stdout
-            if len(stdout) > OUTPUT_TRUNCATION_LIMIT:
-                stdout = stdout[:OUTPUT_TRUNCATION_LIMIT] + "\n[output truncated at 64KB]"
+            elapsed_ms = int((time.monotonic() - start_time) * 1000)
 
             async with self.driver.session() as session:
                 await session.run("""
