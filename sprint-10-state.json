@@ -1,17 +1,17 @@
 {
   "sprint": 10,
-  "updated_at": "2026-04-15T23:00:00Z",
-  "cycle": 22,
+  "updated_at": "2026-04-16T00:21:00Z",
+  "cycle": 25,
   "tasks": {
     "mvp-test": {
-      "current_phase": "security-review",
-      "phase_code": "A8",
-      "phase_agent": "inanna",
-      "phase_worker": "worker-opus",
-      "phase_status": "pending",
-      "dispatched_at": "2026-04-15T20:21:00Z",
+      "current_phase": "fix-review-issues",
+      "phase_code": "A9",
+      "phase_agent": "gemini",
+      "phase_worker": "worker-gemini",
+      "phase_status": "dispatched",
+      "dispatched_at": "2026-04-16T00:21:00Z",
       "retry_count": 0,
-      "note": "Cycle 21: A7 re-dispatched to worker-opus (retry 2). Cycles 19-20 produced no output files.",
+      "note": "Cycle 25: Dispatched A9 to worker-gemini (retry — blocker may be resolved). Fixing 1 HIGH + 6 MEDIUM findings from A7/A8 reviews.",
       "completed_phases": [
         {
           "code": "A1",
@@ -63,18 +63,27 @@
           "agent": "inanna",
           "completed_at": "2026-04-15T22:25:00Z",
           "output": "docs/review-a7-security-code-review.md"
+        },
+        {
+          "code": "A8",
+          "phase": "quality-code-review",
+          "agent": "opus (fallback from codex)",
+          "completed_at": "2026-04-15T22:25:00Z",
+          "output": "docs/review-a8-quality-code-review.md",
+          "verdict": "APPROVED_WITH_NOTES",
+          "findings": "13 findings: 1 HIGH, 6 MEDIUM, 6 LOW"
         }
       ]
     },
     "heartbeat": {
-      "current_phase": "implementation",
-      "phase_code": "B5",
-      "phase_agent": "opus (fallback from gemini)",
+      "current_phase": "revision-final-ok",
+      "phase_code": "B6",
+      "phase_agent": "dione",
       "phase_worker": "worker-opus",
-      "phase_status": "pending",
-      "dispatched_at": "2026-04-15T18:21:00Z",
+      "phase_status": "dispatched",
+      "dispatched_at": "2026-04-16T00:21:00Z",
       "retry_count": 0,
-      "note": "Cycle 20 dispatch. No output yet as of cycle 21. Will check next cycle.",
+      "note": "Cycle 25: Dispatched B6 to worker-opus. Final approval review of heartbeat implementation.",
       "completed_phases": [
         {
           "code": "B1",
@@ -110,6 +119,13 @@
           "agent": "dione",
           "completed_at": "2026-04-15T22:00:00Z",
           "output": "src/hassaleh/sdk.py (heartbeat method added)"
+        },
+        {
+          "code": "B5",
+          "phase": "code-review",
+          "agent": "dione (inanna-style)",
+          "completed_at": "2026-04-15T23:34:00Z",
+          "output": "docs/review-b5-heartbeat-code-review.md"
         }
       ]
     },
@@ -118,29 +134,20 @@
       "phase_code": "C3",
       "phase_status": "completed",
       "completed_phases": [
-        {
-          "code": "C1",
-          "completed_at": "2026-04-14T17:44:00Z"
-        },
-        {
-          "code": "C2",
-          "completed_at": "2026-04-14T20:36:00Z"
-        },
-        {
-          "code": "C3",
-          "completed_at": "2026-04-14T20:36:00Z"
-        }
+        { "code": "C1", "completed_at": "2026-04-14T17:44:00Z" },
+        { "code": "C2", "completed_at": "2026-04-14T20:36:00Z" },
+        { "code": "C3", "completed_at": "2026-04-14T20:36:00Z" }
       ]
     },
     "architecture": {
       "current_phase": "review",
       "phase_code": "D2",
       "phase_agent": "dione",
-      "phase_worker": "worker-opus",
-      "phase_status": "pending",
-      "dispatched_at": null,
+      "phase_worker": "worker-codex",
+      "phase_status": "dispatched",
+      "dispatched_at": "2026-04-16T00:21:00Z",
       "retry_count": 0,
-      "note": "Queued behind A7 and B4. Next in line after one completes.",
+      "note": "Cycle 25: Dispatched D2 to worker-codex (retry — blocker may be resolved).",
       "completed_phases": [
         {
           "code": "D1",
@@ -156,9 +163,9 @@
       "phase_code": "E1",
       "phase_agent": "inanna",
       "phase_worker": "worker-opus",
-      "phase_status": "queued",
+      "phase_status": "pending",
       "dispatched_at": null,
-      "note": "Scheduled for Day 3 (2026-04-16).",
+      "note": "Day 3 task. Will dispatch after B6/A9/D2 results are in. Next cycle if workers free up.",
       "completed_phases": []
     }
   },
@@ -166,29 +173,23 @@
     {
       "type": "dispatch-reliability",
       "worker": "worker-gemini",
-      "detail": "Bootstrap identity confusion \u2014 enters setup instead of executing tasks. Needs workspace BOOTSTRAP.md removed or identity pre-configured.",
+      "detail": "Bootstrap identity confusion — enters setup instead of executing tasks. Needs workspace BOOTSTRAP.md removed or identity pre-configured.",
       "reported_at": "2026-04-15T09:22:00Z",
-      "status": "broken \u2014 identity/bootstrap issue"
+      "status": "retrying cycle 25 — A9 dispatched to test"
     },
     {
       "type": "dispatch-reliability",
       "worker": "worker-codex",
       "detail": "Returns HTML error page instead of executing. Auth or capacity failure.",
       "reported_at": "2026-04-15T09:22:00Z",
-      "status": "broken \u2014 HTML error response"
+      "status": "retrying cycle 25 — D2 dispatched to test"
     },
     {
       "type": "single-worker-bottleneck",
-      "detail": "worker-opus is the only reliable worker. All tasks serialized through it. Queue: A7 (dispatched) \u2192 B4 (awaiting output) \u2192 D2 \u2192 E1.",
-      "reported_at": "2026-04-15T20:21:00Z",
-      "status": "active"
-    },
-    {
-      "type": "dispatch-output-missing",
-      "detail": "A7 dispatched 3 times (cycles 18, 19, 21) with no output file produced. Possible agent timeout or task too complex for single dispatch.",
-      "reported_at": "2026-04-15T20:21:00Z",
-      "status": "investigating"
+      "detail": "worker-opus is the only confirmed reliable worker. Retrying gemini+codex this cycle.",
+      "reported_at": "2026-04-15T22:26:00Z",
+      "status": "mitigating — parallel dispatch attempted"
     }
   ],
-  "notes": "Manual state correction: A7 review found on disk, B4 impl detected in sdk.py changes. All committed."
+  "notes": "Cycle 25: Parallel dispatch — B6→worker-opus, A9→worker-gemini (retry), D2→worker-codex (retry). E1 queued for next cycle. All dispatches backgrounded per protocol."
 }

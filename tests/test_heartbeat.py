@@ -38,7 +38,6 @@ import pytest_asyncio
 # ---------------------------------------------------------------------------
 from hassaleh.errors import (
     AgentDisabledError,
-    AgentNotFoundError,
     AuthenticationError,
     HeartbeatTokenMismatchError,
 )
@@ -46,6 +45,7 @@ from hassaleh.heartbeat_sdk import HeartbeatSDK
 from hassaleh.auth import (
     hash_api_key,
     generate_api_key,
+    lookup_hash,
 )
 
 
@@ -68,10 +68,11 @@ HEARTBEAT_MIN_INTERVAL_SECONDS = 60  # 1m — spec §4
 
 @pytest.fixture
 def api_key_pair():
-    """Generate a fresh API key + its bcrypt hash for a test agent."""
+    """Generate a fresh API key + its bcrypt hash + SHA-256 lookup for a test agent."""
     raw_key = generate_api_key()
     hashed = hash_api_key(raw_key)
-    return raw_key, hashed
+    lookup = lookup_hash(raw_key)
+    return raw_key, hashed, lookup
 
 
 @pytest.fixture
@@ -79,7 +80,8 @@ def second_api_key_pair():
     """Second agent's API key pair — for multi-agent tests."""
     raw_key = generate_api_key()
     hashed = hash_api_key(raw_key)
-    return raw_key, hashed
+    lookup = lookup_hash(raw_key)
+    return raw_key, hashed, lookup
 
 
 @pytest.fixture
@@ -87,7 +89,8 @@ def third_api_key_pair():
     """Third agent's API key pair — for concurrent heartbeat tests."""
     raw_key = generate_api_key()
     hashed = hash_api_key(raw_key)
-    return raw_key, hashed
+    lookup = lookup_hash(raw_key)
+    return raw_key, hashed, lookup
 
 
 @pytest.fixture
@@ -95,7 +98,8 @@ def fourth_api_key_pair():
     """Fourth agent's API key pair — for concurrent heartbeat tests."""
     raw_key = generate_api_key()
     hashed = hash_api_key(raw_key)
-    return raw_key, hashed
+    lookup = lookup_hash(raw_key)
+    return raw_key, hashed, lookup
 
 
 # ── Integration fixtures (require running Neo4j) ─────────────────────────
@@ -106,7 +110,7 @@ async def heartbeat_sdk(api_key_pair):
 
     Seeds agent "hb-test-agent" in lifecycle=pending, no prior heartbeats.
     """
-    raw_key, hashed = api_key_pair
+    raw_key, hashed, lookup = api_key_pair
     sdk = HeartbeatSDK(
         neo4j_uri=NEO4J_URI,
         neo4j_user=NEO4J_USER,
@@ -119,13 +123,14 @@ async def heartbeat_sdk(api_key_pair):
             MERGE (a:Agent {id: 'hb-test-agent'})
             SET a.name = 'Heartbeat Test Agent',
                 a.api_key_hash = $hash,
+                a.api_key_lookup = $lookup,
                 a.lifecycle = 'pending',
                 a.last_heartbeat = null,
                 a.previous_heartbeat = null,
                 a.heartbeat_count = 0,
                 a.heartbeat_token = null,
                 a.heartbeat_source = null
-        """, hash=hashed)
+        """, hash=hashed, lookup=lookup)
 
     yield sdk, raw_key
 
@@ -143,7 +148,7 @@ async def active_agent_sdk(api_key_pair):
 
     Useful for subsequent-heartbeat and rate-limiting tests.
     """
-    raw_key, hashed = api_key_pair
+    raw_key, hashed, lookup = api_key_pair
     sdk = HeartbeatSDK(
         neo4j_uri=NEO4J_URI,
         neo4j_user=NEO4J_USER,
@@ -158,13 +163,14 @@ async def active_agent_sdk(api_key_pair):
             MERGE (a:Agent {id: 'hb-active-agent'})
             SET a.name = 'Active Heartbeat Agent',
                 a.api_key_hash = $hash,
+                a.api_key_lookup = $lookup,
                 a.lifecycle = 'active',
                 a.last_heartbeat = datetime() - duration('PT120S'),
                 a.previous_heartbeat = null,
                 a.heartbeat_count = 5,
                 a.heartbeat_token = 'known-token-abc',
                 a.heartbeat_source = 'agent'
-        """, hash=hashed)
+        """, hash=hashed, lookup=lookup)
 
     yield sdk, raw_key, "known-token-abc"
 
@@ -191,16 +197,17 @@ async def multi_agent_sdk(api_key_pair, second_api_key_pair,
     await sdk.connect()
 
     async with sdk.driver.session() as session:
-        for agent_id, (raw_key, hashed) in zip(agent_ids, keys):
+        for agent_id, (raw_key, hashed, lookup) in zip(agent_ids, keys):
             await session.run("""
                 MERGE (a:Agent {id: $id})
                 SET a.name = $id,
                     a.api_key_hash = $hash,
+                    a.api_key_lookup = $lookup,
                     a.lifecycle = 'pending',
                     a.last_heartbeat = null,
                     a.heartbeat_count = 0,
                     a.heartbeat_token = null
-            """, id=agent_id, hash=hashed)
+            """, id=agent_id, hash=hashed, lookup=lookup)
 
     raw_keys = [k[0] for k in keys]
     yield sdk, agent_ids, raw_keys
@@ -216,7 +223,7 @@ async def multi_agent_sdk(api_key_pair, second_api_key_pair,
 @pytest_asyncio.fixture
 async def disabled_agent_sdk(api_key_pair):
     """HeartbeatSDK with an agent in lifecycle=disabled (terminal state)."""
-    raw_key, hashed = api_key_pair
+    raw_key, hashed, lookup = api_key_pair
     sdk = HeartbeatSDK(
         neo4j_uri=NEO4J_URI,
         neo4j_user=NEO4J_USER,
@@ -229,12 +236,13 @@ async def disabled_agent_sdk(api_key_pair):
             MERGE (a:Agent {id: 'hb-disabled-agent'})
             SET a.name = 'Disabled Agent',
                 a.api_key_hash = $hash,
+                a.api_key_lookup = $lookup,
                 a.lifecycle = 'disabled',
                 a.last_heartbeat = datetime() - duration('P2D'),
                 a.heartbeat_count = 100,
                 a.heartbeat_token = null,
                 a.heartbeat_source = null
-        """, hash=hashed)
+        """, hash=hashed, lookup=lookup)
 
     yield sdk, raw_key
 
@@ -248,7 +256,7 @@ async def disabled_agent_sdk(api_key_pair):
 @pytest_asyncio.fixture
 async def stale_agent_sdk(api_key_pair):
     """HeartbeatSDK with an agent in lifecycle=stale, token cleared."""
-    raw_key, hashed = api_key_pair
+    raw_key, hashed, lookup = api_key_pair
     sdk = HeartbeatSDK(
         neo4j_uri=NEO4J_URI,
         neo4j_user=NEO4J_USER,
@@ -261,12 +269,13 @@ async def stale_agent_sdk(api_key_pair):
             MERGE (a:Agent {id: 'hb-stale-agent'})
             SET a.name = 'Stale Agent',
                 a.api_key_hash = $hash,
+                a.api_key_lookup = $lookup,
                 a.lifecycle = 'stale',
                 a.last_heartbeat = datetime() - duration('PT3H'),
                 a.heartbeat_count = 20,
                 a.heartbeat_token = null,
                 a.heartbeat_source = 'agent'
-        """, hash=hashed)
+        """, hash=hashed, lookup=lookup)
 
     yield sdk, raw_key
 
@@ -280,7 +289,7 @@ async def stale_agent_sdk(api_key_pair):
 @pytest_asyncio.fixture
 async def inactive_agent_sdk(api_key_pair):
     """HeartbeatSDK with an agent in lifecycle=inactive, token cleared."""
-    raw_key, hashed = api_key_pair
+    raw_key, hashed, lookup = api_key_pair
     sdk = HeartbeatSDK(
         neo4j_uri=NEO4J_URI,
         neo4j_user=NEO4J_USER,
@@ -293,12 +302,13 @@ async def inactive_agent_sdk(api_key_pair):
             MERGE (a:Agent {id: 'hb-inactive-agent'})
             SET a.name = 'Inactive Agent',
                 a.api_key_hash = $hash,
+                a.api_key_lookup = $lookup,
                 a.lifecycle = 'inactive',
                 a.last_heartbeat = datetime() - duration('P2D'),
                 a.heartbeat_count = 10,
                 a.heartbeat_token = null,
                 a.heartbeat_source = null
-        """, hash=hashed)
+        """, hash=hashed, lookup=lookup)
 
     yield sdk, raw_key
 
@@ -312,14 +322,28 @@ async def inactive_agent_sdk(api_key_pair):
 # ── Helper ────────────────────────────────────────────────────────────────
 
 async def get_agent_node(sdk, agent_id: str) -> dict:
-    """Read an Agent node's properties from Neo4j."""
+    """Read an Agent node's properties from Neo4j.
+
+    Neo4j removes null-valued properties from nodes, so we explicitly query
+    all heartbeat-relevant fields and let Cypher return null for missing ones.
+    """
     async with sdk.driver.session() as session:
-        result = await session.run(
-            "MATCH (a:Agent {id: $id}) RETURN a", id=agent_id,
-        )
+        result = await session.run("""
+            MATCH (a:Agent {id: $id})
+            RETURN a.id AS id,
+                   a.name AS name,
+                   a.lifecycle AS lifecycle,
+                   a.last_heartbeat AS last_heartbeat,
+                   a.previous_heartbeat AS previous_heartbeat,
+                   a.heartbeat_count AS heartbeat_count,
+                   a.heartbeat_token AS heartbeat_token,
+                   a.heartbeat_source AS heartbeat_source,
+                   a.api_key_hash AS api_key_hash,
+                   a.api_key_lookup AS api_key_lookup
+        """, id=agent_id)
         record = await result.single()
     assert record is not None, f"Agent {agent_id} not found in graph"
-    return dict(record["a"])
+    return dict(record)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -715,7 +739,7 @@ class TestAuthenticationRequired:
     async def test_no_api_key_raises_auth_error(self, heartbeat_sdk):
         """Calling heartbeat with no API key raises AuthenticationError."""
         sdk, _ = heartbeat_sdk
-        with pytest.raises((AuthenticationError, TypeError)):
+        with pytest.raises(AuthenticationError):
             await sdk.heartbeat(None, heartbeat_token=None)
 
     @pytest.mark.integration
@@ -938,6 +962,22 @@ class TestRateLimiting:
         # Token unchanged because no write occurred
         assert r2["heartbeat_token"] == token_1
 
+    @pytest.mark.integration
+    async def test_wrong_token_rejected_even_when_rate_limited(self, heartbeat_sdk):
+        """Token validation must happen BEFORE rate limiting (F8).
+
+        Sending a wrong token during the rate-limit window must raise
+        HeartbeatTokenMismatchError, not silently succeed. Otherwise the
+        rate-limiting window becomes a replay window.
+        """
+        sdk, api_key = heartbeat_sdk
+
+        r1 = await sdk.heartbeat(api_key, heartbeat_token=None)
+
+        # Immediate retry with WRONG token — within rate-limit window
+        with pytest.raises(HeartbeatTokenMismatchError):
+            await sdk.heartbeat(api_key, heartbeat_token="fabricated-wrong-token")
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # §7.12 — Cron-Validated Heartbeat (Source Tracking)
@@ -963,6 +1003,20 @@ class TestHeartbeatSource:
 
         node = await get_agent_node(sdk, "hb-test-agent")
         assert node["heartbeat_source"] == "cron"
+
+    @pytest.mark.integration
+    async def test_invalid_source_rejected(self, heartbeat_sdk):
+        """Invalid heartbeat_source values must raise ValueError (F5)."""
+        sdk, api_key = heartbeat_sdk
+        with pytest.raises(ValueError):
+            await sdk.heartbeat(api_key, heartbeat_token=None, source="admin")
+
+    @pytest.mark.integration
+    async def test_empty_source_rejected(self, heartbeat_sdk):
+        """Empty string source must raise ValueError (F5)."""
+        sdk, api_key = heartbeat_sdk
+        with pytest.raises(ValueError):
+            await sdk.heartbeat(api_key, heartbeat_token=None, source="")
 
     @pytest.mark.integration
     async def test_source_overwritten_on_subsequent_heartbeat(self, heartbeat_sdk):

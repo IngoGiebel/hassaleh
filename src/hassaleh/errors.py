@@ -22,3 +22,18 @@ class CapabilityParamError(Exception):
 
 class AccessDeniedError(Exception):
     """Raised when a caller tries to access an Intent they don't own."""
+
+
+# ── Heartbeat errors (spec-heartbeat.md v1.1) ──
+
+
+class AgentNotFoundError(Exception):
+    """Raised when the authenticated agent_id does not match any Agent node."""
+
+
+class AgentDisabledError(Exception):
+    """Raised when a heartbeat targets an agent in the 'disabled' lifecycle state."""
+
+
+class HeartbeatTokenMismatchError(Exception):
+    """Raised when the provided heartbeat_token does not match the stored token."""
