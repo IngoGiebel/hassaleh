@@ -1,0 +1,88 @@
+{
+  "sprint": 11,
+  "updated_at": "2026-04-17T20:00:00Z",
+  "cycle": 0,
+  "timeline": "3 days (2026-04-17 to 2026-04-20)",
+  "focus": "Security fixes from Sprint 10 audit (IL-01 through IL-07)",
+  "tasks": {
+    "il01-auth": {
+      "current_phase": "implement",
+      "phase_code": "F1",
+      "phase_agent": "dione",
+      "phase_worker": "worker-opus",
+      "phase_status": "pending",
+      "severity": "CRITICAL",
+      "finding_id": "IL-01",
+      "description": "Remove caller-supplied agent_id, derive from API key on all SDK paths",
+      "completed_phases": []
+    },
+    "il03-result-auth": {
+      "current_phase": "implement",
+      "phase_code": "F2",
+      "phase_agent": "dione",
+      "phase_worker": "worker-opus",
+      "phase_status": "pending",
+      "severity": "HIGH",
+      "finding_id": "IL-03",
+      "description": "Authenticate poll_intent and wait_for_intent with ownership check",
+      "completed_phases": []
+    },
+    "il02-bcrypt": {
+      "current_phase": "implement",
+      "phase_code": "F3",
+      "phase_agent": "gemini",
+      "phase_worker": "worker-gemini",
+      "phase_status": "pending",
+      "severity": "HIGH",
+      "finding_id": "IL-02",
+      "description": "Replace O(N) bcrypt scan with indexed lookup",
+      "completed_phases": []
+    },
+    "il04-sanitize": {
+      "current_phase": "implement",
+      "phase_code": "F4",
+      "phase_agent": "gemini",
+      "phase_worker": "worker-gemini",
+      "phase_status": "pending",
+      "severity": "MEDIUM",
+      "finding_id": "IL-04",
+      "description": "Sanitize error messages to not leak filesystem paths",
+      "completed_phases": []
+    },
+    "il05-toctou": {
+      "current_phase": "implement",
+      "phase_code": "F5",
+      "phase_agent": "gemini",
+      "phase_worker": "worker-gemini",
+      "phase_status": "pending",
+      "severity": "MEDIUM",
+      "finding_id": "IL-05",
+      "description": "Make path validation + execution atomic",
+      "completed_phases": []
+    },
+    "il06-heartbeat": {
+      "current_phase": "implement",
+      "phase_code": "F6",
+      "phase_agent": "codex",
+      "phase_worker": "worker-codex",
+      "phase_status": "pending",
+      "severity": "MEDIUM",
+      "finding_id": "IL-06",
+      "description": "Fix heartbeat previous_heartbeat sequencing",
+      "completed_phases": []
+    },
+    "il07-trust-boundary": {
+      "current_phase": "implement",
+      "phase_code": "F7",
+      "phase_agent": "inanna",
+      "phase_worker": "worker-opus",
+      "phase_status": "pending",
+      "severity": "MEDIUM",
+      "finding_id": "IL-07",
+      "description": "Validate graph-sourced invoke_command and exec_as_user",
+      "completed_phases": []
+    }
+  },
+  "workflow": "implement → test → security-review → merge (simplified for fixes)",
+  "notes": "Sprint 11 is a security-hardening sprint. All tasks are fixes for findings from the Sprint 10 E1/E2 security audit. Exit criteria: IL-01 and IL-03 must be closed to unblock release."
+}
