@@ -108,7 +108,7 @@ class IntentDaemon:
         # Build the set of states that may transition to to_state
         allowed_from = [s for s, targets in VALID_TRANSITIONS.items() if to_state in targets]
         if not allowed_from:
-            raise ValueError(f"No state can transition to '{to_state}'")
+            raise ValueError(f"Invalid transition: no state can transition to '{to_state}'")
 
         temp_driver = None
         driver = self.driver

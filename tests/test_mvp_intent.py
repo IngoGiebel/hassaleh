@@ -142,7 +142,8 @@ async def intent_sdk(api_key_pair):
         await session.run("""
             MERGE (a:Agent {id: 'test-dione'})
             SET a.name = 'Test Dione',
-                a.api_key_hash = $hash
+                a.api_key_hash = $hash,
+                a.lifecycle = 'active'
         """, hash=hashed)
         await session.run("""
             MERGE (cap:Capability {id: 'exec-ls'})
@@ -184,11 +185,13 @@ async def two_agent_sdk(api_key_pair, second_api_key_pair):
     async with sdk.driver.session() as session:
         await session.run("""
             MERGE (a:Agent {id: 'agent-alpha'})
-            SET a.api_key_hash = $hash
+            SET a.api_key_hash = $hash,
+                a.lifecycle = 'active'
         """, hash=hash_a)
         await session.run("""
             MERGE (b:Agent {id: 'agent-beta'})
-            SET b.api_key_hash = $hash
+            SET b.api_key_hash = $hash,
+                b.lifecycle = 'active'
         """, hash=hash_b)
         await session.run("""
             MERGE (cap:Capability {id: 'exec-ls'})

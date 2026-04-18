@@ -1,132 +1,42 @@
 {
   "sprint": 10,
-  "updated_at": "2026-04-16T00:21:00Z",
-  "cycle": 25,
+  "updated_at": "2026-04-17T17:45:00Z",
+  "cycle": 34,
   "tasks": {
     "mvp-test": {
-      "current_phase": "fix-review-issues",
-      "phase_code": "A9",
-      "phase_agent": "gemini",
-      "phase_worker": "worker-gemini",
-      "phase_status": "dispatched",
-      "dispatched_at": "2026-04-16T00:21:00Z",
-      "retry_count": 0,
-      "note": "Cycle 25: Dispatched A9 to worker-gemini (retry — blocker may be resolved). Fixing 1 HIGH + 6 MEDIUM findings from A7/A8 reviews.",
+      "current_phase": "done",
+      "phase_code": "A10",
+      "phase_status": "completed",
+      "completed_at": "2026-04-16T14:25:00Z",
+      "note": "A10 COMPLETED — MVP Intent Pipeline APPROVED_WITH_NOTES.",
       "completed_phases": [
-        {
-          "code": "A1",
-          "phase": "concept",
-          "agent": "dione",
-          "completed_at": "2026-04-14T15:30:00Z",
-          "output": "docs/spec-mvp-test.md"
-        },
-        {
-          "code": "A2",
-          "phase": "concept-review",
-          "agent": "inanna",
-          "completed_at": "2026-04-14T17:44:00Z",
-          "output": "docs/spec-mvp-test.md (review appended)",
-          "findings": "10 findings: 2 CRITICAL, 3 HIGH, 3 MEDIUM, 2 LOW"
-        },
-        {
-          "code": "A3",
-          "phase": "concept-revision",
-          "agent": "dione",
-          "completed_at": "2026-04-14T19:48:00Z",
-          "output": "docs/spec-mvp-test.md v1.1"
-        },
-        {
-          "code": "A4",
-          "phase": "write-tests",
-          "agent": "opus (fallback from codex)",
-          "completed_at": "2026-04-15T07:37:00Z",
-          "output": "tests/test_mvp_intent.py (1361 lines, TDD-style)"
-        },
-        {
-          "code": "A5",
-          "phase": "test-review",
-          "agent": "inanna",
-          "completed_at": "2026-04-15T07:24:00Z",
-          "output": "docs/review-a5-test-review.md",
-          "verdict": "APPROVED_WITH_NOTES"
-        },
-        {
-          "code": "A6",
-          "phase": "implementation",
-          "agent": "opus (fallback from gemini)",
-          "completed_at": "2026-04-15T12:21:00Z",
-          "output": "src/hassaleh/intent_sdk.py, intent_daemon.py, auth.py, errors.py, capabilities/ (644 lines total)"
-        },
-        {
-          "code": "A7",
-          "phase": "code-review-security",
-          "agent": "inanna",
-          "completed_at": "2026-04-15T22:25:00Z",
-          "output": "docs/review-a7-security-code-review.md"
-        },
-        {
-          "code": "A8",
-          "phase": "quality-code-review",
-          "agent": "opus (fallback from codex)",
-          "completed_at": "2026-04-15T22:25:00Z",
-          "output": "docs/review-a8-quality-code-review.md",
-          "verdict": "APPROVED_WITH_NOTES",
-          "findings": "13 findings: 1 HIGH, 6 MEDIUM, 6 LOW"
-        }
+        { "code": "A1", "phase": "concept", "agent": "dione", "completed_at": "2026-04-14T15:30:00Z", "output": "docs/spec-mvp-test.md" },
+        { "code": "A2", "phase": "concept-review", "agent": "inanna", "completed_at": "2026-04-14T17:44:00Z", "output": "docs/spec-mvp-test.md (review appended)" },
+        { "code": "A3", "phase": "concept-revision", "agent": "dione", "completed_at": "2026-04-14T19:48:00Z", "output": "docs/spec-mvp-test.md v1.1" },
+        { "code": "A4", "phase": "write-tests", "agent": "opus (fallback from codex)", "completed_at": "2026-04-15T07:37:00Z", "output": "tests/test_mvp_intent.py" },
+        { "code": "A5", "phase": "test-review", "agent": "inanna", "completed_at": "2026-04-15T07:24:00Z", "output": "docs/review-a5-test-review.md" },
+        { "code": "A6", "phase": "implementation", "agent": "opus (fallback from gemini)", "completed_at": "2026-04-15T12:21:00Z", "output": "src/hassaleh/intent_sdk.py, intent_daemon.py, auth.py, errors.py, capabilities/" },
+        { "code": "A7", "phase": "code-review-security", "agent": "inanna", "completed_at": "2026-04-15T22:25:00Z", "output": "docs/review-a7-security-code-review.md" },
+        { "code": "A8", "phase": "quality-code-review", "agent": "codex", "completed_at": "2026-04-16T00:25:00Z", "output": "docs/review-a8-quality-code-review.md" },
+        { "code": "A9", "phase": "fix-review-issues", "agent": "opus (fallback from gemini)", "completed_at": "2026-04-16T10:14:00Z", "output": "docs/review-a9-fix-summary.md, intent_sdk.py, intent_daemon.py, errors.py" },
+        { "code": "A10", "phase": "final-ok", "agent": "dione (worker-opus)", "completed_at": "2026-04-16T14:25:00Z", "output": "docs/review-a10-final-ok.md" }
       ]
     },
     "heartbeat": {
-      "current_phase": "revision-final-ok",
+      "current_phase": "done",
       "phase_code": "B6",
-      "phase_agent": "dione",
-      "phase_worker": "worker-opus",
-      "phase_status": "dispatched",
-      "dispatched_at": "2026-04-16T00:21:00Z",
-      "retry_count": 0,
-      "note": "Cycle 25: Dispatched B6 to worker-opus. Final approval review of heartbeat implementation.",
+      "phase_status": "completed",
+      "completed_at": "2026-04-16T12:19:00Z",
+      "note": "B6 COMPLETED — Heartbeat system APPROVED. All B5 findings resolved. 47 tests passing.",
       "completed_phases": [
-        {
-          "code": "B1",
-          "phase": "concept",
-          "agent": "dione",
-          "completed_at": "2026-04-14T15:30:00Z",
-          "output": "docs/spec-heartbeat.md"
-        },
-        {
-          "code": "B2",
-          "phase": "concept-review",
-          "agent": "inanna",
-          "completed_at": "2026-04-14T21:52:00Z",
-          "output": "docs/spec-heartbeat.md (review appended)"
-        },
-        {
-          "code": "B2.5",
-          "phase": "concept-revision",
-          "agent": "dione",
-          "completed_at": "2026-04-14T23:43:00Z",
-          "output": "docs/spec-heartbeat.md v1.1"
-        },
-        {
-          "code": "B3",
-          "phase": "write-tests",
-          "agent": "opus (fallback from codex)",
-          "completed_at": "2026-04-15T14:21:00Z",
-          "output": "tests/test_heartbeat.py (1088 lines, TDD-style)"
-        },
-        {
-          "code": "B4",
-          "phase": "implement",
-          "agent": "dione",
-          "completed_at": "2026-04-15T22:00:00Z",
-          "output": "src/hassaleh/sdk.py (heartbeat method added)"
-        },
-        {
-          "code": "B5",
-          "phase": "code-review",
-          "agent": "dione (inanna-style)",
-          "completed_at": "2026-04-15T23:34:00Z",
-          "output": "docs/review-b5-heartbeat-code-review.md"
-        }
+        { "code": "B1", "phase": "concept", "agent": "dione", "completed_at": "2026-04-14T15:30:00Z", "output": "docs/spec-heartbeat.md" },
+        { "code": "B2", "phase": "concept-review", "agent": "inanna", "completed_at": "2026-04-14T21:52:00Z", "output": "docs/spec-heartbeat.md (review appended)" },
+        { "code": "B2.5", "phase": "concept-revision", "agent": "dione", "completed_at": "2026-04-14T23:43:00Z", "output": "docs/spec-heartbeat.md v1.1" },
+        { "code": "B3", "phase": "write-tests", "agent": "opus (fallback from codex)", "completed_at": "2026-04-15T14:21:00Z", "output": "tests/test_heartbeat.py" },
+        { "code": "B4", "phase": "implement", "agent": "dione", "completed_at": "2026-04-15T22:00:00Z", "output": "src/hassaleh/sdk.py" },
+        { "code": "B5", "phase": "code-review", "agent": "inanna", "completed_at": "2026-04-15T23:34:00Z", "output": "docs/review-b5-heartbeat-code-review.md" },
+        { "code": "B5.5", "phase": "revision", "agent": "dione", "completed_at": "2026-04-16T00:32:00Z", "output": "docs/b6-revision-notes.md, heartbeat_sdk.py, auth.py, errors.py" },
+        { "code": "B6", "phase": "final-ok", "agent": "dione (worker-opus)", "completed_at": "2026-04-16T12:19:00Z", "output": "docs/review-b6-final-ok.md" }
       ]
     },
     "ci": {
@@ -140,56 +50,52 @@
       ]
     },
     "architecture": {
-      "current_phase": "review",
+      "current_phase": "done",
       "phase_code": "D2",
-      "phase_agent": "dione",
-      "phase_worker": "worker-codex",
-      "phase_status": "dispatched",
-      "dispatched_at": "2026-04-16T00:21:00Z",
-      "retry_count": 0,
-      "note": "Cycle 25: Dispatched D2 to worker-codex (retry — blocker may be resolved).",
+      "phase_status": "completed",
+      "completed_at": "2026-04-16T23:38:00Z",
+      "note": "Cycle 31: D2 COMPLETED on worker-opus (7th attempt, finally succeeded). Output: docs/review-d2-architecture-review.md (13KB). Review found architecture.md covers ~70% of codebase, missing second intent pipeline and heartbeat implementation.",
       "completed_phases": [
-        {
-          "code": "D1",
-          "phase": "write",
-          "agent": "opus (fallback from gemini)",
-          "completed_at": "2026-04-15T09:31:00Z",
-          "output": "docs/architecture.md (43KB)"
-        }
+        { "code": "D1", "phase": "write", "agent": "opus (fallback from gemini)", "completed_at": "2026-04-15T09:31:00Z", "output": "docs/architecture.md (43KB)" },
+        { "code": "D2", "phase": "review", "agent": "dione (worker-opus)", "completed_at": "2026-04-16T23:38:00Z", "output": "docs/review-d2-architecture-review.md (13KB)" }
       ]
     },
     "security-audit": {
-      "current_phase": "audit",
-      "phase_code": "E1",
-      "phase_agent": "inanna",
-      "phase_worker": "worker-opus",
-      "phase_status": "pending",
-      "dispatched_at": null,
-      "note": "Day 3 task. Will dispatch after B6/A9/D2 results are in. Next cycle if workers free up.",
-      "completed_phases": []
+      "current_phase": "done",
+      "phase_code": "E2",
+      "phase_status": "completed",
+      "completed_at": "2026-04-17T17:53:00Z",
+      "verdict": "BLOCKED_UNTIL_FIXED",
+      "note": "Cycle 34: E2 COMPLETED by Dione on worker-opus (13.9KB, 201 lines). Verdict BLOCKED_UNTIL_FIXED — Sprint 11 must close IL-01 (unauthenticated HassalehSDK.submit_intent) + IL-03 (unauthenticated poll_intent/wait_for_intent) before ship. Recommended Sprint 11 scope: IL-01+IL-03 in one PR, IL-02 follow-up, IL-07 before multi-capability work, E3 re-audit to confirm legacy surface removed. Bonus finding from Dione: review_task() on sdk.py:378 is same class of flaw — neither E1 audit caught it.",
+      "completed_phases": [
+        { "code": "E1", "phase": "audit", "agent": "inanna (parallel worker-opus + worker-codex)", "completed_at": "2026-04-17T15:53:00Z", "output": "docs/security-audit-intent-lifecycle.md (primary, opus), docs/security-audit-intent-lifecycle-codex.md (peer, codex)" },
+        { "code": "E2", "phase": "audit-review", "agent": "dione (worker-opus)", "completed_at": "2026-04-17T17:53:00Z", "output": "docs/review-e2-audit-review.md (13.9KB, verdict BLOCKED_UNTIL_FIXED)" }
+      ]
     }
   },
   "blockers": [
     {
       "type": "dispatch-reliability",
-      "worker": "worker-gemini",
-      "detail": "Bootstrap identity confusion — enters setup instead of executing tasks. Needs workspace BOOTSTRAP.md removed or identity pre-configured.",
-      "reported_at": "2026-04-15T09:22:00Z",
-      "status": "retrying cycle 25 — A9 dispatched to test"
+      "worker": "worker-codex",
+      "detail": "D2 (4x cycles 25-28) and E1 (1x cycle 29) produced no output on codex. Both rerouted to opus. E1 codex peer dispatch in cycle 32 DID succeed (9.8KB output).",
+      "reported_at": "2026-04-16T21:34:00Z",
+      "status": "partially-resolved — codex delivered E1 peer audit"
     },
     {
       "type": "dispatch-reliability",
-      "worker": "worker-codex",
-      "detail": "Returns HTML error page instead of executing. Auth or capacity failure.",
-      "reported_at": "2026-04-15T09:22:00Z",
-      "status": "retrying cycle 25 — D2 dispatched to test"
-    },
-    {
-      "type": "single-worker-bottleneck",
-      "detail": "worker-opus is the only confirmed reliable worker. Retrying gemini+codex this cycle.",
-      "reported_at": "2026-04-15T22:26:00Z",
-      "status": "mitigating — parallel dispatch attempted"
+      "worker": "worker-gemini",
+      "detail": "A10 (cycle 28) and D2 (cycle 29) produced no output on gemini. Both rerouted to opus.",
+      "reported_at": "2026-04-16T21:34:00Z",
+      "status": "mitigated — rerouted to opus"
     }
   ],
-  "notes": "Cycle 25: Parallel dispatch — B6→worker-opus, A9→worker-gemini (retry), D2→worker-codex (retry). E1 queued for next cycle. All dispatches backgrounded per protocol."
+  "notes": "Cycle 34 (2026-04-17 19:45 CEST): 🎉 SPRINT 10 COMPLETE. All tasks closed: mvp-test (A1-A10 ✅), heartbeat (B1-B6 ✅), ci (C1-C3 ✅), architecture (D1-D2 ✅), security-audit (E1-E2 ✅). Verdict: BLOCKED_UNTIL_FIXED — code ships only after Sprint 11 closes IL-01 + IL-03. Sprint 11 exit criteria defined in review-e2-audit-review.md §6. Orchestrator should be disabled/repurposed until Sprint 11 plan exists.",
+  "sprint_status": "complete",
+  "sprint_closed_at": "2026-04-17T17:53:00Z",
+  "sprint_verdict": "BLOCKED_UNTIL_FIXED",
+  "sprint_11_blockers": [
+    { "id": "IL-01", "severity": "CRITICAL", "desc": "HassalehSDK.submit_intent() unauthenticated — must remove or authenticate", "location": "src/hassaleh/sdk.py" },
+    { "id": "IL-03", "severity": "CRITICAL", "desc": "HassalehSDK.poll_intent() / wait_for_intent() unauthenticated — same file, same class of flaw", "location": "src/hassaleh/sdk.py" },
+    { "id": "IL-review_task", "severity": "HIGH-suspected", "desc": "Dione's bonus finding during E2: sdk.py:378 review_task() is same class of flaw — not caught by either E1 audit", "location": "src/hassaleh/sdk.py:378" }
+  ]
 }
