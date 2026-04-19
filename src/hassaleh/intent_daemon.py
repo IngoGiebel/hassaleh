@@ -15,6 +15,7 @@ import os
 import socket
 import subprocess
 import time
+import uuid
 
 from neo4j import AsyncDriver, AsyncGraphDatabase
 
@@ -258,8 +259,19 @@ class IntentDaemon:
             try:
                 resolved_path = validate_exec_ls_path(path)
             except CapabilityParamError as e:
+                # IL-04: defense-in-depth sanitization at the daemon boundary.
+                # exec_ls also sanitizes upstream, but we generate a fresh cid
+                # here so the cid travels with the intent_id and any leaky
+                # exception from a future capability handler is still scrubbed
+                # before it reaches Intent.error.
+                cid = uuid.uuid4().hex
+                log.error("Intent %s validation failed [cid: %s]: %s", intent_id, cid, e)
                 elapsed_ms = int((time.monotonic() - start_time) * 1000)
-                await self._fail_intent(intent_id, f"Parameter validation failed: {e}", elapsed_ms)
+                await self._fail_intent(
+                    intent_id,
+                    f"Parameter validation failed [cid: {cid}]",
+                    elapsed_ms,
+                )
                 return
 
             # Execute via capability module (Q1: single source of truth)
@@ -267,17 +279,36 @@ class IntentDaemon:
                 stdout = await asyncio.get_event_loop().run_in_executor(
                     None, lambda: execute_ls(resolved_path, self.intent_timeout_sec)
                 )
-            except subprocess.TimeoutExpired:
+            except subprocess.TimeoutExpired as e:
+                # IL-04: execute_ls lets TimeoutExpired propagate so the daemon
+                # can attach its own intent-scoped context (configured timeout
+                # value, intent_id) while still emitting a sanitized message.
+                cid = uuid.uuid4().hex
+                log.error(
+                    "Intent %s execution timed out after %ds [cid: %s]: %s",
+                    intent_id, self.intent_timeout_sec, cid, e,
+                )
                 elapsed_ms = int((time.monotonic() - start_time) * 1000)
                 await self._fail_intent(
                     intent_id,
-                    f"Execution timed out after {self.intent_timeout_sec}s",
+                    f"Execution timed out [cid: {cid}]",
                     elapsed_ms,
                 )
                 return
             except RuntimeError as e:
+                # IL-04: defense-in-depth sanitization at the daemon boundary.
+                # Mirror the validation path: any RuntimeError (from exec_ls
+                # or a future capability) gets a fresh cid here so raw stderr
+                # like "ls: cannot access ...: Permission denied" never
+                # reaches Intent.error.
+                cid = uuid.uuid4().hex
+                log.error("Intent %s execution failed [cid: %s]: %s", intent_id, cid, e)
                 elapsed_ms = int((time.monotonic() - start_time) * 1000)
-                await self._fail_intent(intent_id, str(e), elapsed_ms)
+                await self._fail_intent(
+                    intent_id,
+                    f"Execution failed [cid: {cid}]",
+                    elapsed_ms,
+                )
                 return
 
             elapsed_ms = int((time.monotonic() - start_time) * 1000)
