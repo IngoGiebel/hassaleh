@@ -23,6 +23,9 @@ from typing import Any
 
 from neo4j import AsyncGraphDatabase
 
+from hassaleh.auth import lookup_hash, verify_api_key
+from hassaleh.errors import AuthenticationError
+
 log = logging.getLogger("hassaleh.sdk")
 
 # ──────────────────────────────────────────────
@@ -55,9 +58,9 @@ class HassalehSDK:
 
     Usage:
         async with HassalehSDK() as sdk:
-            tasks = await sdk.my_tasks("dione")
-            intent_id = await sdk.submit_intent(...)
-            result = await sdk.poll_intent(intent_id)
+            tasks = await sdk.my_tasks(api_key)
+            intent_id = await sdk.submit_intent(api_key, ...)
+            result = await sdk.poll_intent(intent_id, api_key)
     """
 
     def __init__(
@@ -66,9 +69,21 @@ class HassalehSDK:
         neo4j_user: str | None = None,
         neo4j_password: str | None = None,
     ):
-        self.neo4j_uri = neo4j_uri or os.environ.get("NEO4J_URI", "bolt://localhost:7690")
-        self.neo4j_user = neo4j_user or os.environ.get("NEO4J_USER", "neo4j")
-        self.neo4j_password = neo4j_password or os.environ.get("NEO4J_PASSWORD", "hassaleh-dev-2026")
+        self.neo4j_uri = (
+            neo4j_uri
+            if neo4j_uri is not None
+            else os.environ.get("NEO4J_URI", "bolt://localhost:7690")
+        )
+        self.neo4j_user = (
+            neo4j_user
+            if neo4j_user is not None
+            else os.environ.get("NEO4J_USER", "neo4j")
+        )
+        self.neo4j_password = (
+            neo4j_password
+            if neo4j_password is not None
+            else os.environ.get("NEO4J_PASSWORD", "hassaleh-dev-2026")
+        )
         self.driver: Any = None
         self.query_config: dict = dict(DEFAULT_QUERY_CONFIG)
 
@@ -126,6 +141,40 @@ class HassalehSDK:
                 log.info(f"QueryConfig loaded: {self.query_config}")
             else:
                 log.warning("No QueryConfig found — using defaults")
+
+    # ── Authentication ──
+
+    async def _authenticate(self, api_key: str) -> str:
+        """Resolve an API key to an agent_id via deterministic lookup + bcrypt verify.
+
+        Uses the lookup_hash pattern (spec-heartbeat §3B): a SHA-256 digest
+        indexes a single Agent row, then bcrypt verifies the stored hash.
+        Avoids the O(N) bcrypt scan called out in IL-02.
+
+        Raises:
+            AuthenticationError: api_key is missing, malformed, or does not
+                match a known agent.
+        """
+        if not isinstance(api_key, str) or not api_key:
+            raise AuthenticationError("Invalid API key")
+
+        key_lookup = lookup_hash(api_key)
+
+        async with self.driver.session() as session:
+            result = await session.run(
+                "MATCH (a:Agent) WHERE a.api_key_lookup = $lookup "
+                "RETURN a.id AS agent_id, a.api_key_hash AS api_key_hash",
+                lookup=key_lookup,
+            )
+            record = await result.single()
+
+        if record is None or not record["api_key_hash"]:
+            raise AuthenticationError("Invalid API key")
+
+        if not verify_api_key(api_key, record["api_key_hash"]):
+            raise AuthenticationError("Invalid API key")
+
+        return record["agent_id"]
 
     # ── Core Query ──
 
@@ -187,7 +236,7 @@ class HassalehSDK:
 
     async def submit_intent(
         self,
-        agent_id: str,
+        api_key: str,
         action: str,
         capability_id: str | None = None,
         target_id: str | None = None,
@@ -197,8 +246,10 @@ class HassalehSDK:
     ) -> str:
         """Submit an Intent for the Daemon to process.
 
+        The submitting agent is derived server-side from ``api_key`` (IL-01).
+
         Args:
-            agent_id: ID of the submitting agent
+            api_key: Pre-shared API key; agent_id derived server-side.
             action: Intent action (execute_capability, update_property, etc.)
             capability_id: Target capability ID (for execute_capability)
             target_id: Target node ID (for update_property)
@@ -209,6 +260,7 @@ class HassalehSDK:
         Returns:
             The generated Intent ID
         """
+        agent_id = await self._authenticate(api_key)
         intent_id = str(uuid.uuid4())
 
         # Validate label early (before any writes)
@@ -270,14 +322,36 @@ class HassalehSDK:
 
     # ── Intent Polling ──
 
-    async def poll_intent(self, intent_id: str) -> dict[str, Any]:
+    async def poll_intent(self, intent_id: str, api_key: str) -> dict[str, Any]:
         """Poll an Intent for its current state.
 
+        The caller is authenticated via ``api_key`` (IL-03); only the
+        submitting agent (owner of the ``PROPOSED`` edge) may read the
+        Intent's state, stdout, or stderr.
+
+        Args:
+            intent_id: Intent to poll.
+            api_key: Pre-shared API key; caller's agent_id is derived
+                server-side.
+
         Returns:
-            Dict with lifecycle, stdout, stderr, error_reason, exit_code
+            Dict with lifecycle, stdout, stderr, error_reason, exit_code.
+
+        Raises:
+            AuthenticationError: ``api_key`` is missing or invalid.
+            PermissionError: The Intent does not exist OR the authenticated
+                agent is not its owner. A single sanitized message is used
+                for both cases so callers cannot probe for Intent IDs.
         """
+        agent_id = await self._authenticate(api_key)
+
+        # Ownership-scoped match: if the authenticated agent does not own
+        # the Intent (or the Intent doesn't exist), zero rows come back.
+        # We intentionally do NOT branch on "intent exists but not owned"
+        # vs "intent missing" — both yield the same PermissionError so an
+        # attacker cannot enumerate Intent IDs.
         records = await self.query("""
-            MATCH (i:Intent {id: $id})
+            MATCH (a:Agent {id: $agent_id})-[:PROPOSED]->(i:Intent {id: $id})
             RETURN i.lifecycle AS lifecycle,
                    i.stdout AS stdout,
                    i.stderr AS stderr,
@@ -285,51 +359,61 @@ class HassalehSDK:
                    i.exit_code AS exit_code,
                    i.submitted_at AS submitted_at,
                    i.completed_at AS completed_at
-        """, {"id": intent_id})
+        """, {"agent_id": agent_id, "id": intent_id})
 
         if not records:
-            raise ValueError(f"Intent {intent_id} not found")
+            raise PermissionError("intent not found or not authorized")
         return records[0]
 
     async def wait_for_intent(
         self,
         intent_id: str,
+        api_key: str,
         timeout_sec: float = 60.0,
         poll_interval: float = 1.0,
     ) -> dict[str, Any]:
         """Wait for an Intent to reach a terminal state.
 
+        Applies the same authentication + ownership check as
+        :meth:`poll_intent` on every internal poll (IL-03).
+
         Args:
-            intent_id: Intent to wait for
-            timeout_sec: Maximum wait time
-            poll_interval: Seconds between polls
+            intent_id: Intent to wait for.
+            api_key: Pre-shared API key; caller's agent_id is derived
+                server-side.
+            timeout_sec: Maximum wait time.
+            poll_interval: Seconds between polls.
 
         Returns:
-            Final Intent state dict
+            Final Intent state dict.
 
         Raises:
-            TimeoutError: If Intent doesn't complete within timeout
+            AuthenticationError: ``api_key`` is missing or invalid.
+            PermissionError: Caller is not the Intent's owner (sanitized).
+            TimeoutError: Intent did not complete within ``timeout_sec``.
         """
         deadline = asyncio.get_event_loop().time() + timeout_sec
 
         while asyncio.get_event_loop().time() < deadline:
-            state = await self.poll_intent(intent_id)
+            state = await self.poll_intent(intent_id, api_key)
             if state["lifecycle"] in ("success", "failed", "rejected"):
                 return state
             await asyncio.sleep(poll_interval)
 
-        raise TimeoutError(
-            f"Intent {intent_id} did not complete within {timeout_sec}s"
-        )
+        raise TimeoutError("intent did not complete before deadline")
 
     # ── Convenience Methods ──
 
-    async def my_tasks(self, agent_id: str) -> list[dict[str, Any]]:
-        """Get all tasks assigned to an agent.
+    async def my_tasks(self, api_key: str) -> list[dict[str, Any]]:
+        """Get all tasks assigned to the authenticated agent.
+
+        Args:
+            api_key: Pre-shared API key; agent_id derived server-side (IL-01).
 
         Returns:
             List of task dicts with id, name, lifecycle, description
         """
+        agent_id = await self._authenticate(api_key)
         return await self.query("""
             MATCH (t:Task)-[:ASSIGNED_TO]->(a:Agent {id: $agent_id})
             RETURN t.id AS id,
@@ -378,11 +462,15 @@ class HassalehSDK:
     async def review_task(
         self,
         task_id: str,
-        agent_id: str,
+        api_key: str,
         approved: bool,
         comment: str = "",
     ) -> None:
-        """Submit a supervised task review intent."""
+        """Submit a supervised task review intent.
+
+        The reviewing agent is derived server-side from ``api_key`` (IL-01).
+        """
+        agent_id = await self._authenticate(api_key)
         intent_id = str(uuid.uuid4())
         payload = json.dumps({
             "approved": approved,
@@ -422,18 +510,19 @@ class HassalehSDK:
 
     async def send_message(
         self,
-        agent_id: str,
+        api_key: str,
         content: str,
         context_id: str | None = None,
         context_label: str = "Task",
     ) -> str:
         """Send a message to a context (Task, Discussion, etc.).
 
-        Creates a Message node, links it via SENT from the agent,
+        The sender is derived server-side from ``api_key`` (IL-01).
+        Creates a Message node, links it via SENT from the authenticated agent,
         and appends it to the NEXT linked-list for the context.
 
         Args:
-            agent_id: Sending agent's ID
+            api_key: Pre-shared API key; sender agent_id derived server-side.
             content: Message content
             context_id: Optional context node ID (Task, Discussion)
             context_label: Label of the context node
@@ -441,6 +530,7 @@ class HassalehSDK:
         Returns:
             The generated Message ID
         """
+        agent_id = await self._authenticate(api_key)
         message_id = str(uuid.uuid4())
 
         async with self.driver.session() as session:
@@ -503,18 +593,25 @@ class HassalehSDK:
 
     async def read_messages(
         self,
-        agent_id: str,
+        api_key: str,
         context_id: str | None = None,
         limit: int = 50,
     ) -> list[dict[str, Any]]:
-        """Read unread messages for an agent (cursor-based).
+        """Read unread messages for the authenticated agent (cursor-based).
 
+        The reader is derived server-side from ``api_key`` (IL-01).
         Follows the NEXT chain from the agent's LAST_READ cursor.
         If no cursor exists, starts from the HEAD of the context.
+
+        Args:
+            api_key: Pre-shared API key; agent_id derived server-side.
+            context_id: Optional context node ID (Task, Discussion).
+            limit: Max messages to return.
 
         Returns:
             List of message dicts with id, content, timestamp, sender
         """
+        agent_id = await self._authenticate(api_key)
         if context_id:
             # Two-step read: check cursor, then traverse NEXT chain
             # Step 1: Get cursor position
@@ -561,11 +658,13 @@ class HassalehSDK:
                 ORDER BY m.timestamp ASC
             """, {"agent_id": agent_id}, timeout_ms=10000)
 
-    async def advance_cursor(self, agent_id: str, message_id: str) -> None:
-        """Move an agent's LAST_READ cursor to a specific message.
+    async def advance_cursor(self, api_key: str, message_id: str) -> None:
+        """Move the authenticated agent's LAST_READ cursor to a specific message.
 
+        The owning agent is derived server-side from ``api_key`` (IL-01).
         Deletes the old LAST_READ edge and creates a new one.
         """
+        agent_id = await self._authenticate(api_key)
         async with self.driver.session() as session:
             async def _advance(tx):
                 await tx.run("""
@@ -612,12 +711,16 @@ class HassalehSDK:
 
     async def contribute_to_discussion(
         self,
-        agent_id: str,
+        api_key: str,
         discussion_id: str,
         position: str,
         reasoning: str,
     ) -> None:
-        """Add an agent's position to a discussion."""
+        """Add the authenticated agent's position to a discussion.
+
+        The contributor is derived server-side from ``api_key`` (IL-01).
+        """
+        agent_id = await self._authenticate(api_key)
         async with self.driver.session() as session:
             async def _contribute(tx):
                 await tx.run("""
@@ -635,14 +738,16 @@ class HassalehSDK:
 
     async def resolve_discussion(
         self,
-        agent_id: str,
+        api_key: str,
         discussion_id: str,
         resolution: str,
     ) -> None:
         """Resolve a discussion (leader decision).
 
+        The resolver is derived server-side from ``api_key`` (IL-01).
         Only agents who have CONTRIBUTED to the discussion can resolve it.
         """
+        agent_id = await self._authenticate(api_key)
         async with self.driver.session() as session:
             async def _resolve(tx):
                 # Verify agent has contributed (permission check)
@@ -668,8 +773,14 @@ class HassalehSDK:
                    resolution=resolution)
             await session.execute_write(_resolve)
 
-    async def agent_info(self, agent_id: str) -> dict[str, Any] | None:
-        """Get agent details."""
+    async def agent_info(self, api_key: str) -> dict[str, Any] | None:
+        """Get details for the authenticated agent.
+
+        The target is derived server-side from ``api_key`` (IL-01);
+        callers can no longer query other agents via this helper.
+        Use :meth:`query` for read-only lookups of peer agents.
+        """
+        agent_id = await self._authenticate(api_key)
         records = await self.query("""
             MATCH (a:Agent {id: $agent_id})
             RETURN a.id AS id,

@@ -15,6 +15,15 @@
 CREATE CONSTRAINT agent_id IF NOT EXISTS
   FOR (a:Agent) REQUIRE a.id IS UNIQUE;
 
+// IL-02: indexed auth lookup + hash-collision guard.
+// Implicitly indexes api_key_lookup so sdk.py / heartbeat_sdk.py / intent_sdk.py
+// MATCH (a:Agent) WHERE a.api_key_lookup = $lookup uses a range index instead of
+// a label scan, and enforces a 1:1 key→agent invariant (a backfill bug that
+// duplicated a lookup hash would now fail at write time instead of returning an
+// ambiguous record at read time).
+CREATE CONSTRAINT agent_api_key_lookup IF NOT EXISTS
+  FOR (a:Agent) REQUIRE a.api_key_lookup IS UNIQUE;
+
 CREATE CONSTRAINT capability_id IF NOT EXISTS
   FOR (c:Capability) REQUIRE c.id IS UNIQUE;
 

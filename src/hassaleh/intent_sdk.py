@@ -16,7 +16,7 @@ from typing import Any
 
 from neo4j import AsyncDriver, AsyncGraphDatabase
 
-from hassaleh.auth import verify_api_key
+from hassaleh.auth import lookup_hash, verify_api_key
 from hassaleh.capabilities.exec_ls import validate_exec_ls_path_quick
 from hassaleh.errors import (
     AccessDeniedError,
@@ -83,25 +83,42 @@ class IntentSDK:
             self.driver = None
 
     async def _authenticate(self, api_key: str) -> str:
-        """Authenticate caller by API key, return agent_id.
+        """Resolve an API key to an agent_id via deterministic lookup + bcrypt verify.
 
-        Scoped to active agents only (A7-S3).
-        Raises AuthenticationError if no match found.
+        IL-02 fix: port of the sdk.py / heartbeat_sdk.py pattern. SHA-256 of
+        the raw key selects a single Agent row via the `api_key_lookup` index,
+        then bcrypt verifies the stored hash. Caps auth cost at one
+        `bcrypt.checkpw` regardless of agent population.
+
+        All three failure branches raise byte-identical
+        `AuthenticationError("Invalid API key")` to match sdk.py:147,160,163
+        so a timing-only attacker cannot distinguish missing-key, no-such-agent,
+        and wrong-bcrypt outcomes.
+
+        Raises:
+            AuthenticationError: api_key is missing, malformed, or does not
+                match a known agent.
         """
+        if not isinstance(api_key, str) or not api_key:
+            raise AuthenticationError("Invalid API key")
+
+        key_lookup = lookup_hash(api_key)
+
         async with self.driver.session() as session:
             result = await session.run(
-                "MATCH (a:Agent) "
-                "WHERE a.api_key_hash IS NOT NULL "
-                "  AND a.lifecycle IN ['active', 'running'] "
-                "RETURN a.id AS agent_id, a.api_key_hash AS hash"
+                "MATCH (a:Agent) WHERE a.api_key_lookup = $lookup "
+                "RETURN a.id AS agent_id, a.api_key_hash AS api_key_hash",
+                lookup=key_lookup,
             )
-            records = [record async for record in result]
+            record = await result.single()
 
-        for record in records:
-            if verify_api_key(api_key, record["hash"]):
-                return record["agent_id"]
+        if record is None or not record["api_key_hash"]:
+            raise AuthenticationError("Invalid API key")
 
-        raise AuthenticationError("Invalid API key")
+        if not verify_api_key(api_key, record["api_key_hash"]):
+            raise AuthenticationError("Invalid API key")
+
+        return record["agent_id"]
 
     async def _get_owned_intent(self, api_key: str, intent_id: str) -> dict[str, Any]:
         """Authenticate, fetch intent, verify ownership. Returns raw node dict.
