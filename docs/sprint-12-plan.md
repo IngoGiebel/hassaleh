@@ -1,12 +1,23 @@
 # Sprint 12 — Observability v1
 
 **Author:** Dione  
-**Status:** DRAFT — pending review by Inanna (security + API) and one
-independent technical reviewer.  
+**Status:** DRAFT v1 — Round-1 reviews incorporated; pending Round-2.  
 **Created:** 2026-04-18  
+**Revised:** 2026-04-19 (addresses all Round-1 CRs from Inanna + gemini-reviewer)  
 **Sprint timeline (tentative):** starts when Sprint 11 is fully green; ~5 working days.  
 **Review process:** This plan itself is subject to the agentic review workflow
-described in §9 below.
+described in §9 below. Round-1 reviews:
+`docs/sprint-12-plan-review-1-inanna.md`,
+`docs/sprint-12-plan-review-1-gemini.md`.
+
+**Artefact ↔ plan relationship (clarified):** §1, §2, §3 of this plan **are**
+the three spec artefacts (Requirements, Architecture, Interface). Day 1 of
+the sprint consists of polishing them and, if the reviewers request, splitting
+them into separate files `docs/sprint-12-requirements.md`,
+`docs/sprint-12-architecture.md`, `docs/sprint-12-interfaces.md`.
+v1 of this plan treats all three as co-located for ease of cross-referencing
+during review; the split (if any) is a pure-file-move task that does not
+change content.
 
 ---
 
@@ -38,10 +49,10 @@ place that we cannot do today.
 | R2 | **Intent-Pipeline Tracing** — every intent gets a `trace_id`; spans cover the stages `auth → validate → execute → persist → result`. | One click in Grafana Tempo shows where an intent spent its time, which makes latency regressions a 30-second diagnosis. |
 | R3 | **Authentication Telemetrie** — counts of auth attempts by result bucket (`ok \| bad_key \| unknown_agent \| bcrypt_fail`), avg + p99 bcrypt duration, rate of failures per source. | Detects credential stuffing and O(N)-auth-DoS attempts before they wreck the daemon. |
 | R4 | **Graph-Query Performance** — per-Cypher-pattern histogram of query duration, a slow-query log (>100 ms) and Neo4j connection-pool stats. | Separates "slow daemon" from "slow Neo4j" without attaching a profiler. |
-| R5 | **Heartbeat Health** — counter of missed heartbeats, histogram of inter-beat intervals per `agent_id`, uptime-SLO per agent. | Drives the Sprint-10 heartbeat invariant from "hope it works" to "SLO-green 99.x%". |
-| R6 | **Error Classification** — single `hassaleh_errors_total` counter with labels `{type, source}`, where `type ∈ {PermissionError, ValidationError, GraphError, Internal, Timeout}`. | Lets us watch error mix over time and correlate spikes with deploys. |
-| R7 | **Tool-Execution Stats** — `invoke_command`/`exec_as_user` counts per `{agent_id, command, result}`, with command duration histograms. | Feeds security audits (who invoked what?) and capacity planning. |
-| R8 | **Resource Utilization** — Neo4j memory/CPU/connection-count, daemon memory/CPU, container restart-count. | Turns "it feels slow" into a datum, and underpins alert thresholds. |
+| R5 | **Heartbeat Health** — counter of missed heartbeats, histogram of inter-beat intervals per `agent_id`, uptime-SLO per agent (defined in §3.2.1 as a recording rule). | Drives the Sprint-10 heartbeat invariant from "hope it works" to a measurable 99.0 % target. |
+| R6 | **Error Classification** — single `hassaleh_errors_total` counter with labels `{type, source}`. The `type` enum is grounded in the actual exception hierarchy; see §3.2.2 for the exception → bucket mapping. | Lets us watch error mix over time and correlate spikes with deploys. |
+| R7 | **Tool-Execution Stats** — `invoke_command`/`exec_as_user` counts per `{agent_id, command, result}`, with command duration histograms **and** a structured audit log line per invocation (see §3.1.1). | Feeds security audits (who invoked what?) and capacity planning. |
+| R8 | **Resource Utilization** — Neo4j memory/CPU/connection-count (via `neo4j-prometheus-exporter`), per-container memory/CPU/restart-count for all Hassaleh containers (via **cAdvisor**). | Turns "it feels slow" into a datum, and underpins alert thresholds. |
 
 ### Non-Requirements (v1 explicitly out)
 
@@ -51,22 +62,54 @@ place that we cannot do today.
 - External paging destinations (PagerDuty/Opsgenie). v1 stays on Telegram.
 - Profiling/flamegraphs (v3 if ever).
 - Multi-tenant dashboards (single-tenant today; a label is enough).
+- **Tail-based trace sampling**, including "sample 100 % of traces whose
+  duration > 2×p99". v2.
+- **Loki → S3 cold storage.** v2.
+- **SLOs with explicit error budgets.** v1 ships the uptime recording rule
+  (R5) and a 99.0 % target; formal error-budget policy is v2.
+- **Log-based anomaly detection** (e.g. LogQL anomaly detectors). v2+.
+- **Observability for the observability stack itself** — Loki health,
+  Prometheus self-monitoring, Tempo ingest-rate panels. Parked to v2;
+  for v1 we rely on Grafana's built-in self-dashboard.
 
 ### Success Criteria
 
-- **S1:** Every intent has a `trace_id` discoverable in Grafana Tempo end-to-end.
-- **S2:** The `hassaleh-overview` dashboard visualizes R1–R8 live.
+- **S1:** Every intent produced by the observability-smoke harness (run with
+  `HASSALEH_TRACE_FORCE=1` to defeat the 10 % baseline sampling) has a
+  `trace_id` discoverable end-to-end in Grafana Tempo — from SDK
+  submit-spans through daemon `auth/validate/execute/persist` spans. In
+  production, the 10 % baseline applies; sampled-out intents are still
+  counted in metrics.
+- **S2:** The `hassaleh-overview` dashboard visualizes R1–R8 live. Each R*
+  maps to named panel UIDs (see §3.5) so the test harness can assert
+  non-empty data per panel.
+- **S2a:** *(R7)* The integration test `tests/test_observability.py::test_tool_counter_increment`
+  asserts `hassaleh_tool_invocation_total{command="…"}` increments by
+  exactly 1 per `invoke_command` call.
+- **S2b:** *(R8)* The same test asserts:
+  (a) Prometheus target `neo4j-exporter` has `up==1`,
+  (b) Prometheus target `cadvisor` has `up==1`,
+  (c) per-container metrics for `hassaleh-daemon` are non-empty.
 - **S3:** Four default alert rules are configured and test-fired once:
-  - `auth_failed_rate > 1/s` for ≥ 1 min
-  - `heartbeat_missed_count > N/agent` for ≥ 5 min
-  - `cypher_query_slow_total increasing` > Y/min
-  - `hassaleh_errors_total{type="Internal"} rate > 1%`
+  - `HassalehAuthFailureRateHigh` — `rate(hassaleh_auth_attempts_total{result!="ok"}[1m]) > 1` for 1 min.
+  - `HassalehHeartbeatMissed` — `sum by (agent_id) (increase(hassaleh_heartbeat_missed_total[5m])) > 3` for 5 min.
+  - `HassalehSlowQueries` — `rate(hassaleh_cypher_query_slow_total[5m]) > 0.1` for 5 min.
+  - `HassalehInternalErrors` — `sum(rate(hassaleh_errors_total{type="internal"}[5m])) / sum(rate(hassaleh_intent_submitted_total[5m])) > 0.01` for 5 min.
 - **S4:** The observability stack starts cleanly via
-  `docker compose -f ~/observability-stack/docker-compose.yml up`.
+  `docker compose -f ~/projects/observability-stack/docker-compose.yml up`
+  *(path matches §2.2 and Track E)*.
 - **S5:** Hassaleh works with observability **disabled** (it is opt-in via
-  env var), so Ingo can still run locally without the stack.
+  `HASSALEH_OBS=off`, which is the default). A regression test
+  `tests/test_observability.py::test_obs_off_is_noop` asserts zero new
+  processes, zero network calls, and zero new log-formatters when
+  `HASSALEH_OBS=off`.
 - **S6:** All relevant interface contracts (log schema, metric names,
-  dashboard UIDs) are documented and linted (no drift between code and spec).
+  trace span names, dashboard UIDs) are documented in §3 of this plan
+  **and** verified by the script `scripts/check-observability-drift.py`
+  (Track F) which introspects `src/hassaleh/obs/metrics.py`,
+  `src/hassaleh/obs/logging.py`, `src/hassaleh/obs/tracing.py`, and
+  `observability/dashboards/*.json` and diffs them against the tables in
+  §3.1–§3.5. The script runs in CI and exits non-zero on drift.
 
 ---
 
@@ -80,6 +123,10 @@ place that we cannot do today.
 - **Grafana** as the single UI for logs/metrics/traces and alerting.
 - **Promtail** as the log shipper (tails Hassaleh container stdout/err).
 - **neo4j-prometheus-exporter** exposes Neo4j JMX as Prometheus metrics.
+- **cAdvisor** exposes per-container memory/CPU/restart-count metrics for
+  every Hassaleh container (satisfies R8's daemon-side resource requirement).
+  Chosen over `node_exporter` because R8 needs *per-container* granularity,
+  not host-level.
 
 ### 2.2 Deployment — separate compose stack (Q2)
 
@@ -109,11 +156,13 @@ Repo layout:
 │       └── neo4j-alerts.yml
 ├── tempo/
 │   └── tempo-config.yml                # OTLP receiver at :4318 + storage
+├── cadvisor/
+│   └── README.md                       # notes on docker.sock mount + per-container scrape
 ├── grafana/
 │   ├── provisioning/
 │   │   ├── datasources/*.yml           # preconfigured Loki, Prometheus, Tempo
 │   │   ├── dashboards/*.yml            # dashboard loader (points to /var/lib/grafana/dashboards)
-│   │   └── alerting/*.yml              # alert channels incl. Telegram contact point
+│   │   └── alerting/*.yml              # unified alerts — SOURCE OF TRUTH for alert rules + contact points
 │   └── dashboards/
 │       ├── hassaleh-overview.json
 │       ├── hassaleh-intent-deep-dive.json
@@ -123,6 +172,14 @@ Repo layout:
 └── networking/
     └── README-bridge-network.md        # how Hassaleh reaches the stack
 ```
+
+**Alert-rule storage decision (resolves Round-1 CR-7):** Grafana unified
+alerts under `grafana/provisioning/alerting/` are the *source of truth* for
+alert rules AND contact points. `prometheus/rules/` holds only **recording
+rules** (aggregated series, e.g. the R5 uptime-SLO) and alerting rules that
+must run in Prometheus for HA purposes — for v1, that means none. This
+matches the modern Grafana pattern and connects natively to our Telegram
+contact point.
 
 ### 2.3 Network topology
 
@@ -147,7 +204,8 @@ hassaleh-daemon (container)
 
 **New internal package:** `src/hassaleh/obs/` with submodules:
 
-- `obs/logging.py` — structlog setup, JSON renderer, service-wide bindings.
+- `obs/logging.py` — structlog setup, JSON renderer, service-wide bindings,
+  PII redaction middleware.
 - `obs/metrics.py` — Prometheus client and the full metric catalog.
 - `obs/tracing.py` — OTEL tracer provider, OTLP/HTTP exporter, span decorators.
 - `obs/context.py` — `ObservabilityContext` that threads `agent_id`,
@@ -155,16 +213,69 @@ hassaleh-daemon (container)
 - `obs/__init__.py` — single entry point `obs.setup(service_name, env)` called
   from `daemon.py` at boot.
 
+**Logging-handler collision (resolves Round-1 CR-3):** The existing
+`daemon.py:33` calls `logging.basicConfig(...)` at module import, which is
+a no-op once the root handler exists. v1 resolution:
+1. Remove the `logging.basicConfig(...)` call from `daemon.py`.
+2. `obs.setup()` becomes the single owner of root-handler configuration.
+3. When `HASSALEH_OBS=off`, `obs.setup()` installs a minimal text-formatter
+   root handler (functionally equivalent to what `basicConfig` did before)
+   so that stderr output is preserved.
+
+This is Track A's *first* task and must land before any other track can
+rely on structured log output.
+
 **Opt-in via env vars** (R5 backward-compat):
 
 - `HASSALEH_OBS=on|off` (default off)
+- `HASSALEH_ENV=dev|staging|prod` (defaults to `dev`)
 - `HASSALEH_OTLP_ENDPOINT=http://tempo:4318/v1/traces`
+- `HASSALEH_LOKI_ENDPOINT=http://loki:3100/loki/api/v1/push` (optional; if
+  unset, logs only go to stdout and Promtail picks them up)
 - `HASSALEH_METRICS_PORT=9100`
 - `HASSALEH_LOG_LEVEL=INFO|DEBUG|WARN`
-- `HASSALEH_TRACE_SAMPLE_RATE=0.10` (see §4 sampling)
+- `HASSALEH_TRACE_SAMPLE_RATE=0.10` (see §3.4 sampling)
+- `HASSALEH_TRACE_FORCE=1` (force-sample all traces, including health
+  endpoints — smoke-test only)
 
-When `HASSALEH_OBS=off`, `obs.setup()` is a no-op — every decorator becomes a
-pass-through so performance and behavior are unchanged.
+When `HASSALEH_OBS=off`, `obs.setup()` installs only the minimal stderr
+text handler described above — every decorator becomes a pass-through so
+performance and behavior are unchanged.
+
+**SDK ↔ daemon trace propagation (resolves Round-1 CR-2):** The SDK
+writes Intent nodes directly to Neo4j; there is no HTTP RPC from SDK to
+daemon to carry a `traceparent` header. v1 resolution:
+1. `schema.cypher` gets a new optional `traceparent` string property on
+   `Intent` nodes (W3C format: `00-<trace-id>-<span-id>-<flags>`). The
+   constraint is **nullable** so legacy callers are unaffected.
+2. When `HASSALEH_OBS=on` in the SDK process, `submit_intent()` captures
+   its current active span's context and writes the `traceparent` value
+   as part of the Intent node creation.
+3. When the daemon picks up an Intent for processing, it looks at the
+   `traceparent` property; if present, it creates its processing span as
+   a *child of* the SDK's span via `TraceContextTextMapPropagator.extract`.
+   Absent → fresh trace, linked to the SDK-side only via `intent_id` in
+   metrics/logs.
+4. This yields a single distributed trace spanning SDK `submit_intent` →
+   Neo4j write → daemon pick-up → `auth/validate/execute/persist/result`,
+   viewable end-to-end in Grafana Tempo.
+
+Schema migration is covered in Track C's deliverables; §7 Done criteria
+include a `schema.cypher`-update smoke.
+
+**SDK log/trace delivery (resolves Round-1 CR "clarify SDK log/trace
+delivery"):** SDK processes run inside external agents' hosts; Promtail
+only scrapes Hassaleh's own container logs. v1 rules:
+- SDK `obs/logging.py` always writes JSON to stderr.
+- If `HASSALEH_LOKI_ENDPOINT` is set in the SDK's env, it pushes logs
+  directly via HTTP. Unset → stderr only; the external agent host is
+  responsible for shipping further.
+- SDK traces are exported via OTLP only if `HASSALEH_OTLP_ENDPOINT` is
+  reachable from the SDK host (typical when SDK runs inside the
+  observability-bridge network, not typical for external agents).
+- The `service` enum in §3.1 includes `hassaleh-sdk` and
+  `hassaleh-intent-sdk` and `hassaleh-heartbeat-sdk`; whether a log line
+  actually reaches Loki is deployment-dependent.
 
 ### 2.5 Resource profile (estimated)
 
@@ -176,7 +287,8 @@ pass-through so performance and behavior are unchanged.
 | Grafana | ~100 MB | ~50 MB |
 | Promtail | ~50 MB | — |
 | neo4j-exporter | ~40 MB | — |
-| **Total** | **~900 MB** | **~2 GB** |
+| cAdvisor | ~80 MB | — |
+| **Total** | **~970 MB** | **~2 GB** |
 
 On the 16GB MINISFORUM this is affordable alongside Hassaleh (~1 GB),
 OpenClaw (~1.5 GB), and the usual desktop/browser overhead.
@@ -226,7 +338,10 @@ All Hassaleh JSON logs adhere to:
 - `level` — `DEBUG|INFO|WARN|ERROR|CRITICAL`
 - `logger` — dotted name, e.g. `hassaleh.daemon.auth`
 - `msg` — human-readable short message (≤ 80 chars)
-- `service` — one of `hassaleh-daemon`, `hassaleh-sdk`, `hassaleh-heartbeat-sdk`
+- `service` — closed enum for v1:
+  `hassaleh-daemon | hassaleh-sdk | hassaleh-intent-sdk | hassaleh-heartbeat-sdk`.
+  The validator rejects unknown values; to add a new service, the enum and
+  validator must be updated together in one commit.
 - `version` — semver of the hassaleh package
 - `env` — `dev|staging|prod`
 
@@ -236,13 +351,72 @@ All Hassaleh JSON logs adhere to:
 **PII & secrets policy** (mandatory — see §8):
 - `api_key` — NEVER logged
 - `api_key_hash`, `api_key_lookup` — NEVER logged (even partially)
-- `cypher_params` containing user-supplied strings — redacted to length only
+- **Any Cypher parameter named `lookup` or matching `api_key*`** — redacted
+  regardless of how it was computed (even server-side SHA-256 hashes), to
+  guard against a future "log all cypher_params for debugging" patch
+  leaking key hashes. *(Resolves Round-1 non-blocking finding.)*
+- `cypher_params` containing other user-supplied strings — redacted to
+  length only
 - `message_content`, `intent_payload.content` — hash-only or truncated to
   first 40 chars with trailing `…[N chars]`
 - `agent_id`, `intent_id` — OK in logs
 - `source_ip` — logged at INFO, redacted to /24 at DEBUG
 
 Extras live under `extra.*` so the top level stays predictable.
+
+### 3.1.1 Slow-query log (resolves Round-1 "slow-query log unspec'd")
+
+Every Cypher query whose duration exceeds 100 ms emits a structured log
+line *in addition to* incrementing `hassaleh_cypher_query_slow_total`:
+
+```json
+{
+  "ts": "…",
+  "level": "WARN",
+  "logger": "hassaleh.daemon.graph.slow_query",
+  "msg": "slow cypher query",
+  "service": "hassaleh-daemon",
+  "agent_id": "agent-a1",
+  "intent_id": "intent-42",
+  "trace_id": "4a9c2e…",
+  "duration_ms": 237.5,
+  "pattern": "intent.lookup_by_lookup_hash",
+  "param_shape": {"lookup": "str(64)", "agent_id": "str(10)"}
+}
+```
+
+- `pattern` — the pattern label assigned by §3.2.3 classification.
+- `param_shape` — types/lengths only, **never values** (PII policy).
+- Raw Cypher statement text is **not** logged.
+- Owner: Track A (logging) with Track B (graph instrumentation) for the
+  call-site hook.
+
+### 3.1.2 Tool-invocation audit log (resolves Round-1 "R7 log counterpart")
+
+Alongside the `hassaleh_tool_invocation_total` counter, every tool
+invocation emits a structured audit log line:
+
+```json
+{
+  "ts": "…",
+  "level": "INFO",
+  "logger": "hassaleh.daemon.audit.tool",
+  "msg": "tool invoked",
+  "service": "hassaleh-daemon",
+  "agent_id": "agent-a1",
+  "command": "invoke_command",
+  "target": "agent-b2",
+  "result": "ok",
+  "duration_ms": 42.1
+}
+```
+
+- `command` drawn from the same closed enum as the metric label (§3.2).
+- `target` — where applicable.
+- No command **arguments** in the audit log (they often contain secrets);
+  the metric captures aggregate patterns, the log captures the "who/what/
+  when/result" digest.
+- Owner: Track A with Track B coordination.
 
 ### 3.2 Metrics catalog
 
@@ -260,9 +434,96 @@ Extras live under `extra.*` so the top level stays predictable.
 | `hassaleh_tool_invocation_total` | counter | `agent_id, command, result` | Tool stats |
 | `hassaleh_tool_invocation_duration_seconds` | histogram | `command` | Tool perf |
 | `hassaleh_errors_total` | counter | `type, source` | Classified errors |
-| `hassaleh_active_agents` | gauge | — | Live agent count |
-| `hassaleh_active_intents` | gauge | `state` | Live intents by state |
-| `hassaleh_version_info` | gauge | `version, env` | Constant 1; labels carry info |
+| `hassaleh_active_agents` | gauge | — | Live agent count, sourced from a periodic (30s) Neo4j query `MATCH (a:Agent) WHERE a.lifecycle IN ['active','running'] RETURN count(a)`. Cached in-process between scrapes. |
+| `hassaleh_active_intents` | gauge | `state` | Live intent count per state, sourced from the same periodic sweep. |
+| `hassaleh_version_info` | gauge | `version, env` | Constant 1; follows the Prometheus `_info` convention (labels carry info). |
+
+**cAdvisor metrics** (exposed by the cAdvisor container, no Hassaleh code
+needed): `container_memory_usage_bytes`, `container_cpu_usage_seconds_total`,
+`container_last_seen` — filter by `container_label_com_docker_compose_service`
+in dashboards to isolate Hassaleh containers.
+
+### 3.2.1 Recording rules (Prometheus side)
+
+R5's uptime-SLO is computed as a Prometheus recording rule, not as a
+standalone metric. Defined in `prometheus/rules/hassaleh-recording.yml`:
+
+```yaml
+groups:
+- name: hassaleh.recording
+  interval: 1m
+  rules:
+  # Per-agent rolling-hour uptime ratio. Target: 99.0 % (S3 alert at < 0.99).
+  - record: hassaleh:agent_uptime_ratio:1h
+    expr: |
+      1 - (
+        sum by (agent_id) (increase(hassaleh_heartbeat_missed_total[1h]))
+        /
+        clamp_min(
+          sum by (agent_id) (increase(hassaleh_heartbeat_received_total[1h])),
+          1
+        )
+      )
+  # Rolling-hour p99 of intent duration; feeds the slow-intent alert panel.
+  - record: hassaleh:intent_duration_seconds:p99_1h
+    expr: histogram_quantile(0.99, sum(rate(hassaleh_intent_duration_seconds_bucket[1h])) by (le, stage))
+```
+
+### 3.2.2 Error-type taxonomy (resolves Round-1 CR-4)
+
+`hassaleh_errors_total` has labels `{type, source}`. The `type` enum is
+grounded in the *actual* exception classes raised in the codebase today
+(from `src/hassaleh/errors.py` and stdlib). Track B's `obs/metrics.py`
+owns the exception → bucket mapping function:
+
+| Exception class | `type` label |
+|-----------------|--------------|
+| `AuthenticationError` | `auth` |
+| `AgentNotFoundError`, `AgentDisabledError` | `auth` |
+| `HeartbeatTokenMismatchError` | `auth` |
+| `CapabilityNotFoundError`, `CapabilityDeniedError`, `CapabilityParamError` | `capability` |
+| `AccessDeniedError`, stdlib `PermissionError` | `permission` |
+| `ValueError`, `TypeError` (validation at API surface) | `validation` |
+| stdlib `TimeoutError` | `timeout` |
+| Neo4j driver errors, `ServiceUnavailable`, `TransientError` | `graph` |
+| Everything else (unhandled) | `internal` |
+
+The `source` label names the raising subsystem: `auth`, `intent`,
+`heartbeat`, `tool`, `graph`, `sdk`. A single `Internal` bucket catching
+"everything else" is deliberate — it's the signal that something uncaught
+escaped our taxonomy and needs triage.
+
+The §3.4 sampling boost "boost-to-100 % on error" uses the same table:
+any exception that maps to `type ∈ {internal, graph, timeout}` forces a
+sampled trace.
+
+### 3.2.3 Cypher-pattern label classification (resolves Round-1 CR-5)
+
+`hassaleh_cypher_query_duration_seconds` and `hassaleh_cypher_query_slow_total`
+carry a `pattern` label. The enum is caller-supplied, drawn from a closed
+list in `src/hassaleh/obs/cypher_patterns.py`:
+
+```python
+CYPHER_PATTERNS = [
+    "agent.lookup_by_lookup_hash",
+    "agent.list_active",
+    "intent.create",
+    "intent.lookup_by_id",
+    "intent.list_pending",
+    "heartbeat.sweep",
+    # … total ≤ 50
+    "__other__",  # catchall for exploratory/ad-hoc queries
+]
+```
+
+- Each `sdk.query()` / `daemon.query()` call site receives a
+  `pattern: str` keyword arg. Track B adds this kwarg as part of the
+  instrumentation rollout.
+- At runtime, `obs/metrics.py` validates `pattern in CYPHER_PATTERNS`;
+  unknown values bucket into `__other__` and emit a WARN log so the
+  closed list can grow with intent.
+- This gives an unambiguous instrumentation contract and bounds
+  cardinality at 50 by construction, not by hope.
 
 **Label-cardinality caps** (enforced by obs/metrics.py):
 - `agent_id`: no cap today (dev load); **must be bounded** before we go multi-tenant.
@@ -298,27 +559,48 @@ Span tag namespaces:
   (`db.system=neo4j`, `db.statement` redacted, `db.operation`).
 - `authn.*` — authentication outcome tags (`authn.result`).
 
-**W3C traceparent propagation**: SDK clients that opt into observability
-set the `traceparent` header on outgoing daemon calls. The daemon
-continues the trace rather than starting a new one when a valid header
-is present. Clients without the header get a fresh trace (no error).
+**Trace propagation** (resolves Round-1 CR-2): Because the SDK writes
+Intent nodes directly to Neo4j (no HTTP channel), the W3C `traceparent`
+value is carried as a **property on the Intent node**, not as an HTTP
+header. When the daemon picks up an intent whose node has a non-empty
+`traceparent`, it extracts the parent context with
+`TraceContextTextMapPropagator.extract({"traceparent": node.traceparent})`
+and creates its processing spans as children. Intents without a
+`traceparent` property get a fresh daemon-side trace, linked to the SDK
+only via `intent_id` in metrics/logs. See §2.4 for the schema change.
 
 ### 3.4 Sampling strategy (Q3)
 
-- **Baseline sample rate**: 10% of traces (`HASSALEH_TRACE_SAMPLE_RATE=0.10`).
-- **Boost to 100%**:
-  - Any intent that produces an error of type ∈ `{Internal, GraphError,
-    Timeout}`.
-  - Any intent whose root-span duration exceeds 2 × p99 of the last 24h.
-  - `HASSALEH_TRACE_FORCE=1` env-var setting — Ingo's manual escape hatch
-    for debugging.
-- **Drop to 0%**: health-check endpoints (e.g. `/health`, `/metrics`) by
-  default.
-- **Parent-based**: if a client sends `traceparent` with `sampled=1`,
-  always record downstream spans (tail-based sampling is v2).
+v1 is strictly **head-based sampling** — the sample/drop decision is made
+at span start, not after the span finishes. Tail-based sampling (including
+duration-based boosts) is parked for v2.
 
-All sampled-out traces are still **counted** in metrics, so the histogram
-view is not biased. Only the trace detail is absent.
+- **Baseline sample rate**: 10 % of traces (`HASSALEH_TRACE_SAMPLE_RATE=0.10`).
+- **Boost to 100 %** (head-based):
+  - Any request whose caller classifies the operation as `type ∈
+    {internal, graph, timeout}` *before* work begins (rare — typically a
+    retry after a known-flaky path). Implementation: `obs.tracing.hint_error_prone()`
+    sets a sampling attribute that the sampler reads.
+  - `HASSALEH_TRACE_FORCE=1` env-var — forces all spans to be sampled,
+    including `/health` and `/metrics`. Scope: process-wide. Used only by
+    the observability-smoke harness (see S1).
+- **Drop to 0 %**: health-check endpoints (`/health`, `/metrics`) by
+  default, overridable by `HASSALEH_TRACE_FORCE=1`.
+- **Parent-based**: if a client sends `traceparent` with `sampled=1`,
+  always record downstream spans (respecting the parent's decision is
+  mandatory per W3C).
+- **Error-post-sampling**: even when a span was **not** sampled, if it
+  *ends* with an exception, its basic metadata (`trace_id`, `intent_id`,
+  `exception.type`, `duration_ms`) is still written to a log line at WARN
+  level, so operators can at least link metrics to intents via
+  `trace_id` even without the full trace. This is the v1 compromise for
+  "all errors observable" without tail-sampling.
+
+All sampled-out traces are still **counted** in metrics, so the
+histogram view is not biased. Only the full trace detail is absent.
+
+**2 × p99 duration boost was dropped in v1** and added to §1's
+Non-Requirements; it requires tail-based sampling which lands in v2.
 
 ### 3.5 Dashboard UIDs and contract
 
@@ -337,8 +619,9 @@ can link to specific panels from runbooks.
 
 ### 3.6 Alert contract
 
-Alerts are defined in Prometheus rule files (`grafana/provisioning/alerting/*`)
-with the format:
+Alerts are defined as **Grafana unified alerts** under
+`grafana/provisioning/alerting/*` (the source of truth per §2.2).
+Example rule format:
 
 ```yaml
 - alert: HassalehAuthFailureRateHigh
@@ -348,9 +631,13 @@ with the format:
     severity: warning
   annotations:
     summary: "Auth failure rate > 1/s for 1 min"
-    runbook: "https://…/runbooks/auth-failure"
+    runbook: "file:///home/uranus/projects/hassaleh/docs/runbooks/auth-failure.md"
     suggested_action: "Check hassaleh-auth-security dashboard; correlate with source IPs."
 ```
+
+Runbooks live at `docs/runbooks/<alert-name>.md`. Grafana renders the
+file:// URL as a clickable link; Track D owns the runbook-stub templates
+so every rule ships with a matching runbook.
 
 Channel: Grafana → Telegram contact point (reuses the OpenClaw bot).
 
@@ -358,24 +645,29 @@ Channel: Grafana → Telegram contact point (reuses the OpenClaw bot).
 
 ## 4. Review Phases
 
-Three artefacts × two review rounds.
+Three artefacts × up to three review rounds × two reviewer perspectives.
 
-| Artefact | Reviewer(s) | Worker | Verdicts |
-|----------|-------------|--------|----------|
-| Requirements doc | Ingo (product) | — (human) | approve / change-req |
-| Architecture doc | Inanna (tech) | worker-opus | clean / change-req |
-| Interface spec | Inanna (security+API) | worker-opus | clean / change-req |
+| Artefact | Primary reviewer | Secondary reviewer (clarity) | Workers | Verdicts |
+|----------|------------------|------------------------------|---------|----------|
+| Requirements doc (§1) | Ingo (product) | gemini-reviewer | human + worker-gemini | approve / change-req |
+| Architecture doc (§2) | Inanna (tech) | gemini-reviewer | worker-opus + worker-gemini | clean / change-req |
+| Interface spec (§3) | Inanna (security+API) | gemini-reviewer | worker-opus + worker-gemini | clean / change-req |
 
-- **Round 1**: each reviewer produces a verdict doc under
-  `docs/sprint-12-artefact-<name>-review-1.md`.
+Every artefact gets both reviewer perspectives: Inanna (tech/security, runs
+on worker-opus in a session distinct from Dione's) and gemini-reviewer
+(clarity/completeness/internal-consistency, runs on worker-gemini).
+
+- **Round 1**: each reviewer produces a verdict doc:
+  `docs/sprint-12-<artefact>-review-1-<reviewer>.md`.
 - **Revision**: authors address all CR items in-place on the artefact;
-  diff goes into the PR/commit.
-- **Round 2**: reviewers re-verify only the CR items. If still not clean,
-  Ingo arbitrates.
+  diff + a short "how each CR was addressed" block goes into the commit.
+- **Round 2**: reviewers re-verify only the CR items; may downgrade
+  remaining issues to non-blocking.
+- **Round 3** (cap): Ingo arbitrates.
 
-**Cap:** three rounds total per artefact. If still not clean, Ingo calls it.
-
-This plan document itself follows the same process — see §9.
+This plan document itself follows the same process (§9). v1 of this plan
+resolves all Round-1 CRs from Inanna and gemini-reviewer per the change
+log in §10.
 
 ---
 
@@ -391,8 +683,25 @@ This plan document itself follows the same process — see §9.
 | F — Tests | Integration tests that verify logs/metrics/traces are emitted for every opt-in flag | worker-gemini | `tests/test_observability.py` incl. "obs=off" regression test |
 
 Dione (worker-opus) coordinates integration conflicts (e.g. when Tracks A
-and B both touch `daemon.py`). The standing rule is: merge in the order
-A → B → C, with Dione resolving conflicts by rebasing.
+and B both touch `daemon.py`). Explicit merge order:
+
+1. **A (Logging)** — first, because every other track relies on the
+   structlog handler being installed (`obs.setup()` ownership, per §2.4).
+2. **B (Metrics)** — second, because Track D (Dashboards) queries the
+   metric names and Track F (Tests) asserts on them.
+3. **C (Traces)** — third, carries the schema.cypher `traceparent`
+   addition; coordinates with ongoing Sprint 11 IL-01/IL-02 edits to
+   schema.cypher (merge conflict risk; Dione arbitrates).
+4. **E (Docker Compose)** — largely independent; can land any time after
+   B since its provisioning points at metric names and after D once
+   dashboards exist.
+5. **D (Dashboards)** — lands after B+C so panels can reference real
+   metrics and traces.
+6. **F (Tests)** — last by nature; the smoke suite asserts behaviour
+   across all tracks.
+
+Tracks A, B, C, E can run in parallel on authoring; merge serialization
+follows the order above. D and F block on their inputs.
 
 ---
 
@@ -449,9 +758,14 @@ Total calendar budget: **~5 working days** after Sprint 11 is closed.
 
 **Done for the sprint:**
 - All six implementation tracks merged on trunk.
-- `make observability-smoke` (or equivalent script) runs green: starts the
-  stack, runs a synthetic intent, verifies logs/metrics/traces appear.
-- S1–S6 from §1 demonstrably green.
+- `scripts/observability-smoke.sh` runs green end-to-end: starts the
+  stack, runs a synthetic intent, asserts logs/metrics/traces appear.
+  (No Makefile in the repo; a shell script is canonical. The same
+  invocation is wired into CI as `pytest -m smoke tests/test_observability.py`.)
+- `scripts/check-observability-drift.py` runs green in CI.
+- S1–S6 (including S2a, S2b) from §1 demonstrably green.
+- `schema.cypher` includes the optional `traceparent` property on Intent
+  nodes, with a migration note.
 - A one-paragraph "what changed" note gets appended to
   `docs/ADR-000N-observability.md` (an architecture decision record).
 - Final Telegram message to Ingo with dashboard URLs and known gaps.
@@ -464,18 +778,22 @@ Each item below has an explicit owner so it cannot fall through the cracks.
 
 | Concern | Owner | Resolution plan |
 |---------|-------|-----------------|
-| **PII policy in logs** | Track A (Codex) | Redaction in `obs/logging.py`; explicit allow-list of fields; test asserts `api_key` never appears |
+| **PII policy in logs** | Track A (Codex) | Redaction in `obs/logging.py`; explicit allow-list of fields; test asserts `api_key`, `api_key_hash`, `api_key_lookup`, and any cypher param named `lookup` never appear |
 | **Retention policy** | Track E (Codex) | Loki `retention_period: 7d`, Prometheus `--storage.tsdb.retention.time=7d`, Tempo `retention: 168h` |
 | **Log sampling at high volume** | Track A | DEBUG loggers sample 1-in-10 above 1000 lines/s; INFO always kept |
-| **trace_id propagation over SDK boundaries** | Track C | W3C `traceparent` header in SDK outbound calls; daemon continues the trace |
-| **Backward-compat with legacy agents** | Track A/B/C | `HASSALEH_OBS=off` is a no-op; missing fields on the wire are tolerated |
+| **trace_id propagation over SDK boundaries** | Track C | `traceparent` as a property on `Intent` nodes (schema change); daemon resumes trace via `TraceContextTextMapPropagator` (see §2.4) |
+| **Backward-compat with legacy agents** | Track A (primary; B+C satisfy invariants) | `HASSALEH_OBS=off` is a no-op; missing wire-fields are tolerated. Track A enforces the pattern; B and C must demonstrate no-op behaviour in their own tests. |
 | **Dev vs. prod mode** | Track A | `HASSALEH_ENV` env-var drives log level + sampling defaults |
 | **Graceful-shutdown of OTEL exporter** | Track C | SIGTERM handler flushes pending spans with a 5 s budget |
 | **Dashboard versioning** | Track D | JSON-as-code; Grafana provisioning in read-only mode blocks UI edits from clobbering committed files |
 | **Alert channel wiring** | Track E | Grafana contact point `telegram-ingo` reusing OpenClaw's bot; provisioned via config file |
 | **Secrets handling** | Track E | Grafana admin password and any future API keys live in `.env` (gitignored) with `.env.example` committed |
-| **Smoke-test suite** | Track F | `tests/test_observability.py` asserts at least one log, one metric, one trace per endpoint |
-| **Runbook stubs** | Track D | One short markdown runbook per alert rule, linked from the alert annotation |
+| **Smoke-test suite** | Track F | `tests/test_observability.py` asserts ≥1 log, ≥1 metric, ≥1 trace per named endpoint. Invocation: `scripts/observability-smoke.sh` (shell harness) and `pytest -m smoke tests/test_observability.py` (CI). |
+| **Drift-lint (S6)** | Track F | `scripts/check-observability-drift.py` introspects `obs/metrics.py`, `obs/logging.py`, `obs/tracing.py`, and dashboard JSONs; compares to §3.1–§3.5 tables; exits non-zero on drift. |
+| **Runbook stubs** | Track D | One short markdown runbook per alert rule under `docs/runbooks/`; linked via `file://` URL from the alert annotation |
+| **Cardinality enforcement** | Track B | Runtime guard in `obs/metrics.py` rejects unknown `pattern`/`command` labels and buckets them into `__other__` with a WARN log |
+| **Histogram-bucket tuning** | Dione | After one week of production data, revisit bucket boundaries per-metric (the bcrypt histogram in particular — the `0.01` and `0.05` buckets are dead for cost-12 bcrypt). v1.1 patch. |
+| **R1 agent-lifecycle integration** | Dione | R1 spans Track A (lifecycle logs), Track B (`hassaleh_active_agents`/`active_intents` gauges), and Track D (dashboards). Dione owns the integration check in §7 Done criteria. |
 | **ADR commitment** | Dione | One `docs/ADR-000N-observability.md` summarising the chosen stack and rejected alternatives |
 
 ### Things that are **explicitly out of v1** and parked for v2+
@@ -541,3 +859,92 @@ Items decided by Ingo and therefore not open for review:
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-04-18 | Dione | Initial draft (v0). Pending Inanna + Ingo review. |
+| 2026-04-19 | Dione | v1 — integrated all Round-1 CRs from Inanna and gemini-reviewer. Summary below. |
+
+### v1 change summary — how each Round-1 CR was addressed
+
+**From `docs/sprint-12-plan-review-1-inanna.md` (Inanna — tech + security):**
+
+1. **CR-1 — R7/R8 testable markers:** Added S2a (tool-counter assertion
+   in integration test) and S2b (neo4j-exporter + cAdvisor `up==1`
+   assertions). §1 Success Criteria.
+2. **CR-2 — SDK→daemon trace propagation:** Rewrote propagation as a
+   `traceparent` property on `Intent` nodes (schema change, nullable) —
+   daemon uses `TraceContextTextMapPropagator` to resume the trace.
+   §2.4, §3.3. Schema migration owned by Track C.
+3. **CR-3 — `logging.basicConfig` collision:** Track A's first task is
+   to remove the `daemon.py:33` basicConfig call; `obs.setup()` is now
+   the sole owner of root-handler configuration, with an explicit
+   off-mode handler to preserve legacy stderr behaviour. §2.4.
+4. **CR-4 — Error-type taxonomy:** Added §3.2.2 "Error-type taxonomy"
+   with an explicit exception-class → bucket-label table grounded in
+   `src/hassaleh/errors.py` + stdlib. Sampling §3.4 now uses the same
+   table.
+5. **CR-5 — Cypher pattern classification:** Added §3.2.3 specifying a
+   caller-supplied `pattern: str` kwarg drawn from a closed ≤50-entry
+   enum in `src/hassaleh/obs/cypher_patterns.py`. Unknown values bucket
+   to `__other__` with a WARN.
+6. **CR-6 — Sampling contradiction:** Dropped the "2×p99 duration boost"
+   from v1 (head-based only); added it to Non-Requirements. §3.4
+   rewritten for strictly head-based; added error-post-sampling log-only
+   fallback for non-sampled failures.
+7. **CR-7 — Alert-rule storage:** §2.2 now declares Grafana unified
+   alerts as the source of truth; Prometheus `rules/` holds only
+   recording rules (per §3.2.1). §3.6 updated to match.
+
+Non-blocking items addressed:
+- §3.1 PII policy now explicitly covers any Cypher param named `lookup`
+  or matching `api_key*`.
+- §3.1 service enum now includes `hassaleh-intent-sdk` and documents
+  that it is a closed enum.
+- §8 "backward-compat" row now designates Track A as primary with B+C
+  as invariant-satisfiers.
+- §8 adds histogram-bucket-tuning row (bcrypt specifically) as a v1.1
+  follow-up.
+- §8 adds R1 integration row owned by Dione.
+
+**From `docs/sprint-12-plan-review-1-gemini.md` (gemini-reviewer — clarity):**
+
+1. **R8 data sources:** Added cAdvisor to §2.1 and §2.2 stack layout.
+   §2.5 resource profile updated (+80 MB).
+2. **Compose-stack path inconsistency:** Fixed S4 to use
+   `~/projects/observability-stack/` (matching §2.2 and Track E).
+3. **Slow-query log spec:** Added §3.1.1 with logger name, level,
+   required fields, param_shape redaction rule, and Track A+B
+   co-ownership.
+4. **R5 uptime-SLO:** Added §3.2.1 Prometheus recording rule with a
+   concrete 99.0 % target.
+5. **S6 drift-lint mechanism:** Named `scripts/check-observability-drift.py`
+   in Track F's deliverables and in §8 Cross-cutting.
+6. **S1 ↔ sampling contradiction:** S1 now explicitly scopes to the
+   observability-smoke harness running with `HASSALEH_TRACE_FORCE=1`.
+7. **Artefact ↔ plan relationship:** Clarified in the front-matter —
+   §1/§2/§3 *are* the artefacts; Day-1 may split them into separate
+   files as a pure-move.
+8. **Second reviewer in §4:** Added `gemini-reviewer` as secondary
+   reviewer for all three artefacts.
+9. **SDK log/trace delivery:** Added §2.4 subsection describing how SDK
+   logs reach Loki (direct push via `HASSALEH_LOKI_ENDPOINT`, or
+   stderr-only if unset), and how SDK traces depend on OTLP endpoint
+   reachability.
+
+Non-blocking items addressed:
+- §3.6 runbook URL now points at a concrete `file://` path under
+  `docs/runbooks/`.
+- §5 merge order for Tracks D, E, F is now explicit.
+- §7 `make observability-smoke` was replaced with the concrete
+  `scripts/observability-smoke.sh` + `pytest -m smoke` invocations.
+- §8 added a "Cardinality enforcement" row owned by Track B.
+- §8 added a "Histogram-bucket tuning" row owned by Dione (v1.1 follow-up).
+
+### Remaining non-blocking items (not fixed in v1)
+
+- **R4 slow-query log call-site hook** is described but not yet named at
+  the code level — Track A during implementation will add the hook point
+  once they know whether it belongs in a `sdk.query()` wrapper or a
+  Neo4j driver event handler.
+- **Bcrypt histogram buckets** keep their v0 default (`0.01, 0.05, 0.1,
+  0.25, 0.5, 1, 2.5, 5, 10` seconds); the tuning pass to drop the two
+  lowest buckets is scheduled as a v1.1 patch (§8 owner: Dione).
+- **"Observability for the observability stack"** is explicitly parked
+  to v2 (§1 Non-Requirements).
