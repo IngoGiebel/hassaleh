@@ -453,7 +453,10 @@ groups:
 - name: hassaleh.recording
   interval: 1m
   rules:
-  # Per-agent rolling-hour uptime ratio. Target: 99.0 % (S3 alert at < 0.99).
+  # Per-agent rolling-hour uptime ratio. Target: 99.0 %. The SLO-violation
+  # alert (`hassaleh:agent_uptime_ratio:1h < 0.99`) is NOT in S3's four
+  # baseline alerts; it can be added after v1 once a week of real data
+  # establishes sensible hysteresis.
   - record: hassaleh:agent_uptime_ratio:1h
     expr: |
       1 - (
@@ -695,16 +698,15 @@ and B both touch `daemon.py`). Explicit merge order:
 3. **C (Traces)** — third, carries the schema.cypher `traceparent`
    addition; coordinates with ongoing Sprint 11 IL-01/IL-02 edits to
    schema.cypher (merge conflict risk; Dione arbitrates).
-4. **E (Docker Compose)** — largely independent; can land any time after
-   B since its provisioning points at metric names and after D once
-   dashboards exist.
-5. **D (Dashboards)** — lands after B+C so panels can reference real
-   metrics and traces.
+4. **D (Dashboards)** — fourth, lands after B+C so panels can reference
+   real metrics and traces.
+5. **E (Docker Compose)** — fifth, lands after D because Grafana
+   provisioning loads the dashboard JSON produced by D.
 6. **F (Tests)** — last by nature; the smoke suite asserts behaviour
    across all tracks.
 
-Tracks A, B, C, E can run in parallel on authoring; merge serialization
-follows the order above. D and F block on their inputs.
+Tracks A, B, C can run in parallel on authoring; merge serialization
+follows the order above. D, E, and F block on their inputs.
 
 ---
 
@@ -865,6 +867,7 @@ Items decided by Ingo and therefore not open for review:
 | 2026-04-18 | Dione | Initial draft (v0). Pending Inanna + Ingo review. |
 | 2026-04-19 | Dione | v1 — integrated all Round-1 CRs from Inanna and gemini-reviewer. Summary below. |
 | 2026-04-19 | Dione | v1.0.1 — Round-2 editorial cleanup: (a) §3.2.2 case consistency (`Internal` → `internal`), (b) §3.2.2 prose now correctly states the sampling decision is at span-start via `hint_error_prone()`, not retroactively, (c) §8 adds an explicit heartbeat-miss instrumentation-site row pointing at the daemon sweep loop (`heartbeat_sdk.py:168`). All per Inanna's Round-2 non-blocking observations. |
+| 2026-04-19 | Dione | v1.0.2 — **FROZEN** after both Round-2 verdicts are CLEAN. Fixed gemini-reviewer's two Round-2 non-blocking observations: (a) §3.2.1 parenthetical about "S3 alert at < 0.99" updated — the SLO alert is explicitly NOT in S3's four baseline alerts; it can be added after v1 once a week of real data establishes hysteresis; (b) §5 merge order fixed: A→B→C→D→E→F (was A→B→C→E→D→F but the prose correctly said E depends on D). Observations O3 (harmless duplication) and O4 (§9.1 two-reviewer pattern prose polish) are not regressions and can land during implementation. **Plan is now the frozen source of truth for the Sprint-12 orchestrator cron.** |
 
 ### v1 change summary — how each Round-1 CR was addressed
 
