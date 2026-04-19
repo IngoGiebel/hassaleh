@@ -489,13 +489,16 @@ owns the exception → bucket mapping function:
 | Everything else (unhandled) | `internal` |
 
 The `source` label names the raising subsystem: `auth`, `intent`,
-`heartbeat`, `tool`, `graph`, `sdk`. A single `Internal` bucket catching
+`heartbeat`, `tool`, `graph`, `sdk`. A single `internal` bucket catching
 "everything else" is deliberate — it's the signal that something uncaught
 escaped our taxonomy and needs triage.
 
-The §3.4 sampling boost "boost-to-100 % on error" uses the same table:
-any exception that maps to `type ∈ {internal, graph, timeout}` forces a
-sampled trace.
+The §3.4 sampling boost "boost-to-100 % on error" uses the same table.
+Because v1 is strictly head-based (see §3.4), the sampling decision is
+made at span start, not at exception time: callers that *know* an
+operation is likely to raise `type ∈ {internal, graph, timeout}` (for
+example, a retry after a known-flaky path) call
+`obs.tracing.hint_error_prone()` to force 100 % sampling for that span.
 
 ### 3.2.3 Cypher-pattern label classification (resolves Round-1 CR-5)
 
@@ -792,6 +795,7 @@ Each item below has an explicit owner so it cannot fall through the cracks.
 | **Drift-lint (S6)** | Track F | `scripts/check-observability-drift.py` introspects `obs/metrics.py`, `obs/logging.py`, `obs/tracing.py`, and dashboard JSONs; compares to §3.1–§3.5 tables; exits non-zero on drift. |
 | **Runbook stubs** | Track D | One short markdown runbook per alert rule under `docs/runbooks/`; linked via `file://` URL from the alert annotation |
 | **Cardinality enforcement** | Track B | Runtime guard in `obs/metrics.py` rejects unknown `pattern`/`command` labels and buckets them into `__other__` with a WARN log |
+| **Heartbeat-miss instrumentation site** | Track B | Increment `hassaleh_heartbeat_missed_total` inside the daemon sweep loop that transitions `agent.lifecycle` between `active`/`stale`/`inactive` (currently at `heartbeat_sdk.py:168`). Each `active → stale` or `stale → inactive` transition is exactly one missed beat from the instrumentation's point of view. |
 | **Histogram-bucket tuning** | Dione | After one week of production data, revisit bucket boundaries per-metric (the bcrypt histogram in particular — the `0.01` and `0.05` buckets are dead for cost-12 bcrypt). v1.1 patch. |
 | **R1 agent-lifecycle integration** | Dione | R1 spans Track A (lifecycle logs), Track B (`hassaleh_active_agents`/`active_intents` gauges), and Track D (dashboards). Dione owns the integration check in §7 Done criteria. |
 | **ADR commitment** | Dione | One `docs/ADR-000N-observability.md` summarising the chosen stack and rejected alternatives |
@@ -860,6 +864,7 @@ Items decided by Ingo and therefore not open for review:
 |------|--------|--------|
 | 2026-04-18 | Dione | Initial draft (v0). Pending Inanna + Ingo review. |
 | 2026-04-19 | Dione | v1 — integrated all Round-1 CRs from Inanna and gemini-reviewer. Summary below. |
+| 2026-04-19 | Dione | v1.0.1 — Round-2 editorial cleanup: (a) §3.2.2 case consistency (`Internal` → `internal`), (b) §3.2.2 prose now correctly states the sampling decision is at span-start via `hint_error_prone()`, not retroactively, (c) §8 adds an explicit heartbeat-miss instrumentation-site row pointing at the daemon sweep loop (`heartbeat_sdk.py:168`). All per Inanna's Round-2 non-blocking observations. |
 
 ### v1 change summary — how each Round-1 CR was addressed
 
