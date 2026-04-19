@@ -140,12 +140,52 @@ def execute_ls(resolved_path: str, timeout_sec: int = 30) -> str:
     re-raised unchanged (subprocess.TimeoutExpired) so the daemon can sanitize
     them in the async boundary where it has timeout-specific context.
     """
-    result = subprocess.run(
-        ["ls", "-la", resolved_path],
-        capture_output=True,
-        text=True,
-        timeout=timeout_sec,
-    )
+    # IL-05: Close the TOCTOU between validate_exec_ls_path() and execution.
+    #
+    # Threat model: validate_exec_ls_path() resolved the path with
+    # os.path.realpath() and checked the prefix. Between that check and this
+    # call, any component of `resolved_path` may have been swapped for a
+    # symlink pointing outside the allowed bases.
+    #
+    # Two guards, applied atomically with respect to each other:
+    #   1. O_NOFOLLOW rejects the open if the *final* component is now a
+    #      symlink (kernel returns ELOOP).
+    #   2. After open, readlink(/proc/self/fd/<N>) yields the kernel's
+    #      canonical path for the inode the FD is bound to. If an
+    #      *intermediate* component was swapped for a symlink during path
+    #      resolution, the FD now references some other directory whose
+    #      canonical path no longer matches resolved_path — we detect that
+    #      here and refuse to execute. The FD itself is the source of truth
+    #      for ls; we never pass the possibly-tampered pathname to ls.
+    try:
+        fd = os.open(resolved_path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    except OSError as e:
+        detail = f"Failed to securely open directory: {e}"
+        raise RuntimeError(_sanitize(_MSG_EXECUTION_FAILED, detail=detail))
+
+    try:
+        try:
+            fd_target = os.readlink(f"/proc/self/fd/{fd}")
+        except OSError as e:
+            detail = f"Failed to verify fd canonical path: {e}"
+            raise RuntimeError(_sanitize(_MSG_EXECUTION_FAILED, detail=detail))
+
+        if fd_target != resolved_path:
+            detail = (
+                "Path changed between validation and execution "
+                f"(expected {resolved_path!r}, fd resolves to {fd_target!r})"
+            )
+            raise RuntimeError(_sanitize(_MSG_EXECUTION_FAILED, detail=detail))
+
+        result = subprocess.run(
+            ["ls", "-la", "--", f"/proc/self/fd/{fd}/"],
+            capture_output=True,
+            text=True,
+            timeout=timeout_sec,
+            pass_fds=(fd,),
+        )
+    finally:
+        os.close(fd)
 
     if result.returncode != 0:
         detail = result.stderr.strip() or f"ls exited with code {result.returncode}"

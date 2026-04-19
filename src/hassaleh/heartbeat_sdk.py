@@ -156,13 +156,18 @@ class HeartbeatSDK:
             # This query only writes if the rate-limit interval has elapsed.
             # If last_heartbeat is within 60s, the WHERE clause excludes the
             # node and no SET occurs — the heartbeat is silently deduplicated.
+            #
+            # IL-06: bind the pre-write last_heartbeat explicitly so the
+            # sequencing is unambiguous. On the first heartbeat old_last is
+            # NULL, and previous_heartbeat intentionally remains NULL.
             result = await session.run("""
                 MATCH (a:Agent {id: $agent_id})
                 WHERE a.lifecycle <> 'disabled'
                   AND (a.last_heartbeat IS NULL
                        OR a.last_heartbeat < datetime() - duration('PT60S'))
-                SET a.last_heartbeat = datetime(),
-                    a.previous_heartbeat = a.last_heartbeat,
+                WITH a, a.last_heartbeat AS old_last
+                SET a.previous_heartbeat = old_last,
+                    a.last_heartbeat = datetime(),
                     a.heartbeat_count = coalesce(a.heartbeat_count, 0) + 1,
                     a.lifecycle = CASE
                         WHEN a.lifecycle IN ['pending', 'stale', 'inactive']
