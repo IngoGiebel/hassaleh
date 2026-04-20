@@ -30,13 +30,10 @@ from hassaleh.engine.resolver import resolve_intents
 from hassaleh.bridge.openclaw import OpenClawBridge
 from hassaleh.bridge.notifications import NotificationDispatcher
 from hassaleh.domain import domain_matches_any
+from hassaleh import obs
+from hassaleh.obs import logging as obs_logging
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [hassaleh-daemon] %(levelname)s %(message)s",
-    datefmt="%Y-%m-%dT%H:%M:%S",
-)
-log = logging.getLogger("hassaleh.daemon")
+log: Any = logging.getLogger("hassaleh.daemon")
 
 # ──────────────────────────────────────────────
 # Configuration (loaded from Neo4j on boot)
@@ -1376,6 +1373,12 @@ class HassalehDaemon:
 # ──────────────────────────────────────────────
 
 async def main():
+    obs_env = os.environ.get("HASSALEH_ENV", "dev")
+    obs.setup("hassaleh-daemon", obs_env)
+
+    global log
+    log = obs_logging.rebind_daemon_logger()
+
     uri = os.environ.get("NEO4J_URI", "bolt://localhost:7690")
     user = os.environ.get("NEO4J_USER", "neo4j")
     password = os.environ.get("NEO4J_PASSWORD", "hassaleh-dev-2026")
