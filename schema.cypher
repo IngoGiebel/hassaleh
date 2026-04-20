@@ -65,6 +65,23 @@ CREATE CONSTRAINT discussion_id IF NOT EXISTS
 CREATE INDEX intent_lifecycle IF NOT EXISTS
   FOR (i:Intent) ON (i.lifecycle);
 
+// ──────────────────────────────────────────
+// Sprint 12 / Track C — distributed tracing
+// ──────────────────────────────────────────
+//
+// Intent.traceparent (optional, nullable string)
+//   W3C Trace Context header value, format:
+//     "00-<trace-id-32hex>-<parent-id-16hex>-<flags-2hex>"
+//   Written by the SDK (`submit_intent`) when HASSALEH_OBS=on so the daemon
+//   can continue the caller's trace via TraceContextTextMapPropagator.extract.
+//   Absent / null → daemon starts a fresh trace, linked only via intent_id.
+//   See docs/sprint-12-plan.md §2.4 (SDK↔daemon propagation) and §3.3.
+//
+// Neo4j does not require a DDL statement for new properties on existing
+// node labels (properties are schemaless per node). This block is the
+// contract-of-record for the property; no constraint/index is created
+// because traceparent is (a) nullable, (b) not queried by value.
+
 // Daemon hot-path: find running agents for health checks
 CREATE INDEX agent_lifecycle IF NOT EXISTS
   FOR (a:Agent) ON (a.lifecycle);
