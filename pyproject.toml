@@ -19,6 +19,7 @@ dependencies = [
     "aiohttp>=3.9",
     "lark>=1.0",
     "structlog>=24.1",
+    "prometheus_client>=0.20",
 ]
 
 [project.optional-dependencies]
