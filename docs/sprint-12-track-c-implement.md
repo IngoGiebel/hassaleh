@@ -1,9 +1,10 @@
 # Sprint 12 — Track C implementation (Traces)
 
 Status: implemented on `trunk`
-Commit: `TBD`
+Commit: `cf5d13a` (merge-order 3; daemon integration deferred to post-Track-A merge)
 Plan: `docs/sprint-12-plan.md` (frozen v1.0.2, commit `c2aea90`)
 Author track: **C — Traces**
+Landed at: 2026-04-20 (Sprint 12, cycle 4 retry)
 
 ## Summary
 
