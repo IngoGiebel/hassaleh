@@ -17,6 +17,7 @@ import os
 import signal
 import socket
 import sys
+import uuid
 from datetime import datetime, timezone
 from typing import Any, Sequence
 
@@ -53,6 +54,40 @@ DEFAULT_CONFIG = {
 }
 
 TASK_TERMINAL_LIFECYCLES = frozenset({"success", "failed"})
+
+# ──────────────────────────────────────────────
+# IL-07: capability execution trust boundary
+# ──────────────────────────────────────────────
+#
+# `_execute_capability()` reads `invoke_command` and `exec_as_user` off a
+# `Capability` node and builds a `sudo -n -u <user> <command> ...` invocation.
+# Any actor with write access to `Capability` could otherwise pick the binary
+# and the target uid (lateral movement). The graph is treated as untrusted
+# input; this allowlist is the local source of truth for what (binary, uid)
+# pair each `capability_id` is permitted to run as.
+#
+# Mutating this allowlist requires a code change + review; it cannot be
+# changed by writing to Neo4j. Schema/seed updates that introduce a new
+# capability must add a matching entry here in the same change.
+#
+# Tests inject ephemeral entries via `monkeypatch.setitem`.
+CAPABILITY_ALLOWLIST: dict[str, tuple[str, str]] = {
+    "exec-ls":                    ("/usr/bin/ls",                       "hassaleh-fs"),
+    "graph-query-inspector":      ("hassaleh.graph_query_inspector",    "hassaleh-daemon"),
+    "rule-author-basic":          ("hassaleh.rule_author",              "hassaleh-daemon"),
+    "audit-log-export":           ("/usr/bin/printf",                   "hassaleh-audit"),
+    "metrics-daily-summary":      ("hassaleh.metrics_daily_summary",    "hassaleh-daemon"),
+    "ci-test-runner":             ("/usr/bin/env",                      "hassaleh-ci"),
+    "openclaw-alert-dispatch":    ("hassaleh.openclaw_alert_dispatch",  "hassaleh-daemon"),
+    "workflow-cron-maintenance":  ("hassaleh.workflow_cron_maintenance","hassaleh-daemon"),
+}
+
+# IL-07 / IL-04: agent-visible vocabulary for graph-trust failures. Full
+# detail (capability_id, expected vs. actual binary/uid, intent_id) is logged
+# server-side under the same correlation ID; the agent only ever sees the
+# sanitized form so that allowlist failures are indistinguishable from any
+# other "Parameter validation failed" outcome (see docs/IL-04-implementation.md).
+_MSG_PARAM_VALIDATION_FAILED = "Parameter validation failed"
 
 
 def _next_sequential_task_id(tasks: Sequence[dict[str, Any]]) -> str | None:
@@ -411,7 +446,7 @@ class HassalehDaemon:
         async with self.driver.session() as session:
             result = await session.run("""
                 MATCH (i:Intent {id: $id})-[:TARGETS]->(cap:Capability)
-                RETURN cap.invoke_command AS command, cap.exec_as_user AS exec_user
+                RETURN cap.id AS cap_id, cap.invoke_command AS command, cap.exec_as_user AS exec_user
             """, id=intent_id)
             record = await result.single()
 
@@ -419,8 +454,27 @@ class HassalehDaemon:
             await self._fail_intent(intent_id, "No capability linked to Intent")
             return
 
+        cap_id = record["cap_id"]
         command = record["command"]
         exec_user = record["exec_user"]
+
+        # IL-07 validation boundary
+        if cap_id not in CAPABILITY_ALLOWLIST:
+            cid = uuid.uuid4().hex
+            log.error(f"Intent {intent_id} validation failed [cid: {cid}]: capability {cap_id} not in allowlist")
+            await self._fail_intent(intent_id, f"Parameter validation failed [cid: {cid}]")
+            return
+
+        allowed_cmd, allowed_user = CAPABILITY_ALLOWLIST[cap_id]
+        if command != allowed_cmd or exec_user != allowed_user:
+            cid = uuid.uuid4().hex
+            log.error(
+                f"Intent {intent_id} validation failed [cid: {cid}]: capability {cap_id} values "
+                f"(cmd={command!r}, user={exec_user!r}) do not match allowlist "
+                f"(expected cmd={allowed_cmd!r}, user={allowed_user!r})"
+            )
+            await self._fail_intent(intent_id, f"Parameter validation failed [cid: {cid}]")
+            return
 
         # Parse additional args from Intent value
         args = []
