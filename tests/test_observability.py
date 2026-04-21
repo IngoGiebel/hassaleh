@@ -575,6 +575,12 @@ def test_obs_off_import_time_isolation():
     """
     env = os.environ.copy()
     env["HASSALEH_OBS"] = "off"
+    # Don't write .pyc — avoids __pycache__ write contention with the parent
+    # pytest process, a known cause of subprocess slowdown on shared CI.
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    # Line-buffer stdout/stderr so a timeout reports *what the child managed
+    # to print* instead of an empty buffer.
+    env["PYTHONUNBUFFERED"] = "1"
     for noisy_var in (
         "HASSALEH_TRACE_FORCE",
         "HASSALEH_TRACE_SAMPLE_RATE",
@@ -582,19 +588,33 @@ def test_obs_off_import_time_isolation():
     ):
         env.pop(noisy_var, None)
 
-    result = subprocess.run(
+    # 15s is ~10× the observed cold-start cost (~1.5s) and fails loudly if
+    # something wedges, instead of waiting 30s for a mystery hang.
+    timeout_seconds = 15
+    proc = subprocess.Popen(  # noqa: S603 — fixed-argv subprocess, no shell
         [sys.executable, "-c", _IMPORT_TIME_ISOLATION_SCRIPT],
         env=env,
-        capture_output=True,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         text=True,
-        timeout=30,
-        check=False,
     )
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout_seconds)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        stdout, stderr = proc.communicate()
+        pytest.fail(
+            "HASSALEH_OBS=off import-time isolation subprocess hung "
+            f"(> {timeout_seconds}s).\n"
+            f"partial stdout:\n{stdout!r}\n"
+            f"partial stderr:\n{stderr!r}"
+        )
 
-    assert result.returncode == 0, (
+    assert proc.returncode == 0, (
         "HASSALEH_OBS=off import-time isolation subprocess failed.\n"
-        f"exit={result.returncode}\n"
-        f"stdout:\n{result.stdout}\n"
-        f"stderr:\n{result.stderr}"
+        f"exit={proc.returncode}\n"
+        f"stdout:\n{stdout}\n"
+        f"stderr:\n{stderr}"
     )
-    assert result.stdout.strip().splitlines()[-1] == "OK"
+    assert stdout.strip().splitlines()[-1] == "OK"
