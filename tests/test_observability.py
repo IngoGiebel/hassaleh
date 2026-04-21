@@ -10,11 +10,17 @@ Covers the cross-subsystem contract from docs/sprint-12-plan.md §3:
        provider stays unconfigured when off.
     4. Regression (S5): HASSALEH_OBS=off is a true zero-cost no-op — no
        Prometheus registry, no TracerProvider, no structlog processor chain.
+       Import-time isolation is verified with a subprocess so merely
+       importing the obs modules cannot mutate global state.
 """
 
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
+import textwrap
 
 import pytest
 from aiohttp.test_utils import make_mocked_request
@@ -28,6 +34,7 @@ from hassaleh.obs.context import clear_request_context
 from hassaleh.obs.metrics import (
     METRIC_NAMES,
     get_metrics_registry,
+    record_tool_invocation,
     setup_metrics,
     shutdown_metrics,
 )
@@ -231,6 +238,88 @@ async def test_metrics_endpoint_exposes_catalog_via_daemon(monkeypatch):
 
 
 # ────────────────────────────────────────────────────────────────────────────
+# 2a. Tool counter (plan §1 S2a) + 2b skipped placeholders
+# ────────────────────────────────────────────────────────────────────────────
+
+
+def test_tool_counter_increment(monkeypatch):
+    """S2a (R7): hassaleh_tool_invocation_total increments by exactly 1 per call.
+
+    Drives the public instrumentation entry point `record_tool_invocation`
+    (the same site the daemon's tool-invocation path calls) and asserts the
+    Counter label-combination moves by one for a single invocation and by
+    two for a second call with the same labels.
+    """
+    monkeypatch.setenv("HASSALEH_OBS", "on")
+    monkeypatch.setenv("HASSALEH_ENV", "dev")
+
+    state = setup_metrics(env="dev")
+    assert state is not None
+    registry = state.registry
+
+    labels = {"agent_id": "agent-a1", "command": "invoke_command", "result": "ok"}
+
+    before = registry.get_sample_value("hassaleh_tool_invocation_total", labels) or 0.0
+    record_tool_invocation(
+        command="invoke_command",
+        result="ok",
+        agent_id="agent-a1",
+        duration_seconds=0.012,
+    )
+    after_one = registry.get_sample_value("hassaleh_tool_invocation_total", labels)
+    assert after_one is not None
+    assert after_one - before == 1.0
+
+    record_tool_invocation(
+        command="invoke_command",
+        result="ok",
+        agent_id="agent-a1",
+        duration_seconds=0.020,
+    )
+    after_two = registry.get_sample_value("hassaleh_tool_invocation_total", labels)
+    assert after_two == 2.0
+
+    duration_count = registry.get_sample_value(
+        "hassaleh_tool_invocation_duration_seconds_count",
+        {"command": "invoke_command"},
+    )
+    assert duration_count == 2.0, (
+        "tool invocation duration histogram must move in lockstep with the counter"
+    )
+
+
+_S2B_SKIP_REASON = (
+    "requires docker smoke harness — tracked for Sprint 13 smoke suite "
+    "(see docs/sprint-12-track-f-fix.md §S2b deferral)"
+)
+
+
+@pytest.mark.skip(reason=_S2B_SKIP_REASON)
+def test_neo4j_exporter_up():
+    """S2b(a): Prometheus target `neo4j-exporter` has `up==1`.
+
+    Deferred — covered by Sprint 13 compose smoke harness, not by this
+    hermetic unit/integration suite.
+    """
+
+
+@pytest.mark.skip(reason=_S2B_SKIP_REASON)
+def test_cadvisor_up():
+    """S2b(b): Prometheus target `cadvisor` has `up==1`.
+
+    Deferred — covered by Sprint 13 compose smoke harness.
+    """
+
+
+@pytest.mark.skip(reason=_S2B_SKIP_REASON)
+def test_per_container_metrics_non_empty():
+    """S2b(c): per-container metrics for `hassaleh-daemon` are non-empty.
+
+    Deferred — covered by Sprint 13 compose smoke harness.
+    """
+
+
+# ────────────────────────────────────────────────────────────────────────────
 # 3. Traces
 # ────────────────────────────────────────────────────────────────────────────
 
@@ -258,6 +347,77 @@ def test_traces_on_produce_spans_with_attributes(monkeypatch):
     by_name = {span.name: span for span in exporter.spans}
     assert by_name["intent.lifecycle"].attributes["intent.id"] == "intent-42"
     assert by_name["intent.auth"].attributes["hassaleh.agent_id"] == "agent-a1"
+
+
+_CANONICAL_STAGES = [
+    ("auth_stage", "intent.auth"),
+    ("validate_stage", "intent.validate"),
+    ("execute_stage", "intent.execute"),
+    ("persist_stage", "intent.persist_result"),
+    ("result_stage", "intent.result"),
+]
+
+
+@pytest.mark.parametrize("helper_name,expected_span_name", _CANONICAL_STAGES)
+def test_canonical_lifecycle_stage_emits_named_span(
+    monkeypatch, helper_name, expected_span_name
+):
+    """Every §3.3 lifecycle stage helper emits the plan-named child span.
+
+    The review flagged that Track F only asserted `intent.auth` +
+    `intent.lifecycle`; the frozen plan requires the full canonical set
+    (`auth`, `validate`, `execute`, `persist_result`, `result`).
+    """
+    monkeypatch.setenv("HASSALEH_OBS", "on")
+    exporter = InMemoryExporter()
+    provider = obs_tracing.setup_tracing(
+        service_name="hassaleh-daemon",
+        env="dev",
+        sample_rate=1.0,
+        exporter=exporter,
+    )
+    assert provider is not None
+
+    helper = getattr(obs_tracing, helper_name)
+    with obs_tracing.span_context(
+        "intent.lifecycle", **{"intent.id": "intent-42"}
+    ):
+        with helper(**{"hassaleh.intent_id": "intent-42"}):
+            pass
+
+    span_names = [span.name for span in exporter.spans]
+    assert "intent.lifecycle" in span_names, span_names
+    assert expected_span_name in span_names, (
+        f"{helper_name} should emit {expected_span_name!r}, got {span_names}"
+    )
+
+
+def test_trace_force_sampling_carries_through_decorator(monkeypatch):
+    """HASSALEH_TRACE_FORCE=1 must carry through an end-to-end decorator path.
+
+    The prior test only created a single manually-managed span. The review
+    required evidence that the force flag also flips sampling for spans
+    produced by the `@trace_span(...)` decorator (the real daemon callsite
+    pattern) even when the ratio sampler is pinned to zero.
+    """
+    monkeypatch.setenv("HASSALEH_OBS", "on")
+    monkeypatch.setenv("HASSALEH_TRACE_FORCE", "1")
+    exporter = InMemoryExporter()
+    provider = obs_tracing.setup_tracing(
+        service_name="hassaleh-daemon",
+        env="dev",
+        sample_rate=0.0,
+        exporter=exporter,
+    )
+    assert provider is not None
+
+    @obs_tracing.trace_span("intent.execute")
+    def run_business_step(value: int) -> int:
+        return value + 1
+
+    assert run_business_step(41) == 42
+    span_names = [span.name for span in exporter.spans]
+    assert "intent.execute" in span_names, span_names
 
 
 def test_trace_force_sampling_overrides_zero_ratio(monkeypatch):
@@ -338,3 +498,103 @@ def test_obs_off_regression_no_subsystem_setup_side_effects(monkeypatch, capsys)
 
     # Drain captured stderr so the fixture teardown doesn't see it.
     capsys.readouterr()
+
+
+_IMPORT_TIME_ISOLATION_SCRIPT = textwrap.dedent(
+    """
+    import sys
+
+    from prometheus_client import REGISTRY
+
+    def _collector_names():
+        names = set()
+        for collector_names in REGISTRY._collector_to_names.values():
+            names.update(collector_names)
+        return names
+
+    pre_import = _collector_names()
+
+    import hassaleh.obs  # noqa: F401
+    import hassaleh.obs.metrics  # noqa: F401
+    import hassaleh.obs.tracing  # noqa: F401
+
+    post_import = _collector_names()
+
+    hassaleh_collectors = sorted(
+        n for n in post_import if n.startswith("hassaleh_")
+    )
+    if hassaleh_collectors:
+        print(
+            f"FAIL: hassaleh_* collectors registered at import: "
+            f"{hassaleh_collectors!r}",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+
+    delta = post_import - pre_import
+    if delta:
+        print(
+            f"FAIL: global prometheus REGISTRY gained collectors at import: "
+            f"{sorted(delta)!r}",
+            file=sys.stderr,
+        )
+        sys.exit(3)
+
+    from opentelemetry import trace
+    from opentelemetry.sdk.trace import TracerProvider as SdkTracerProvider
+
+    provider = trace.get_tracer_provider()
+    if isinstance(provider, SdkTracerProvider):
+        print(
+            f"FAIL: SDK TracerProvider installed at import: "
+            f"{type(provider).__name__}",
+            file=sys.stderr,
+        )
+        sys.exit(4)
+
+    import structlog
+    if structlog.is_configured():
+        print("FAIL: structlog.is_configured() is True at import", file=sys.stderr)
+        sys.exit(5)
+
+    print("OK")
+    """
+).strip()
+
+
+def test_obs_off_import_time_isolation():
+    """S5 (strict): a fresh interpreter with HASSALEH_OBS=off must not mutate
+    global observability state merely by importing the obs modules.
+
+    The in-process regression test only proves `obs.setup()` + tracing-setup
+    are inert after explicit calls. This subprocess test closes the gap the
+    review flagged: it runs under a clean import graph and fails hard if
+    *importing* `hassaleh.obs`, `hassaleh.obs.metrics`, or
+    `hassaleh.obs.tracing` registers any `hassaleh_*` Prometheus collector,
+    installs an SDK `TracerProvider`, or calls `structlog.configure()`.
+    """
+    env = os.environ.copy()
+    env["HASSALEH_OBS"] = "off"
+    for noisy_var in (
+        "HASSALEH_TRACE_FORCE",
+        "HASSALEH_TRACE_SAMPLE_RATE",
+        "HASSALEH_LOG_LEVEL",
+    ):
+        env.pop(noisy_var, None)
+
+    result = subprocess.run(
+        [sys.executable, "-c", _IMPORT_TIME_ISOLATION_SCRIPT],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+
+    assert result.returncode == 0, (
+        "HASSALEH_OBS=off import-time isolation subprocess failed.\n"
+        f"exit={result.returncode}\n"
+        f"stdout:\n{result.stdout}\n"
+        f"stderr:\n{result.stderr}"
+    )
+    assert result.stdout.strip().splitlines()[-1] == "OK"
