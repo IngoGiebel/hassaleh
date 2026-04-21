@@ -200,14 +200,18 @@ This is aligned with plan §3.1’s requirement that `api_key`,
 logged as values.
 
 ### `cypher_params`
-For `cypher_params`, Track A does not log raw values.
-Instead it logs only type/shape information via `_shape_only(...)`.
+For `cypher_params`, Track A now applies a two-step rule:
+- keys matching `_SECRET_KEY_RE` (for example `lookup`, `api_key`, `api_key_hash`, `api_key_lookup`) are forced to `[REDACTED_SECRET]`
+- all other values are reduced to type/shape only via `_shape_only(...)`
+
 Examples from the test:
-- string → `str(N)`
+- `lookup` → `[REDACTED_SECRET]`
+- `api_key_lookup` → `[REDACTED_SECRET]`
+- ordinary string → `str(N)`
 - int → `int`
 
-This matches the plan’s requirement that `cypher_params` be reduced to safe
-shape information instead of raw payloads.
+This aligns with the plan’s requirement that lookup-like and `api_key*` Cypher
+parameters must be redacted regardless of how they were computed.
 
 ### `message_content`
 `message_content` is truncated to:
@@ -315,3 +319,45 @@ Track A is in a mergeable state for its core deliverables:
 The remaining §3.1.1 and §3.1.2 call-site hooks should be treated as follow-on
 integration work with Track B / later observability wiring, not as blockers for
 landing the logging foundation.
+
+## Follow-up for Inanna Round-1 review
+
+A follow-up change addressed the two remaining blocking findings from
+`docs/sprint-12-track-a-review.md`.
+
+### 1) `cypher_params` secret redaction bypass fixed
+Previously, `cypher_params` values were always reduced through `_shape_only()`,
+which meant secret-like keys such as `lookup` could leak shape information
+instead of being hard-redacted.
+
+The fix now checks each `cypher_params` key against `_SECRET_KEY_RE` first:
+- secret-like keys → `[REDACTED_SECRET]`
+- non-secret keys → `_shape_only(...)`
+
+Test updates:
+- `tests/test_obs_logging.py` now expects `cypher_params["lookup"] == "[REDACTED_SECRET]"`
+- added `api_key_lookup` coverage inside `cypher_params`
+
+### 2) `HASSALEH_OBS=off` is now a true zero-cost no-op for processors
+Previously, obs-off mode still installed the structlog pipeline and paid the
+cost of the shared processor chain, including `pii_redaction_processor`.
+
+The fix now bypasses structlog entirely when `HASSALEH_OBS=off`:
+- plain stdlib `logging.Formatter` is installed directly on the root handler
+- no shared structlog processor chain is constructed or executed
+- `get_logger()` / `bind_logger()` return a lightweight plain logger wrapper in
+  off mode so existing call sites still work without structlog processing
+
+Test updates:
+- added an assertion that `pii_redaction_processor` is **not invoked** when
+  obs is off
+
+### Resulting test delta
+Required follow-up test command:
+
+```bash
+.venv/bin/pytest tests/test_obs_logging.py tests/test_obs_metrics.py tests/test_obs_tracing.py -q
+```
+
+This follow-up is intended to leave Track A compliant with both the plan and
+Inanna’s review without changing Track C-owned files.

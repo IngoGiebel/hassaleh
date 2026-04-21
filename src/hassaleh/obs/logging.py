@@ -52,6 +52,42 @@ class TextRenderer:
         return base if not extras else f"{base} {json.dumps(extras, sort_keys=True, default=str)}"
 
 
+class PlainBoundLogger:
+    def __init__(self, logger_name: str, *, bindings: Mapping[str, Any] | None = None):
+        self._logger = logging.getLogger(logger_name)
+        self._bindings = dict(bindings or {})
+
+    def bind(self, **bindings: Any) -> "PlainBoundLogger":
+        merged = dict(self._bindings)
+        merged.update(bindings)
+        return PlainBoundLogger(self._logger.name, bindings=merged)
+
+    def _log(self, level: int, event: str, **kwargs: Any) -> None:
+        merged = dict(self._bindings)
+        merged.update(kwargs)
+        message = event
+        if merged:
+            message = f"{event} {json.dumps(merged, sort_keys=True, default=str)}"
+        self._logger.log(level, message)
+
+    def debug(self, event: str, **kwargs: Any) -> None:
+        self._log(logging.DEBUG, event, **kwargs)
+
+    def info(self, event: str, **kwargs: Any) -> None:
+        self._log(logging.INFO, event, **kwargs)
+
+    def warning(self, event: str, **kwargs: Any) -> None:
+        self._log(logging.WARNING, event, **kwargs)
+
+    warn = warning
+
+    def error(self, event: str, **kwargs: Any) -> None:
+        self._log(logging.ERROR, event, **kwargs)
+
+    def critical(self, event: str, **kwargs: Any) -> None:
+        self._log(logging.CRITICAL, event, **kwargs)
+
+
 def _package_version() -> str:
     pyproject = Path(__file__).resolve().parents[3] / "pyproject.toml"
     if not pyproject.exists():
@@ -110,7 +146,13 @@ def _redact_mapping(data: Mapping[str, Any], *, debug: bool = False) -> dict[str
     for key, value in data.items():
         lower = key.lower()
         if lower == "cypher_params" and isinstance(value, Mapping):
-            redacted[key] = {param: _shape_only(param_value) for param, param_value in value.items()}
+            redacted_params: dict[str, Any] = {}
+            for param, param_value in value.items():
+                if _SECRET_KEY_RE.search(param.lower()):
+                    redacted_params[param] = "[REDACTED_SECRET]"
+                else:
+                    redacted_params[param] = _shape_only(param_value)
+            redacted[key] = redacted_params
             continue
         if _SECRET_KEY_RE.search(lower):
             redacted[key] = "[REDACTED_SECRET]"
@@ -163,6 +205,31 @@ def configure_logging(service_name: str, env: str | None = None) -> ObsLoggingCo
     hostname = socket.gethostname()
     version = _package_version()
 
+    root = logging.getLogger()
+    for handler in list(root.handlers):
+        root.removeHandler(handler)
+    root.setLevel(_normalize_level(os.environ.get("HASSALEH_LOG_LEVEL")))
+
+    handler = logging.StreamHandler(sys.stderr)
+
+    if not enabled:
+        handler.setFormatter(
+            logging.Formatter(
+                fmt="%(asctime)s [%(name)s] %(levelname)s %(message)s",
+                datefmt="%Y-%m-%dT%H:%M:%S",
+            )
+        )
+        root.addHandler(handler)
+        if hasattr(structlog, "reset_defaults"):
+            structlog.reset_defaults()
+        return ObsLoggingConfig(
+            service_name=service_name,
+            env=env_name,
+            enabled=False,
+            hostname=hostname,
+            version=version,
+        )
+
     shared_processors: list[Processor] = [
         structlog.stdlib.add_log_level,
         structlog.stdlib.add_logger_name,
@@ -171,14 +238,9 @@ def configure_logging(service_name: str, env: str | None = None) -> ObsLoggingCo
         pii_redaction_processor,
     ]
 
-    root = logging.getLogger()
-    for handler in list(root.handlers):
-        root.removeHandler(handler)
-    root.setLevel(_normalize_level(os.environ.get("HASSALEH_LOG_LEVEL")))
-
     renderer: Processor = (
         structlog.processors.JSONRenderer(sort_keys=True)
-        if enabled and env_name == "prod"
+        if env_name == "prod"
         else TextRenderer()
     )
     formatter = structlog.stdlib.ProcessorFormatter(
@@ -188,7 +250,6 @@ def configure_logging(service_name: str, env: str | None = None) -> ObsLoggingCo
             renderer,
         ],
     )
-    handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(formatter)
     root.addHandler(handler)
 
@@ -227,13 +288,16 @@ def setup(service_name: str, env: str | None = None) -> ObsLoggingConfig:
     return configure_logging(service_name, env)
 
 
-def bind_logger(logger_name: str, **bindings: Any) -> structlog.stdlib.BoundLogger:
+def bind_logger(logger_name: str, **bindings: Any) -> Any:
+    obs_mode = (os.environ.get("HASSALEH_OBS") or "off").lower()
+    if obs_mode == "off":
+        return PlainBoundLogger(logger_name).bind(**bindings)
     return structlog.get_logger(logger_name).bind(**bindings)
 
 
-def get_logger(logger_name: str) -> structlog.stdlib.BoundLogger:
+def get_logger(logger_name: str) -> Any:
     return bind_logger(logger_name)
 
 
-def rebind_daemon_logger() -> structlog.stdlib.BoundLogger:
+def rebind_daemon_logger() -> Any:
     return bind_logger("hassaleh.daemon")

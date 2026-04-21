@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+from hassaleh.obs import logging as obs_logging
 from hassaleh.obs.logging import get_logger, setup
 
 
@@ -53,7 +54,7 @@ def test_pii_redaction(monkeypatch, capsys):
         api_key_hash="def456",
         api_key_lookup="ghi789",
         lookup="jkl000",
-        cypher_params={"lookup": "secret", "agent_id": "agent-007", "count": 3},
+        cypher_params={"lookup": "secret", "api_key_lookup": "hashed-secret", "agent_id": "agent-007", "count": 3},
         message_content="x" * 64,
         intent_payload={"content": "top secret body", "other": "alice@example.com"},
     )
@@ -67,7 +68,8 @@ def test_pii_redaction(monkeypatch, capsys):
     assert payload["api_key_lookup"] == "[REDACTED_SECRET]"
     assert payload["lookup"] == "[REDACTED_SECRET]"
     assert payload["cypher_params"] == {
-        "lookup": "str(6)",
+        "lookup": "[REDACTED_SECRET]",
+        "api_key_lookup": "[REDACTED_SECRET]",
         "agent_id": "str(9)",
         "count": "int",
     }
@@ -80,12 +82,22 @@ def test_obs_off_uses_text_fallback(monkeypatch, capsys):
     monkeypatch.setenv("HASSALEH_OBS", "off")
     monkeypatch.setenv("HASSALEH_ENV", "dev")
 
+    calls = {"count": 0}
+    original = obs_logging.pii_redaction_processor
+
+    def wrapped(*args, **kwargs):
+        calls["count"] += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(obs_logging, "pii_redaction_processor", wrapped)
+
     config = setup("hassaleh-daemon", "dev")
     logger = get_logger("hassaleh.daemon")
     logger.info("plain startup", source_ip="192.168.1.44")
 
     captured = capsys.readouterr().err.strip()
     assert config.enabled is False
+    assert calls["count"] == 0
     assert captured
     assert not captured.startswith("{")
     assert "plain startup" in captured
