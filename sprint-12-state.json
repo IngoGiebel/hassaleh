@@ -1,0 +1,340 @@
+{
+  "sprint": 12,
+  "status": "COMPLETE",
+  "completed_at": "2026-04-21T20:44:00+02:00",
+  "started_at": "2026-04-20T14:25:00+02:00",
+  "cycle": 17,
+  "focus": "Observability v1 \u2014 structured logging, Prometheus metrics, OpenTelemetry tracing, Grafana UI",
+  "plan_doc": "docs/sprint-12-plan.md",
+  "plan_commit": "c2aea90",
+  "plan_status": "FROZEN v1.0.2, both Round-2 reviews CLEAN (Inanna + gemini-reviewer)",
+  "timeline": "~5 working days from 2026-04-20",
+  "orchestrator_cron": "hassaleh-sprint-12-orchestrator (active)",
+  "merge_order": ["A", "B", "C", "D", "E", "F"],
+  "tasks": {
+    "track-a-logging": {
+      "track_code": "A",
+      "title": "Logging",
+      "description": "structlog setup, JSON formatter, PII redaction, service-wide bindings, obs.setup() ownership",
+      "deliverables": [
+        "src/hassaleh/obs/logging.py",
+        "daemon integration",
+        "unit tests"
+      ],
+      "phase_worker": "worker-codex",
+      "merge_order": 1,
+      "current_phase": "merged",
+      "phase_status": "completed",
+      "completed_phases": ["implement", "fix", "review"],
+      "blocks_tracks": [],
+      "plan_refs": [
+        "\u00a72.4 obs.setup() ownership",
+        "\u00a73.1.1 structured audit log",
+        "\u00a75 Track A"
+      ],
+      "implement_commit": "ecab59a",
+      "implement_pytest": "3 passed in 0.82s",
+      "implement_docs": "docs/sprint-12-track-a-implement.md",
+      "review_round1_verdict": "CHANGES-REQUESTED",
+      "review_round1_doc": "docs/sprint-12-track-a-review.md",
+      "review_round1_commit": "fb486b0",
+      "review_round1_blockers_resolved": [
+        "missing __init__.py (RESOLVED by Track B commit e6fd6b6)",
+        "cypher_params PII redaction bypass (RESOLVED by commit 63d4c47)",
+        "HASSALEH_OBS=off not a zero-cost no-op (RESOLVED by commit 63d4c47)"
+      ],
+      "fix_commit": "63d4c47",
+      "fix_pytest": "12 passed in 1.94s",
+      "review_round2_verdict": "CLEAN",
+      "review_round2_doc": "docs/sprint-12-track-a-review-round2.md",
+      "review_round2_completed_at": "2026-04-21T04:31:00+02:00",
+      "review_round2_summary": "All three Round-1 blockers confirmed resolved. Two minor non-blocking observations (return type widened to Any; json-serialization fallback in PlainBoundLogger) noted but do not block merge.",
+      "merge_note": "Code already on trunk (ecab59a + 63d4c47). Merge phase is virtual \u2014 Round-2 CLEAN verdict recorded 2026-04-21T02:31 UTC."
+    },
+    "track-b-metrics": {
+      "track_code": "B",
+      "title": "Metrics",
+      "description": "prometheus_client, metric catalog implementation, /metrics endpoint, cardinality guards",
+      "deliverables": [
+        "src/hassaleh/obs/metrics.py",
+        "src/hassaleh/obs/context.py",
+        "tests/test_obs_metrics.py",
+        "docs/sprint-12-track-b-implement.md"
+      ],
+      "phase_worker": "worker-codex",
+      "merge_order": 2,
+      "current_phase": "merged",
+      "phase_status": "completed",
+      "completed_phases": ["implement", "review"],
+      "plan_refs": [
+        "\u00a73.2 metric catalog",
+        "\u00a73.2.1 recording rules",
+        "\u00a73.2.2 error taxonomy",
+        "\u00a73.2.3 cypher pattern classification",
+        "\u00a75 Track B",
+        "\u00a78 cardinality enforcement + heartbeat instrumentation site"
+      ],
+      "unblocked_by": "track-a-logging implement (commit ecab59a)",
+      "implement_commit": "e6fd6b6",
+      "implement_pytest": "5 metrics tests + 3 logging tests = 8 passed in 1.64s",
+      "implement_docs": "docs/sprint-12-track-b-implement.md",
+      "review_verdict": "CLEAN",
+      "review_doc": "docs/sprint-12-track-b-review.md",
+      "review_completed_at": "2026-04-21T02:33:00+00:00",
+      "merge_note": "Code already on trunk (e6fd6b6). Merge phase is virtual \u2014 CLEAN verdict recorded 2026-04-21T02:33 UTC."
+    },
+    "track-c-traces": {
+      "track_code": "C",
+      "title": "Traces",
+      "description": "OTEL SDK setup, OTLP exporter, sampling policy (10% baseline + HASSALEH_TRACE_FORCE), span decorators, schema.cypher traceparent addition",
+      "deliverables": [
+        "src/hassaleh/obs/tracing.py",
+        "decorator library",
+        "tests"
+      ],
+      "phase_worker": "worker-gemini",
+      "merge_order": 3,
+      "current_phase": "merged",
+      "phase_status": "completed",
+      "completed_phases": ["implement", "review"],
+      "plan_refs": [
+        "\u00a72 tracing arch",
+        "\u00a73 traceparent propagation",
+        "\u00a75 Track C"
+      ],
+      "implement_commit": "cf5d13a",
+      "implement_docs_commit": "0169627",
+      "review_verdict": "CLEAN",
+      "review_doc": "docs/sprint-12-track-c-review.md",
+      "merge_note": "Code already on trunk (cf5d13a + 0169627). Merge phase is virtual \u2014 CLEAN verdict recorded 2026-04-20T22:47 UTC."
+    },
+    "track-d-dashboards": {
+      "track_code": "D",
+      "title": "Dashboards",
+      "description": "Grafana JSON for five dashboards, alert rules, runbook stubs",
+      "deliverables": [
+        "observability/grafana/dashboards/*.json",
+        "observability/prometheus/rules/*.yml",
+        "docs/runbooks/<alert-name>.md",
+        "docs/sprint-12-track-d-implement.md"
+      ],
+      "phase_worker": "worker-gemini",
+      "merge_order": 4,
+      "current_phase": "merged",
+      "phase_status": "completed",
+      "completed_phases": ["implement", "review"],
+      "plan_refs": [
+        "\u00a73.5 dashboard UIDs",
+        "\u00a73.2.1 recording rules",
+        "\u00a73.6 alert contract",
+        "\u00a78 runbook stubs",
+        "\u00a75 Track D"
+      ],
+      "unblocked_by": "track-b-metrics review CLEAN (commit e6fd6b6) \u2014 metric names now frozen",
+      "implement_commit": "a61af86",
+      "implement_docs": "docs/sprint-12-track-d-implement.md",
+      "implement_scope": "5 dashboards (ha-overview-v1, ha-intent-v1, ha-auth-v1, ha-graph-v1, ha-agent-v1) + recording.yml + alerts.yml + 4 runbook stubs + implement doc",
+      "implement_completed_at": "2026-04-21T04:30:00+02:00",
+      "review_dispatched_at": "2026-04-21T04:32:00+02:00",
+      "review_dispatched_to": "worker-opus (Inanna session)",
+      "review_verdict": "CLEAN",
+      "review_doc": "docs/sprint-12-track-d-review.md",
+      "review_completed_at": "2026-04-21T06:30:00+02:00",
+      "review_advisories": [
+        "(1) v1.0.1 patch candidate: alert rules placed in prometheus/rules/ contradict \u00a72.2/\u00a73.6 which name Grafana unified alerts as source of truth \u2014 S3 \"test-fired once\" not reachable via Telegram without migration or Alertmanager wiring",
+        "(2) $env template variable is cosmetic (no env label on any metric except hassaleh_version_info)",
+        "(3) v1.0.1 patch candidate: panel UIDs not explicitly assigned; \u00a73.5 requires stable panel UIDs",
+        "(4) S3-vs-\u00a73.6 aggregation-style inconsistency (plan-internal; implementation follows S3)",
+        "(5) Uptime ratio can go negative for fully-dead agents \u2014 worth a clamp(0,1) wrap in v1.1"
+      ],
+      "merge_note": "Code already on trunk (a61af86). Merge phase is virtual \u2014 CLEAN verdict recorded 2026-04-21T04:30 UTC. 5 advisories captured for v1.0.1 patch arbitration (Dione); none block Sprint 12 close."
+    },
+    "track-e-compose": {
+      "track_code": "E",
+      "title": "Docker Compose",
+      "description": "Loki/Prometheus/Tempo/Grafana/Promtail/neo4j-exporter services + provisioning in a separate stack outside Hassaleh compose",
+      "deliverables": [
+        "~/projects/observability-stack/docker-compose.yml",
+        "~/projects/observability-stack/prometheus/*.yml",
+        "~/projects/observability-stack/loki/*.yml",
+        "~/projects/observability-stack/tempo/*.yml",
+        "~/projects/observability-stack/grafana/provisioning/*"
+      ],
+      "phase_worker": "worker-codex",
+      "merge_order": 5,
+      "current_phase": "merged",
+      "phase_status": "completed",
+      "completed_phases": ["implement", "review_round1", "fix", "review_round2"],
+      "plan_refs": [
+        "\u00a72 separate stack boundary",
+        "\u00a75 Track E"
+      ],
+      "unblocked_by": "track-d-dashboards implement landed on trunk (commit a61af86) \u2014 dashboard JSON now available for Grafana provisioning",
+      "implement_commit_hassaleh": "93836fc",
+      "implement_docs": "docs/sprint-12-track-e-implement.md",
+      "implement_scope": "observability-stack repo at ~/projects/observability-stack: docker-compose.yml with Loki+Prometheus+Tempo+Grafana+Promtail+neo4j-exporter; prometheus rules copied from hassaleh; grafana auto-provisions 5 dashboards + 3 datasources; README + .env.example + networking docs. Ports: Grafana 3000, Prometheus 9091, Loki 3100, Tempo 3200/4317/4318, neo4j-exporter 2004. Data persisted under ./data/<service>/. Initial commit on observability-stack repo; docs commit 93836fc on hassaleh trunk.",
+      "implement_completed_at": "2026-04-21T06:29:00+02:00",
+      "review_round1_dispatched_at": "2026-04-21T08:39:00+02:00",
+      "review_round1_dispatched_to": "worker-opus (Inanna session)",
+      "review_round1_completed_at": "2026-04-21T08:46:00+02:00",
+      "review_round1_verdict": "CHANGES-REQUESTED",
+      "review_round1_doc": "docs/sprint-12-track-e-review.md",
+      "review_round1_commit": "367a4de",
+      "review_round1_blockers": [
+        "B1 \u2014 Secrets: Grafana admin (admin/admin) + Neo4j password committed plaintext in docker-compose.yml; .env.example unreferenced",
+        "B2 \u2014 Promtail mounts /var/log:/var/log:ro and scrapes /var/log/*.log \u2014 ships host syslogs to Loki, violates \u00a73.1 PII policy",
+        "B3 \u2014 cAdvisor service missing entirely; breaks R8/S2b",
+        "B4 \u2014 Prometheus scrapes Hassaleh at :9090 instead of spec-mandated :9100"
+      ],
+      "review_round1_advisories_count": 12,
+      "fix_dispatched_at": "2026-04-21T10:38:00+02:00",
+      "fix_dispatched_to": "worker-codex",
+      "fix_completed_at": "2026-04-21T12:20:00+02:00",
+      "fix_commit_hassaleh": "014a839",
+      "fix_commit_obsstack": "3a7bdbb",
+      "fix_docs": "docs/sprint-12-track-e-fix.md",
+      "fix_scope": "B1 secrets \u2192 env vars + .gitignore + README update; B2 promtail \u2192 removed /var/log mount + removed system-log-fallback scrape; B3 cAdvisor \u2192 service added (gcr.io/cadvisor/cadvisor:v0.49.1) + prometheus scrape job; B4 \u2192 hassaleh scrape :9090 \u2192 :9100. Also pinned neo4j-exporter 2024.2.6, added healthchecks on Loki/Prometheus/Tempo/Grafana/Promtail/cAdvisor, replaced file:// runbook URLs with GitHub HTTPS.",
+      "review_round2_dispatched_at": "2026-04-21T12:38:00+02:00",
+      "review_round2_dispatched_to": "worker-opus (Inanna session)",
+      "review_round2_completed_at": "2026-04-21T14:30:00+02:00",
+      "review_round2_verdict": "CLEAN",
+      "review_round2_doc": "docs/sprint-12-track-e-review-round2.md",
+      "review_round2_commit": "50eeb8b",
+      "review_round2_summary": "CLEAN (blocker scope). All four Round-1 blockers B1\u2013B4 verified resolved in code (not just in the fix note): secrets moved to env vars + .gitignore confirms .env ignored; promtail narrowed to ${HASSALEH_LOG_DIR}:/var/log/hassaleh:ro with system-log-fallback job removed; cAdvisor service + scrape job present; hassaleh scrape target is :9100. No new security regressions introduced by the fix. Carry-over advisories from Round-1 (non-blocking) remain for v1.0.1 / v1.1.",
+      "merge_note": "Code already on trunk (hassaleh 014a839 + observability-stack 3a7bdbb). Merge phase is virtual \u2014 Round-2 CLEAN verdict recorded 2026-04-21T12:30 UTC."
+    },
+    "track-f-tests": {
+      "track_code": "F",
+      "title": "Integration tests",
+      "description": "Integration tests verifying logs/metrics/traces are emitted per opt-in flag, including obs=off regression test",
+      "deliverables": ["tests/test_observability.py"],
+      "phase_worker": "worker-gemini",
+      "merge_order": 6,
+      "current_phase": "merged",
+      "phase_status": "completed",
+      "completed_phases": ["implement", "review_round1", "fix", "review_round2", "fix_round2", "review_round3"],
+      "plan_refs": [
+        "\u00a77 Done criteria",
+        "\u00a75 Track F"
+      ],
+      "unblocked_by": "track-e-compose implement landed (commit 93836fc) \u2014 A/B/C already merged, E artifacts available; F can author tests against on-trunk code in parallel with E review",
+      "implement_dispatched_at": "2026-04-21T08:39:00+02:00",
+      "implement_dispatched_to": "worker-gemini",
+      "implement_completed_at": "2026-04-21T08:44:00+02:00",
+      "implement_commit": "528de03",
+      "implement_docs": "docs/sprint-12-track-f-implement.md",
+      "implement_pytest": "10 passed in ~0.9s",
+      "implement_scope": "tests/test_observability.py \u2014 10 integration tests: structured JSON logs + bindings; /metrics endpoint exposing frozen \u00a73.2 catalog; span decorators + HASSALEH_TRACE_FORCE=1 sampling flip; S5 regression test (no import-time side effects when OBS=off).",
+      "review_round1_dispatched_at": "2026-04-21T10:38:00+02:00",
+      "review_round1_dispatched_to": "worker-opus (Inanna session)",
+      "review_round1_completed_at": "2026-04-21T12:15:00+02:00",
+      "review_round1_verdict": "CHANGES-REQUESTED",
+      "review_round1_doc": "docs/sprint-12-track-f-review.md",
+      "review_round1_commit": "ab753ae",
+      "review_round1_blockers": [
+        "B1 \u2014 S5 import-time isolation NOT actually tested: tests import obs modules at file scope, so cannot detect side effects from import itself (only post-setup state); needs subprocess-level import-order test under HASSALEH_OBS=off",
+        "B2 \u2014 S2a/S2b coverage missing: no test_tool_counter_increment for hassaleh_tool_invocation_total; no checks for neo4j-exporter/cAdvisor up==1 or per-container metrics presence",
+        "B3 \u2014 Trace surface coverage incomplete: assertions cover only intent.lifecycle + intent.auth, not canonical \u00a72/\u00a73 stage set (validate, execute, persist_result); HASSALEH_TRACE_FORCE verified only on a manually-created span, not through decorator path"
+      ],
+      "fix_dispatched_at": "2026-04-21T12:38:00+02:00",
+      "fix_dispatched_to": "worker-gemini",
+      "fix_completed_at": "2026-04-21T14:30:00+02:00",
+      "fix_commit_tests": "967e427",
+      "fix_commit_docs": "6d5e74e",
+      "fix_docs": "docs/sprint-12-track-f-fix.md",
+      "fix_scope": "B1 \u2014 added test_obs_off_import_time_isolation() that launches subprocess with HASSALEH_OBS=off, imports hassaleh.obs/.metrics/.tracing, and asserts no collectors registered + no TracerProvider + structlog not configured. B2 \u2014 added test_tool_counter_increment() asserting record_tool_invocation() increments hassaleh_tool_invocation_total + duration histogram by exactly 1 per call; S2b deferred explicitly via three @pytest.mark.skip tests (test_neo4j_exporter_up, test_cadvisor_up, test_per_container_metrics_non_empty) tracked for Sprint 13 smoke harness. B3 \u2014 expanded trace assertions to cover canonical lifecycle stages and verified HASSALEH_TRACE_FORCE through decorator path. tests/test_observability.py grew to 600 lines.",
+      "review_round2_dispatched_at": "2026-04-21T14:38:00+02:00",
+      "review_round2_dispatched_to": "worker-opus (Inanna session)",
+      "review_round2_completed_at": "2026-04-21T14:58:00+02:00",
+      "review_round2_verdict": "CHANGES-REQUESTED",
+      "review_round2_doc": "docs/sprint-12-track-f-review-round2.md",
+      "review_round2_commit": "ae3c752",
+      "review_round2_summary": "B2 (tool counter + S2b deferral) and B3 (canonical trace stages + decorator-path force sampling) both RESOLVED. B1 (test_obs_off_import_time_isolation subprocess test) structurally correct in source but hangs locally in .venv \u2014 pytest reports 1 failed (TimeoutExpired after 30s), 17 passed, 3 skipped in 59.61s. Single remaining blocker.",
+      "fix_round2_dispatched_at": "2026-04-21T16:38:00+02:00",
+      "fix_round2_dispatched_to": "worker-gemini",
+      "fix_round2_completed_at": "2026-04-21T16:48:00+02:00",
+      "fix_round2_commit_tests": "8491109",
+      "fix_round2_commit_docs": "8baeb96",
+      "fix_round2_docs": "docs/sprint-12-track-f-fix-round2.md",
+      "fix_round2_pytest": "18 passed, 3 skipped in 2.25s (stable across 1.57\u20132.47s)",
+      "fix_round2_scope": "Diagnosed subprocess hang as pycache race + inherited pytest fds. Harness hardened with PYTHONDONTWRITEBYTECODE=1 + PYTHONUNBUFFERED=1 + stdin=DEVNULL + Popen+communicate+kill-on-timeout + timeout 30s\u219215s. Import-time assertions unchanged (no hassaleh_* collectors, no SdkTracerProvider, structlog not configured). B2 + B3 coverage preserved.",
+      "review_round3_dispatched_at": "2026-04-21T18:38:00+02:00",
+      "review_round3_dispatched_to": "worker-opus (Inanna session)",
+      "review_round3_dispatch_timeout_s": 300,
+      "review_round3_dispatch_log": "/tmp/sprint12-trackF-review-round3-cycle16.log",
+      "review_round3_completed_at": "2026-04-21T18:44:00+02:00",
+      "review_round3_verdict": "CLEAN",
+      "review_round3_doc": "docs/sprint-12-track-f-review-round3.md",
+      "review_round3_commit": "f707fc9",
+      "review_round3_summary": "CLEAN. B1 verified \u2014 _IMPORT_TIME_ISOLATION_SCRIPT byte-for-byte unchanged; harness hardening (PYTHONDONTWRITEBYTECODE + DEVNULL stdin + Popen+kill-on-timeout + 30s\u219215s budget) tightens the 'fresh interpreter' model, not weakens it. All 4 fail-hard exits intact, OK sentinel enforced. Pytest: 18 passed, 3 skipped, 0 failed in 3.00s (blocker alone 1.94s). B2 + B3 regression checks green.",
+      "merge_note": "Code already on trunk (tests 8491109 + docs 8baeb96 + review f707fc9). Merge phase is virtual \u2014 Round-3 CLEAN verdict closes Sprint 12 Track F at 2026-04-21T16:44 UTC."
+    }
+  },
+  "roles": {
+    "dione": {
+      "worker": "worker-opus",
+      "responsibilities": [
+        "orchestration",
+        "merge-order arbitration",
+        "integration conflict resolution",
+        "final-merge authority"
+      ]
+    },
+    "inanna": {
+      "worker": "worker-opus (separate session)",
+      "responsibilities": [
+        "security review per track",
+        "API/interface review",
+        "final sign-off"
+      ]
+    },
+    "gemini-author": {
+      "worker": "worker-gemini",
+      "responsibilities": ["Tracks C, D, F implementation"]
+    },
+    "codex-author": {
+      "worker": "worker-codex",
+      "responsibilities": ["Tracks A, B, E implementation"]
+    }
+  },
+  "last_updated_at": "2026-04-21T20:44:00+02:00",
+  "cycle_17_closure": {
+    "closed_at": "2026-04-21T20:44:00+02:00",
+    "final_tally": "6/6 tracks merged (A Logging, B Metrics, C Traces, D Dashboards, E Compose, F Tests). All CLEAN.",
+    "round3_outcome": "Track F Round-3 CLEAN \u2014 f707fc9. Harness fix confirmed to preserve B1 assertions; B2 + B3 regression-checked green. Pytest 18 passed / 3 skipped / 0 failed.",
+    "retrospective": "docs/sprint-12-retrospective.md",
+    "sprint_13_backlog_seeded": "docs/sprint-13-backlog.md",
+    "carry_over_summary": "21 non-blocking advisories captured across Tracks A/D/E/F plus 3 process observations (S13-P1\u20133). Top P0: S13-E2 (all obs-stack ports bind 0.0.0.0). Top P1 v1.0.1 patch candidates: S13-D1 + S13-D3 + S13-E5 (alerts cannot reach Telegram without Grafana unified-alerts provisioning).",
+    "orchestrator_cron": "hassaleh-sprint-12-orchestrator should stand down. Sprint 13 orchestrator arms once Ingo picks a theme (see sprint-13-backlog.md suggested themes).",
+    "rework_cycles": 4,
+    "dispatches_total_estimate": "~30 across 6 tracks and 3 workers",
+    "escalations_to_ingo": 0
+  },
+  "cycle_16_inspection": {
+    "inspected_at": "2026-04-21T18:38:00+02:00",
+    "cycle_15_outcome": {
+      "track_f_fix_round2": "SUCCESS \u2014 worker-gemini delivered (via Opus fallback per model-fallback/decision in dispatch log: gemini-3.1-pro-preview \u2192 claude-opus-4-7 on capacity). Fix commit 8491109 (tests), docs commit 8baeb96. Root cause: pycache race + inherited pytest fds. Harness hardened without weakening assertions. Pytest: 18 passed, 3 skipped in 2.25s (stable across 1.57\u20132.47s). Track F advances to Round-3 review.",
+      "streak": "Cycle-15 dispatch produced output on schedule. Escalation streak at zero. Sprint 12 status: 5/6 tracks merged (A, B, C, D, E); Track F fix_round2 complete \u2014 only Round-3 review remains."
+    },
+    "idle_workers_before_dispatch": [
+      "worker-opus",
+      "worker-gemini",
+      "worker-codex"
+    ],
+    "idle_workers_after_dispatch": ["worker-gemini", "worker-codex"],
+    "gemini_idle_reason": "Gemini has no Sprint 12 work remaining \u2014 fix_round2 just delivered. Re-activates only if Round-3 returns CHANGES-REQUESTED (unlikely given harness fix is targeted and tests verified stable).",
+    "codex_idle_reason": "Codex has no Sprint 12 work remaining \u2014 Tracks A/B/E all merged.",
+    "cycle_16_dispatches": [
+      {
+        "task": "track-f-tests Round-3 review (verify B1 harness fix does not weaken import-time assertions; run pytest locally; confirm 18 passed / 3 skipped / 0 failed; confirm B2+B3 coverage intact)",
+        "worker": "worker-opus (Inanna session)",
+        "dispatched_at": "2026-04-21T18:38:00+02:00",
+        "timeout_s": 300,
+        "log": "/tmp/sprint12-trackF-review-round3-cycle16.log",
+        "expected_output": "docs/sprint-12-track-f-review-round3.md",
+        "gating": "CLEAN advances F to merged \u2192 Sprint 12 CLOSES at cycle 17 (Dione writes sprint-12-retrospective.md, ingests carry-over advisories into Sprint 13 backlog). CHANGES-REQUESTED returns F to a Round-3 fix and Sprint 12 close slips further."
+      }
+    ],
+    "process_note": "Sprint 12 tail: 5/6 tracks merged; Track F is the final hurdle. Round-3 is a narrow verification of a single-blocker harness fix \u2014 not a fresh audit. If Inanna runs pytest locally and it stays green, CLEAN is the expected verdict."
+  }
+}
