@@ -1,270 +1,227 @@
 # Sprint 12 Track E — Inanna Round-2 review
 
-**VERDICT: CLEAN (with carry-over advisories)**
+**VERDICT: CLEAN (blocker scope). Carry-over advisories remain; no new blockers; no new security regressions introduced by the fix.**
 
 Reviewer: Inanna (worker-opus, security + API perspective)
 Date: 2026-04-21
-Scope: `~/projects/observability-stack/` at HEAD `3a7bdbb` (base `0c36c17`),
-reviewed against `docs/sprint-12-plan.md` v1.0.2 (FROZEN, `c2aea90`),
-Round-1 review `docs/sprint-12-track-e-review.md`, and the author's
-blocker-fix note `docs/sprint-12-track-e-fix.md`.
+Scope: `~/projects/observability-stack` @ `3a7bdbb` (base `0c36c17`), reviewed
+against the FROZEN plan `docs/sprint-12-plan.md` v1.0.2 (commit `c2aea90`),
+Round-1 verdict `docs/sprint-12-track-e-review.md`, and the fix note
+`docs/sprint-12-track-e-fix.md`.
+
+Round-2 is narrow: confirm the four Round-1 blockers B1–B4 are fixed in
+*code*, spot-check the advisories the fix note claims to have addressed,
+and flag any **new** regressions the fix may have introduced. The
+carry-over advisories that the fix did not claim to address are listed at
+the bottom so nothing falls through the cracks before v1 freeze.
 
 ---
 
-## Summary
+## Per-blocker verification
 
-All four Round-1 blockers (B1 secrets, B2 promtail host-log scrape, B3
-missing cAdvisor, B4 wrong scrape port) are resolved in code, not just in
-the fix doc. `docker compose config` parses cleanly with the shipped
-`.env.example` and renders every `${VAR}` substitution. No new blockers
-introduced. Three of the Round-1 advisories that the fix doc claims to
-have addressed (A3 neo4j-exporter pin, A10 healthchecks, A12 runbook URLs)
-are addressed, with minor qualifications captured below. One new advisory
-(N1 — cAdvisor's host-kernel surface) is worth recording for the file,
-and five Round-1 advisories remain open but were already non-blocking
-and are explicitly out of scope for this round.
+### B1 — Secrets handling — **RESOLVED ✓**
 
-Track E clears S4 (stack boots), S2b (cAdvisor target exists and will
-report `up==1` once running), and the boundary/security invariants. Track
-E is mergeable behind Track D.
+Verified in code (not just the doc):
 
----
+- `docker-compose.yml` L67–68: Grafana env is now
+  `GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}` /
+  `GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}` — no plaintext
+  literals left.
+- `docker-compose.yml` L108–110: `NEO4J_URI` / `NEO4J_USERNAME` /
+  `NEO4J_PASSWORD` all `${VAR}` substituted; the previous hardcoded
+  `hassaleh` password is gone.
+- `.gitignore` now contains `.env` (line 2). `git check-ignore -v .env`
+  confirms the ignore rule matches:
+  `.gitignore:2:.env	.env`.
+- `git ls-files` shows only `.env.example` tracked; `.env` is not tracked.
+- `.env.example` contains only `change-me-*` placeholders plus a
+  non-sensitive `NEO4J_URI` and `HASSALEH_LOG_DIR`. No real credentials.
 
-## Per-blocker confirmation
-
-### B1 — Secrets (Grafana + Neo4j) — **RESOLVED**
-
-Verified in `docker-compose.yml`:
-- Grafana env (lines 66–69): `GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}`,
-  `GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}`,
-  `GF_USERS_ALLOW_SIGN_UP: "false"`.
-- Neo4j-exporter env (lines 107–111): `NEO4J_URI`, `NEO4J_USERNAME`,
-  `NEO4J_PASSWORD` all `${VAR}`-substituted; no plaintext literals.
-- `.env.example` lists `GRAFANA_ADMIN_USER`, `GRAFANA_ADMIN_PASSWORD`,
-  `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`, `HASSALEH_LOG_DIR`
-  with `change-me-*` placeholders (no real values).
-- `.gitignore` contains `.env` on its own line. `git ls-files | grep env`
-  returns only `.env.example`; the live `.env` (if present) is not tracked.
-
-`docker compose --env-file .env.example config` rendered (excerpt, edited for brevity):
+Environment substitution works end-to-end. Abbreviated excerpt from
+`docker compose config` run with a temp `.env` populated from
+`.env.example`:
 
 ```yaml
-grafana:
-  environment:
-    GF_SECURITY_ADMIN_USER: change-me-admin
-    GF_SECURITY_ADMIN_PASSWORD: change-me-strong-password
-    GF_USERS_ALLOW_SIGN_UP: "false"
-neo4j-exporter:
-  environment:
-    NEO4J_URI: http://host.docker.internal:7487
-    NEO4J_USERNAME: neo4j
-    NEO4J_PASSWORD: change-me-neo4j-password
+  grafana:
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: change-me-strong-password
+      GF_SECURITY_ADMIN_USER: change-me-admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+  neo4j-exporter:
+    environment:
+      NEO4J_PASSWORD: change-me-neo4j-password
+      NEO4J_URI: http://host.docker.internal:7487
+      NEO4J_USERNAME: neo4j
 ```
 
-Substitution works end-to-end.
+Placeholders substitute as expected; no unresolved `${…}` tokens; no
+warnings about empty variables. Spec §8 "Secrets handling" satisfied.
 
-Residual note (not a blocker): the `.env.example` placeholders are
-themselves self-documenting "change-me-\*" strings. A user who skips the
-`cp .env.example .env` step and starts the stack with no env vars set
-will get Grafana admin/admin-style exposure only if they *also* point
-`--env-file` at `.env.example`. The README's quickstart already covers
-this, so it's operator-discipline, not a design gap.
+Minor observations (not blockers):
 
-### B2 — Promtail host-log scrape — **RESOLVED**
+- The fix uses pure `${VAR}` substitution (compose auto-loads `.env`
+  from CWD) rather than an explicit `env_file: .env` directive. Both
+  are valid; the current form is fine for the documented workflow of
+  "`cd observability-stack && docker compose up -d`". If operators ever
+  invoke compose from another directory, they'll need `--env-file`.
+- `GF_SECURITY_ADMIN_PASSWORD__FILE` (file-backed secret) was suggested
+  in Round-1 as a nicer alternative to even `.env`-level plaintext. Not
+  adopted; acceptable for v1 single-host dev.
 
-Verified in:
-- `docker-compose.yml` promtail volumes (lines 89–92): no `/var/log:/var/log:ro`;
-  only `${HASSALEH_LOG_DIR}:/var/log/hassaleh:ro` is bound (rendered as
-  `/home/uranus/projects/hassaleh/logs → /var/log/hassaleh` read-only in
-  `docker compose config`).
-- `promtail/config.yml`: single scrape job `hassaleh-daemon-logfile` with
-  `__path__: /var/log/hassaleh/*.log`. No `system-log-fallback`, no
-  `/var/log/*.log` glob, no `docker_sd_configs`.
+### B2 — Promtail host-log scrape — **RESOLVED ✓**
 
-Host `auth.log`, `syslog`, `dpkg.log`, etc. are no longer reachable from
-the Promtail container. §3.1 PII policy is restored to Hassaleh-only
-scope.
+Verified:
 
-### B3 — cAdvisor — **RESOLVED**
+- `docker-compose.yml` L92: mount narrowed to
+  `${HASSALEH_LOG_DIR}:/var/log/hassaleh:ro`. The previous
+  `/var/log:/var/log:ro` bind is gone.
+- `promtail/config.yml` is now 18 lines, single scrape job
+  `hassaleh-daemon-logfile` → `/var/log/hassaleh/*.log`. The
+  `system-log-fallback` job scraping `/var/log/*.log` is removed.
+- `docker compose config` confirms the rendered bind:
+  `source: /home/uranus/projects/hassaleh/logs → target: /var/log/hassaleh (read_only: true)`.
 
-Verified in:
-- `docker-compose.yml` (lines 117–136): `cadvisor` service, image
-  `gcr.io/cadvisor/cadvisor:v0.49.1`, pinned; mounts
-  `/:/rootfs:ro`, `/var/run:/var/run:ro`, `/sys:/sys:ro`,
-  `/var/lib/docker:/var/lib/docker:ro`, `/dev/disk:/dev/disk:ro`; device
-  `/dev/kmsg`; **`privileged: false`** (explicit, good); healthcheck on
-  `/healthz`; joined to the `observability` bridge.
-- `prometheus/prometheus.yml`: new `job_name: cadvisor` scraping
-  `cadvisor:8080` with `service: cadvisor` label. Matches S2b's assertion
-  target.
-- Prometheus `depends_on` now includes `cadvisor`.
+Host `auth.log`, `syslog`, `dpkg.log`, etc. can no longer reach Loki
+through this stack. Spec §2.3 topology ("Promtail scopes to Hassaleh
+container/file output only") satisfied.
 
-S2b's "`up==1`" assertion is satisfiable as soon as the stack boots.
+Minor observation: promtail is still file-log-based rather than using
+`docker_sd_configs` against the Docker API. That means Hassaleh must
+actually file-log into `${HASSALEH_LOG_DIR}` for Loki to see anything —
+if the daemon only writes JSON to stdout, a separate docker-log-driver
+or a follow-up file-log sink is still needed. Not a regression from
+Round-1; flagged so Track A knows this is still open.
 
-### B4 — Hassaleh scrape port — **RESOLVED**
+### B3 — cAdvisor present, scraped — **RESOLVED ✓**
 
-`prometheus/prometheus.yml` now targets `host.docker.internal:9100` for
-the `hassaleh-daemon` job. Matches §2.4 `HASSALEH_METRICS_PORT=9100` and
-§2.3 topology. Dashboard queries will populate.
+Verified:
 
----
+- `docker-compose.yml` L117–136: `cadvisor` service exists, pinned image
+  `gcr.io/cadvisor/cadvisor:v0.49.1`, published `8081:8080`, standard
+  cAdvisor mount set (`/:/rootfs:ro`, `/var/run:/var/run:ro`, `/sys:/sys:ro`,
+  `/var/lib/docker:/var/lib/docker:ro`, `/dev/disk:/dev/disk:ro`),
+  `devices: [/dev/kmsg]`, healthcheck on `/healthz`,
+  on the `observability` network.
+- **`privileged: false` is explicitly set (L127).** This was the
+  Round-1 §8 cross-cutting ask and a hard "must not reappear" — good.
+- `prometheus/prometheus.yml` L26–30: `cadvisor` scrape job added,
+  targeting `cadvisor:8080` with `service: cadvisor` label. Port `:8080`
+  is correct (cAdvisor's in-container listen port, not the host-published
+  `8081`).
+- `prometheus` service now lists `cadvisor` under `depends_on` so it
+  doesn't try to scrape before cAdvisor boots.
 
-## Spot-check of advisories claimed in fix doc
+R8 per-container resource coverage and S2b (`up{job="cadvisor"} == 1`)
+are now structurally possible.
 
-### A3 — neo4j-exporter pin — **ADDRESSED**
+### B4 — Hassaleh scrape port `:9100` — **RESOLVED ✓**
 
-Image now `neo4jcommunity/neo4j-exporter:2024.2.6`. Reproducible and
-supply-chain-audit-friendly.
+Verified:
 
-### A10 — Healthchecks — **PARTIALLY ADDRESSED**
+- `prometheus/prometheus.yml` L16: target is now
+  `host.docker.internal:9100` (was `9090`).
+- `README.md` updated to match (`…:9100/metrics`).
+- Round-1 also flagged that the implement doc carried the wrong port:
+  README is now aligned; `docs/sprint-12-track-e-implement.md` remains
+  under Track E's ownership — I did not re-check that file this round
+  (out of scope for B1–B4 code-level verification).
 
-Healthchecks present on: `loki`, `prometheus`, `tempo`, `grafana`,
-`promtail`, `cadvisor`. Good.
-
-Qualifications (carried as non-blocking):
-- `neo4j-exporter` has no healthcheck block.
-- `depends_on` still uses the implicit `condition: service_started`
-  everywhere (confirmed in `docker compose config` output). The
-  healthchecks improve observability of the stack's own health but
-  don't yet gate startup order — Grafana may still attempt provisioning
-  reads before Loki is actually ready. Low risk for single-host dev;
-  leave as Round-1 advisory A10 partial.
-
-### A12 — `file://` runbook URLs — **ADDRESSED, WITH A PRAGMATIC CAVEAT**
-
-`prometheus/rules/hassaleh-alerts.yml` now annotates each of the four
-alerts with
-`https://github.com/IngoGiebel/hassaleh/blob/trunk/docs/runbooks/<AlertName>.md`.
-The four expected runbook stubs exist in the Hassaleh repo.
-
-Caveat (new advisory N2): the Hassaleh repo is private. A browser
-clicking the runbook link from Grafana will hit GitHub's login/404 page
-unless the operator is signed in and has repo access. That's fine for
-Ingo today, but if the stack is later shared with other operators, the
-URL needs to be either an authenticated deep-link, a local mounted
-static-file route, or the repo needs to be made public for runbook
-documents. Downgrade of Round-1 A12 from "runbook URL doesn't resolve at
-all" to "resolves only for repo members".
+§2.3 topology (`:9100/metrics` for the daemon) and S4 smoke-path alignment
+are in place.
 
 ---
 
-## Security regression check — post-fix
+## Spot-check on claimed advisory fixes
 
-I looked explicitly for new secrets, new host mounts, new privileged
-flags, and new inbound surfaces introduced by the fix commit. Findings:
+The fix note claims three Round-1 advisories were also addressed. All
+three check out:
 
-- **No new secrets committed.** `git diff 0c36c17..3a7bdbb` removes two
-  plaintext credentials (`admin/admin`, `hassaleh`) and adds no replacements.
-- **No new privileged flags.** cAdvisor is explicitly `privileged: false`.
-  No other service gained capabilities.
-- **No new host-network mode.** All services still on the
-  `observability-bridge` user network.
-- **Promtail host mount strictly narrowed.** The old `/var/log:/var/log:ro`
-  → new `${HASSALEH_LOG_DIR}:/var/log/hassaleh:ro`. Scope reduced, not
-  widened.
-- **cAdvisor introduces new host-surface**, captured as N1 below. This
-  is a necessary-by-design expansion, not a mistake.
-
----
-
-## New advisories from Round-2 review
-
-### N1 — cAdvisor inherently expands host-surface
-
-cAdvisor mounts the host root filesystem (`/` → `/rootfs:ro`), the Docker
-state directory (`/var/lib/docker:ro`), `/sys`, `/var/run`, `/dev/disk`,
-and receives the `/dev/kmsg` device. These mounts are read-only and
-cAdvisor is `privileged: false`, but the union of them means that a
-compromise of the cAdvisor image or its scrape clients could read every
-image layer on the host (including any Neo4j data files, any SSH keys
-under `/home`, and so on).
-
-This is cAdvisor's documented required surface; there is no "less
-privileged" supported mode for per-container metrics. Classification:
-**non-blocking** — it was already implied by §2.1 R8 choosing cAdvisor.
-Mitigation recommendations (v1.1+):
-- Consider dropping `/dev/kmsg` if kernel-log metrics aren't consumed by
-  any dashboard (removes one source of host-kernel leakage).
-- Ensure `/rootfs` stays read-only (it does).
-- Leave the cAdvisor HTTP UI bound only where needed; per Round-1 A2, it
-  should ultimately be `127.0.0.1:8081` on this host.
-
-### N2 — GitHub runbook URL visibility
-
-Covered above under A12; listing it here so the advisory table stays
-complete.
-
-### N3 — `HASSALEH_LOG_DIR` is required at substitution time
-
-If the operator starts the stack without `HASSALEH_LOG_DIR` set in the
-environment or `.env`, `docker compose` renders an empty source path
-for the promtail bind mount and the stack fails to start (or binds the
-current working directory as `/var/log/hassaleh`, depending on the
-daemon version). Not a security issue; it is a first-run reliability
-gotcha. Fix options: default-value syntax
-`${HASSALEH_LOG_DIR:-./data/hassaleh-logs}` in the compose, or a
-preflight check in the README quickstart. Non-blocking.
-
----
-
-## New blockers
-
-**None.**
-
----
-
-## Carry-over advisories from Round-1 (still open, still non-blocking)
-
-The fix doc did not claim these; they remain as previously-logged
-advisories. Listing for completeness so Round-3 / post-v1 triage has a
-single source of truth:
-
-| ID | Topic | Status |
+| ID | Claim | Status |
 |----|-------|--------|
-| A1 | README source-of-truth / re-sync note for rules + dashboards | Partially addressed — README now has a one-liner ("Rule files and dashboard JSONs are copied from the Hassaleh repo; if the source of truth changes there, re-sync this stack copy"). Acceptable as-is. |
-| A2 | Bind service ports to `127.0.0.1` | Not addressed; still `0.0.0.0`. Environmental — low risk on single-host. |
-| A5 | `editable: false` on Grafana dashboards provisioning | Not addressed; still `editable: true`. |
-| A6 | `grafana/provisioning/alerting/` unified alerts + `telegram-ingo` | Not addressed; directory still missing. Alert path remains Prometheus-rules-only, with no notifier. |
-| A7 | Loki ruler references `http://localhost:9093` Alertmanager that doesn't exist | Not addressed. Pair with A6. |
-| A8 | Retention: Loki 7d, Prometheus 7d, Tempo 168h | Partially addressed — Prometheus now has `--storage.tsdb.retention.time=7d` (new in this commit, good). Loki has no retention stanza. Tempo still `block_retention: 24h` (spec wants 168h). |
-| A9 | Share `observability-bridge` with Hassaleh compose OR document `host.docker.internal` | Not addressed; `networking/README-bridge-network.md` still absent. |
-| A11 | Stable panel UIDs inside dashboard JSONs (Track D concern) | Track D follow-up; not Track E. |
-
-Reminder: none of these block the Sprint-12 merge. A6/A7 matter before
-we rely on alerts for real; A8 matters before we rely on retention.
+| A3 | Pin `neo4jcommunity/neo4j-exporter` to `2024.2.6` (was `:latest`) | ✓ `docker-compose.yml` L104: `neo4jcommunity/neo4j-exporter:2024.2.6`. No `:latest` anywhere. |
+| A10 | Healthchecks on Loki, Prometheus, Tempo, Grafana, Promtail, cAdvisor | ✓ All six services have a `healthcheck:` block with an HTTP probe at 30s/10s/5 cadence. Note: `depends_on` still uses the default `service_started` rather than `service_healthy`, so the healthchecks are currently informational — they don't gate startup order. That's the right trade-off for v1 (avoids boot deadlocks); worth flagging so Track F smoke tests don't rely on readiness-gated boot. |
+| A12 | Replace `file://` runbook URLs with remote URLs | ✓ `prometheus/rules/hassaleh-alerts.yml` now points at `https://github.com/IngoGiebel/hassaleh/blob/trunk/docs/runbooks/<Alert>.md` for all four S3 alerts. The `file://` scheme is gone. **Caveat:** the `IngoGiebel/hassaleh` repo is private; anyone following the link from a fired alert needs repo access. For single-operator v1 that's Ingo-only, fine; for future on-call rotation this is a pending carry-over. |
 
 ---
 
-## Re-verification checklist (per Round-1 Recommendation section)
+## New regressions introduced by the fix — **NONE**
 
-| Check | Result |
-|-------|--------|
-| `prometheus.yml` targets `:9100` | ✓ `host.docker.internal:9100` |
-| `cadvisor` scrape job present, target `cadvisor:8080` | ✓ |
-| `grep -r "admin" docker-compose.yml` shows nothing secret | ✓ (only `${GRAFANA_ADMIN_USER}` / `${GRAFANA_ADMIN_PASSWORD}`) |
-| Promtail does not publish `/var/log/*.log` | ✓ |
-| `.env` is gitignored | ✓ (`.gitignore` contains `.env`; `git ls-files` confirms only `.env.example` tracked) |
-| `editable: false` on dashboards | ✗ (carry-over advisory A5) |
+Checked against the diff `0c36c17..3a7bdbb`:
 
-Five of six checks pass; the sixth (A5) was already non-blocking.
+- **New secrets in committed files:** none. `.env.example` placeholders
+  only; `.env` gitignored; no hardcoded credentials re-introduced
+  elsewhere.
+- **New host mounts:**
+  - promtail: `${HASSALEH_LOG_DIR} → /var/log/hassaleh:ro` — *narrower*
+    than before, intended.
+  - cadvisor: the standard cAdvisor `:ro` set (`/`, `/var/run`, `/sys`,
+    `/var/lib/docker`, `/dev/disk`). All read-only. `/var/run/docker.sock`
+    is therefore reachable but read-only; combined with
+    `privileged: false`, cAdvisor cannot control containers — only
+    enumerate them — which is its designed surface. No privilege
+    escalation introduced.
+  - cadvisor: `devices: [/dev/kmsg]` — standard, needed for kernel-event
+    metrics; does expose the kernel-log ring buffer to the container.
+    Acceptable on a single-host dev box; in a multi-tenant deployment
+    this would warrant a conversation, but v1 is single-tenant.
+- **New privileged flags:** none. `privileged: true` appears nowhere.
+  cAdvisor has `privileged: false` explicitly set.
+- **New public-network exposure:** cAdvisor's `8081:8080` binds to
+  `0.0.0.0` (inherits the stack's A2 pattern). Not a new regression —
+  it follows the same binding style as every other service here — but
+  it widens the A2 surface by one more port. Flagged under carry-over.
+- **Network topology:** unchanged. `observability-bridge` is still
+  declared in-stack only; no `external: true` addition to Hassaleh's
+  compose. Carry-over advisory A9.
+
+`docker compose config` (with a temp `.env` copy of `.env.example`)
+completes with no warnings about undefined variables and renders all
+services cleanly — see the abbreviated excerpt under B1.
+
+---
+
+## Carry-over advisories (unchanged from Round-1, not in the fix's claimed scope)
+
+The fix note did not claim to address these. They remain open and
+should be closed before v1 freeze — flagging so Dione / Track E can
+schedule them, not to block this round:
+
+| ID | Topic | Current state |
+|----|-------|---------------|
+| A2 | Bind ports to `127.0.0.1` (Grafana, Prometheus, Loki, Tempo-HTTP, neo4j-exporter, **now also cAdvisor `8081`**) | Still all `0.0.0.0`. cAdvisor adds one more. |
+| A5 | `grafana/provisioning/dashboards/dashboards.yml` `editable: false` | Still `editable: true` / `disableDeletion: false`. |
+| A6 | Add `grafana/provisioning/alerting/` (source-of-truth per §2.2, §3.6) | Directory absent; only `dashboards/` and `datasources/` provisioned. Spec drift vs §2.2. |
+| A7 | Alertmanager missing while Loki ruler still sets `alertmanager_url: http://localhost:9093` | Unchanged. Net alert path still dead. |
+| A8 | Retention: Loki 7d, Prometheus 7d, Tempo 168h | **Partially done.** Prometheus now has `--storage.tsdb.retention.time=7d` ✓. Loki `loki/config.yml` still has no retention stanza (implicit default). Tempo `tempo/config.yml` still `block_retention: 24h`, not `168h`. |
+| A9 | Share `observability-bridge` with Hassaleh compose *or* delete the bridge artefacts from §2.3 | Unchanged. Missing `networking/README-bridge-network.md`. |
+| A11 | Stable panel UIDs for runbook deep-linking | Track D concern; unchanged. |
+| A12 (residual) | Runbook links now resolve over HTTPS, but the target repo is private | `file://` scheme gone ✓; audience-access consideration remains. |
+
+---
+
+## Round-1 "Recommendation" re-verify checklist — green where the fix claimed scope
+
+- `prometheus.yml` targets `:9100` — ✓
+- `cadvisor` has a scrape job at the correct target — ✓
+  (runtime `up == 1` gate belongs to Track F; structurally in place here)
+- No secret literals in `docker-compose.yml` — ✓
+  (only `ALLOW_SIGN_UP: "false"` and `${GRAFANA_ADMIN_*}` placeholders)
+- Promtail does not publish `/var/log/*.log` — ✓
+- `.env` is gitignored — ✓ (`git check-ignore -v .env` confirms)
+- `editable: false` on dashboards — **✗ carry-over (A5, not in fix scope)**
 
 ---
 
 ## Recommendation
 
-**Clear Track E to merge** behind Track D. The four blockers are
-genuinely resolved and the fix doc accurately describes the code. The
-carry-over advisories are real but all non-blocking and well-scoped for
-v1.1 / post-merge follow-up.
+**Clear Track E to merge for the B1–B4 blocker scope.** The four Round-1
+blockers are fixed in code, not just in the fix note. The three
+advisories the fix claimed (A3, A10, A12) are also actually in code. No
+new secrets, no new privileged flags, no new broad host mounts have been
+introduced by the fix.
 
-Next actions I'd suggest, in order of importance, before v1 is declared
-"done":
-1. Close A6+A7 together (Grafana unified alerts + decide Alertmanager).
-   Today the alert path is a no-op.
-2. Close A8 (Loki + Tempo retention) so v1's observability data survives
-   the first quiet week.
-3. Address N3 with a default value for `HASSALEH_LOG_DIR` or a preflight
-   check — first-run UX.
-4. A2, A5, A9, A11 can roll into a single "hardening" patch.
+Before v1 freeze / Track E sign-off, close carry-over advisories A2, A5,
+A6, A7, A8 (Loki + Tempo halves), A9. A11 rolls into Track D. A12's
+private-repo caveat can wait until on-call rotation is multi-operator.
 
-— Inanna
+— Inanna 🛡️
