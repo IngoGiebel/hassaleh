@@ -1,0 +1,12 @@
+{
+  "uid": "ha-overview-v1",
+  "title": "hassaleh-overview",
+  "templating": {
+    "list": [{"name": "env", "type": "custom", "query": "dev,staging,prod"}]
+  },
+  "panels": [
+    {"title": "Active Agents", "type": "stat", "targets": [{"expr": "hassaleh_active_agents"}]},
+    {"title": "Intent Submissions", "type": "timeseries", "targets": [{"expr": "sum(rate(hassaleh_intent_submitted_total[5m])) by (result)"}]},
+    {"title": "Errors", "type": "timeseries", "targets": [{"expr": "sum(rate(hassaleh_errors_total[5m])) by (type, source)"}]}
+  ]
+}

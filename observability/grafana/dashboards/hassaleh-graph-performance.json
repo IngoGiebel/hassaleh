@@ -1,0 +1,14 @@
+{
+  "uid": "ha-graph-v1",
+  "title": "hassaleh-graph-performance",
+  "templating": {
+    "list": [
+      {"name": "env", "type": "custom", "query": "dev,staging,prod"},
+      {"name": "pattern", "type": "custom", "query": "*"}
+    ]
+  },
+  "panels": [
+    {"title": "Cypher Query Latency p99", "type": "timeseries", "targets": [{"expr": "histogram_quantile(0.99, sum(rate(hassaleh_cypher_query_duration_seconds_bucket{pattern=~\"$pattern\"}[5m])) by (le))"}]},
+    {"title": "Slow Query Count", "type": "timeseries", "targets": [{"expr": "sum(rate(hassaleh_cypher_query_slow_total{pattern=~\"$pattern\"}[5m])) by (pattern)"}]}
+  ]
+}

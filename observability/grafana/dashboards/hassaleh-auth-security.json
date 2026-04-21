@@ -1,0 +1,11 @@
+{
+  "uid": "ha-auth-v1",
+  "title": "hassaleh-auth-security",
+  "templating": {
+    "list": [{"name": "env", "type": "custom", "query": "dev,staging,prod"}]
+  },
+  "panels": [
+    {"title": "Auth Attempts", "type": "timeseries", "targets": [{"expr": "sum(rate(hassaleh_auth_attempts_total[5m])) by (result)"}]},
+    {"title": "Bcrypt Duration p99", "type": "timeseries", "targets": [{"expr": "histogram_quantile(0.99, sum(rate(hassaleh_auth_bcrypt_duration_seconds_bucket[5m])) by (le))"}]}
+  ]
+}

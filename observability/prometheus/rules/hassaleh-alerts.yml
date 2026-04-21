@@ -1,0 +1,35 @@
+groups:
+- name: hassaleh.alerts
+  rules:
+  - alert: HassalehAuthFailureRateHigh
+    expr: rate(hassaleh_auth_attempts_total{result!="ok"}[1m]) > 1
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Auth failure rate > 1/s for 1 min"
+      runbook: "file:///home/uranus/projects/hassaleh/docs/runbooks/HassalehAuthFailureRateHigh.md"
+  - alert: HassalehHeartbeatMissed
+    expr: sum by (agent_id) (increase(hassaleh_heartbeat_missed_total[5m])) > 3
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Agent missed more than 3 heartbeats in 5m"
+      runbook: "file:///home/uranus/projects/hassaleh/docs/runbooks/HassalehHeartbeatMissed.md"
+  - alert: HassalehSlowQueries
+    expr: rate(hassaleh_cypher_query_slow_total[5m]) > 0.1
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Slow Cypher queries > 0.1/s for 5m"
+      runbook: "file:///home/uranus/projects/hassaleh/docs/runbooks/HassalehSlowQueries.md"
+  - alert: HassalehInternalErrors
+    expr: sum(rate(hassaleh_errors_total{type="internal"}[5m])) / sum(rate(hassaleh_intent_submitted_total[5m])) > 0.01
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Internal error rate > 1% of intents for 5m"
+      runbook: "file:///home/uranus/projects/hassaleh/docs/runbooks/HassalehInternalErrors.md"

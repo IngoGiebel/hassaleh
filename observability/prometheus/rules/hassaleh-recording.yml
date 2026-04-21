@@ -1,0 +1,16 @@
+groups:
+- name: hassaleh.recording
+  interval: 1m
+  rules:
+  - record: hassaleh:agent_uptime_ratio:1h
+    expr: |
+      1 - (
+        sum by (agent_id) (increase(hassaleh_heartbeat_missed_total[1h]))
+        /
+        clamp_min(
+          sum by (agent_id) (increase(hassaleh_heartbeat_received_total[1h])),
+          1
+        )
+      )
+  - record: hassaleh:intent_duration_seconds:p99_1h
+    expr: histogram_quantile(0.99, sum(rate(hassaleh_intent_duration_seconds_bucket[1h])) by (le, stage))
