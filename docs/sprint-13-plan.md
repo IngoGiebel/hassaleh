@@ -1,8 +1,8 @@
 # Sprint 13 — Runtime Operator
 
 **Author:** Dione
-**Status:** DRAFT v1.1 — Round-2 polish (one remaining Inanna finding on I-CR-4.2); awaiting Inanna Round-2b.
-**Created:** 2026-04-21 (v0); **Revised:** 2026-04-23 (v1), 2026-04-24 (v1.1)
+**Status:** **FROZEN as v1.1 — both Round-2 verdicts CLEAN** (Inanna Round-2b 2026-04-24, gemini Round-2 2026-04-23).
+**Created:** 2026-04-21 (v0); **Revised:** 2026-04-23 (v1), 2026-04-24 (v1.1 → FROZEN)
 **Sprint timeline (tentative):** starts when Sprint 12 is fully merged
 (already true as of 2026-04-21T20:44+02:00) and this plan is approved
 (Round-2 CLEAN from Inanna + gemini-reviewer); ~5 working days.
@@ -1241,3 +1241,12 @@ issue rather than v1.1.
 
   gemini-reviewer Round-2 was already CLEAN; v1.1 requires only an
   Inanna Round-2b re-verify on I-CR-4.2, not a full Round-2.
+
+- **2026-04-24 FROZEN as v1.1**: Inanna Round-2b returned CLEAN
+  (`sprint-13-plan-review-2b-inanna.md`) — 0 blocking remaining,
+  1 non-blocking Advisory (A-1, carried over from Round-2, applies to
+  Track B implementation review, not to this plan). Combined with
+  gemini-reviewer Round-2 CLEAN, both reviewer sign-offs are now in
+  hand. The plan is FROZEN as v1.1 and ready for §6.5 Phase P2
+  (Track A + Track D kickoff) pending Ingo's operational go for worker
+  dispatch.

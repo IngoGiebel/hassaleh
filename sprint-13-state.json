@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "sprint": 13,
+  "startedAt": null,
+  "planVersion": "v1.1",
+  "planCommitFrozen": "13dce84",
+  "planReviews": {
+    "round1": {
+      "inanna": {"verdict": "change-req", "findings": 8, "file": "docs/sprint-13-plan-review-1-inanna.md"},
+      "gemini": {"verdict": "change-req", "findings": 6, "changeReqs": 1, "file": "docs/sprint-13-plan-review-1-gemini.md"}
+    },
+    "round2": {
+      "inanna": {"verdict": "change-req", "addressed": 7, "partial": 1, "file": "docs/sprint-13-plan-review-2-inanna.md"},
+      "gemini": {"verdict": "clean", "addressed": 7, "file": "docs/sprint-13-plan-review-2-gemini.md"}
+    },
+    "round2b": {
+      "inanna": {"verdict": "clean", "scope": "I-CR-4.2 narrow", "file": "docs/sprint-13-plan-review-2b-inanna.md"}
+    }
+  },
+  "tracks": {
+    "A": {
+      "scope": "Core runtime (Intent/Result dataclasses, registry, execute())",
+      "author": "worker-codex",
+      "reviewer": "inanna",
+      "phase": "pending",
+      "dependsOn": [],
+      "round1Verdict": null,
+      "mergedAt": null,
+      "files": ["src/hassaleh/runtime/core.py", "src/hassaleh/runtime/types.py", "tests/test_runtime_core.py"]
+    },
+    "B": {
+      "scope": "Six Intent handlers (§3.1-§3.6) with Cypher preconditions and mutations",
+      "author": "worker-codex",
+      "reviewer": "inanna",
+      "phase": "pending",
+      "dependsOn": ["A", "C"],
+      "round1Verdict": null,
+      "mergedAt": null,
+      "files": ["src/hassaleh/runtime/intents/market.py", "tests/test_runtime_market_intents.py"]
+    },
+    "C": {
+      "scope": "Capability enforcement (scope list, exact-match check, schema addition)",
+      "author": "worker-codex",
+      "reviewer": "inanna",
+      "phase": "pending",
+      "dependsOn": ["A"],
+      "round1Verdict": null,
+      "mergedAt": null,
+      "files": ["src/hassaleh/runtime/capabilities.py", "schema.cypher"]
+    },
+    "D": {
+      "scope": "Observability wiring (spans, metrics, logs) per §2.6",
+      "author": "worker-gemini",
+      "reviewer": "gemini-reviewer",
+      "phase": "pending",
+      "dependsOn": [],
+      "round1Verdict": null,
+      "mergedAt": null,
+      "files": ["src/hassaleh/runtime/observability.py", "tests/test_runtime_observability.py"]
+    },
+    "E": {
+      "scope": "Market Pipeline migration to Intent dispatch",
+      "author": "worker-gemini",
+      "reviewer": "inanna",
+      "phase": "pending",
+      "dependsOn": ["A", "B", "C"],
+      "round1Verdict": null,
+      "mergedAt": null,
+      "files": ["scripts/market_state.py"]
+    },
+    "F": {
+      "scope": "End-to-end + crash-recovery integration tests",
+      "author": "dione-main",
+      "reviewer": "inanna",
+      "phase": "pending",
+      "dependsOn": ["A", "B", "C", "D", "E"],
+      "round1Verdict": null,
+      "mergedAt": null,
+      "files": ["tests/test_runtime_e2e.py", "tests/test_runtime_crash_recovery.py"]
+    }
+  },
+  "orchestrator": {
+    "cronId": "5d854f3b-8dea-4e5c-a680-9ba5eee1c64b",
+    "retarget": "pending",
+    "note": "Re-target to this state.json after P2 kickoff."
+  },
+  "advisories": [
+    {"id": "A-1", "fromReview": "sprint-13-plan-review-2-inanna.md / Round-2b", "scope": "§3.2 SetVerdict — address at Track B implementation review, non-blocking for plan freeze"}
+  ]
+}
