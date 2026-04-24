@@ -1,8 +1,8 @@
 # Sprint 13 — Runtime Operator
 
 **Author:** Dione
-**Status:** DRAFT v1 — Round-1 CRs integrated, awaiting Round-2 reviews.
-**Created:** 2026-04-21 (v0); **Revised:** 2026-04-23 (v1)
+**Status:** DRAFT v1.1 — Round-2 polish (one remaining Inanna finding on I-CR-4.2); awaiting Inanna Round-2b.
+**Created:** 2026-04-21 (v0); **Revised:** 2026-04-23 (v1), 2026-04-24 (v1.1)
 **Sprint timeline (tentative):** starts when Sprint 12 is fully merged
 (already true as of 2026-04-21T20:44+02:00) and this plan is approved
 (Round-2 CLEAN from Inanna + gemini-reviewer); ~5 working days.
@@ -405,17 +405,25 @@ for this Intent type. The previous v0 collapse into a single
 ```cypher
 // Fixed in v1 (I-CR-4): APOC inner-query parameter scope, schema
 // uniqueness constraint now declared in §8, $now sourced from ctx.now
-// per §2.4.
+// per §2.4.  Fixed in v1.1 (I-CR-4.2 round-2): CREATE clause and
+// SET clause both persist `segment_id` on the Attempt node, so the
+// `(a.segment_id, a.n)` uniqueness constraint in §8 actually fires
+// (Neo4j 5 treats null-tuples as "no constraint applies").
 MATCH (s:Segment {id: $segment_id})
 OPTIONAL MATCH (s)-[:HAS_ATTEMPT]->(a:Attempt {n: $current_cycle})
 CALL apoc.do.when(
   a IS NOT NULL AND a.verdict IS NULL,
-  'SET a.analystBy = $analyst_by, a.analystAt = $now RETURN a AS attempt',
-  'CREATE (s)-[:HAS_ATTEMPT]->(attempt:Attempt {n: $current_cycle,
+  'SET a.analystBy = $analyst_by,
+       a.analystAt = $now,
+       a.segment_id = coalesce(a.segment_id, $segment_id)
+   RETURN a AS attempt',
+  'CREATE (s)-[:HAS_ATTEMPT]->(attempt:Attempt {
+         segment_id: $segment_id,
+         n: $current_cycle,
          analystBy: $analyst_by, analystAt: $now,
          wordCount: null, reviewBy: null, reviewAt: null,
          verdict: null, reviewFeedback: null}) RETURN attempt',
-  {a: a, s: s, current_cycle: $current_cycle,
+  {a: a, s: s, segment_id: $segment_id, current_cycle: $current_cycle,
    analyst_by: $analyst_by, now: $now}
 ) YIELD value
 SET s.status = "analyzing"
@@ -429,11 +437,19 @@ Notes:
   unbound references (v0 bug fixed per I-CR-4.1).
 - `$now` is bound from `ctx.now` at transaction-open (§2.4); the
   handler never calls `datetime.now()` directly.
+- **`segment_id` is written to every Attempt node** in both branches
+  (CREATE unconditionally; SET via `coalesce` so a pre-existing Attempt
+  without the field gets a lazy backfill on next touch, without
+  clobbering any value already there). This is what makes the §8
+  uniqueness constraint on `(a.segment_id, a.n)` actually bite —
+  without `segment_id`, Neo4j 5's null-tuple rule silently disables
+  the constraint and we'd still have the concurrent-writer race the
+  constraint is meant to prevent (v1.1 fix per I-CR-4.2 round-2).
 - The schema-level uniqueness constraint on `(Segment.id, Attempt.n)`
-  is added to `schema.cypher` by Track C (§8). Without it, two
-  concurrent writers of cycle N could both create Attempt nodes; the
-  constraint is what makes the precondition-to-mutation hand-off
-  race-free even across connection pools.
+  is added to `schema.cypher` by Track C (§8). Without it plus the
+  property write, two concurrent writers of cycle N could both create
+  Attempt nodes; the constraint is what makes the precondition-to-
+  mutation hand-off race-free even across connection pools.
 - The APOC call disappears once we can use Cypher 5.0 conditional
   write; noted as a polish item for a follow-up patch, non-blocking.
 
@@ -1192,3 +1208,36 @@ Only minor polish in response to remaining Round-2 findings. If
 substantive issues surface (which we don't expect — all blocking CRs
 are addressed here with concrete mechanisms), v2 of the plan would
 issue rather than v1.1.
+
+- **2026-04-24 v1.1**: Single-file polish addressing Inanna Round-2's
+  one remaining PARTIAL finding, I-CR-4.2.
+
+  **The issue**: v1 added a uniqueness constraint on
+  `(a.segment_id, a.n)` in §8 but the §3.1 mutation CREATE clause
+  never wrote `segment_id` on the Attempt node. Neo4j 5's rule for
+  node-property uniqueness constraints treats a null in the tuple
+  as "no constraint applies", so the constraint silently did not
+  fire — and the concurrent-writer race the constraint was supposed
+  to close was still open.
+
+  **The fix**: §3.1 mutation now writes `segment_id` on both paths of
+  the `apoc.do.when` dispatch:
+  - CREATE branch: `segment_id: $segment_id` added to the property map.
+  - SET branch: `a.segment_id = coalesce(a.segment_id, $segment_id)`
+    so a pre-existing Attempt missing the field gets a lazy backfill
+    without clobbering any value already there.
+
+  Both branches reference `$segment_id` in the params map (added).
+  Per Inanna's Round-2 recommendation, option (a) — keep the node
+  authoritative rather than re-expressing the constraint against the
+  HAS_ATTEMPT relationship.
+
+  No other §3 Intents are affected: they either don't CREATE Attempt
+  nodes (§3.2 SetVerdict, §3.3 RegisterWriterAttempt target the
+  existing attempt or writer-attempt respectively), or they target
+  different node types (§3.6 SetPublished creates Post nodes).
+  The constraint is scoped to Attempt nodes, and only §3.1 creates
+  those.
+
+  gemini-reviewer Round-2 was already CLEAN; v1.1 requires only an
+  Inanna Round-2b re-verify on I-CR-4.2, not a full Round-2.
