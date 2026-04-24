@@ -1,7 +1,7 @@
 {
   "version": 1,
   "sprint": 13,
-  "startedAt": null,
+  "startedAt": "2026-04-24T16:53:00+02:00",
   "planVersion": "v1.1",
   "planCommitFrozen": "13dce84",
   "planReviews": {
@@ -22,7 +22,8 @@
       "scope": "Core runtime (Intent/Result dataclasses, registry, execute())",
       "author": "worker-codex",
       "reviewer": "inanna",
-      "phase": "pending",
+      "phase": "dispatched",
+      "dispatchedAt": "2026-04-24T16:53:00+02:00",
       "dependsOn": [],
       "round1Verdict": null,
       "mergedAt": null,
@@ -52,7 +53,8 @@
       "scope": "Observability wiring (spans, metrics, logs) per §2.6",
       "author": "worker-gemini",
       "reviewer": "gemini-reviewer",
-      "phase": "pending",
+      "phase": "dispatched",
+      "dispatchedAt": "2026-04-24T16:53:00+02:00",
       "dependsOn": [],
       "round1Verdict": null,
       "mergedAt": null,
