@@ -57,7 +57,7 @@ def _tx(session_factory):
 
 def _ctx(scopes=("market.analyst.write",)) -> Ctx:
     return Ctx(
-        principal=Principal(id="api-key-1", scopes=list(scopes)),
+        principal=Principal(id="api-key-1", scopes=tuple(scopes)),
         now=datetime(2026, 4, 24, 12, 0, tzinfo=timezone.utc),
     )
 
@@ -134,6 +134,31 @@ def test_successful_dispatch_commits_and_returns_ok(session_factory):
     tx.rollback.assert_not_called()
 
 
+def test_runtime_overrides_caller_supplied_now(session_factory):
+    caller_now = datetime(1970, 1, 1, tzinfo=timezone.utc)
+    observed = {}
+
+    @register_handler("market.add-analyst-attempt", requires_capability="market.analyst.write")
+    def _h(intent, tx, ctx):
+        observed["now"] = ctx.now
+        return Result(kind="ok", data=None, error_code=None, error_message=None)
+
+    runtime = HassalehRuntime(session_factory=session_factory)
+    before = datetime.now(timezone.utc)
+    result = runtime.execute(
+        Intent(type="market.add-analyst-attempt", payload={}),
+        Ctx(
+            principal=Principal(id="api-key-1", scopes=("market.analyst.write",)),
+            now=caller_now,
+        ),
+    )
+    after = datetime.now(timezone.utc)
+
+    assert result.kind == "ok"
+    assert observed["now"] != caller_now
+    assert before <= observed["now"] <= after
+
+
 # --- 5. canonical order (validate before cap_check) ---------------------
 
 def test_canonical_order_validate_runs_before_capability_check(session_factory):
@@ -175,6 +200,79 @@ def test_non_ok_handler_result_rolls_back_and_returns_as_is(session_factory):
     tx.commit.assert_not_called()
 
 
+def test_commit_failure_returns_internal_error_without_raising(session_factory):
+    @register_handler("market.add-analyst-attempt", requires_capability="market.analyst.write")
+    def _h(intent, tx, ctx):
+        return Result(kind="ok", data=None, error_code=None, error_message=None)
+
+    tx = _tx(session_factory)
+    tx.commit.side_effect = RuntimeError("commit unavailable")
+
+    runtime = HassalehRuntime(session_factory=session_factory)
+    result = runtime.execute(
+        Intent(type="market.add-analyst-attempt", payload={}), _ctx()
+    )
+
+    assert result.kind == "internal-error"
+    assert result.error_code == "commit-failed"
+
+
+def test_rollback_failure_returns_internal_error_without_raising(session_factory):
+    @register_handler("market.set-verdict", requires_capability="market.reviewer.write")
+    def _h(intent, tx, ctx):
+        return Result(
+            kind="precondition-failed",
+            data=None,
+            error_code="terminal-verdict-exists",
+            error_message="cannot overwrite terminal verdict",
+        )
+
+    tx = _tx(session_factory)
+    tx.rollback.side_effect = RuntimeError("rollback unavailable")
+
+    runtime = HassalehRuntime(session_factory=session_factory)
+    result = runtime.execute(
+        Intent(type="market.set-verdict", payload={}),
+        _ctx(scopes=("market.reviewer.write",)),
+    )
+
+    assert result.kind == "internal-error"
+    assert result.error_code == "rollback-failed"
+
+
+def test_session_open_failure_returns_internal_error_without_raising(session_factory):
+    @register_handler("market.add-analyst-attempt", requires_capability="market.analyst.write")
+    def _h(intent, tx, ctx):  # pragma: no cover - session never opens
+        return Result(kind="ok", data=None, error_code=None, error_message=None)
+
+    session_factory.side_effect = RuntimeError("pool exhausted")
+
+    runtime = HassalehRuntime(session_factory=session_factory)
+    result = runtime.execute(
+        Intent(type="market.add-analyst-attempt", payload={}), _ctx()
+    )
+
+    assert result.kind == "internal-error"
+    assert result.error_code == "session-open-failed"
+
+
+def test_handler_exception_preserved_when_rollback_also_fails(session_factory):
+    @register_handler("market.add-analyst-attempt", requires_capability="market.analyst.write")
+    def _h(intent, tx, ctx):
+        raise RuntimeError("handler boom")
+
+    tx = _tx(session_factory)
+    tx.rollback.side_effect = RuntimeError("rollback boom")
+
+    runtime = HassalehRuntime(session_factory=session_factory)
+    result = runtime.execute(
+        Intent(type="market.add-analyst-attempt", payload={}), _ctx()
+    )
+
+    assert result.kind == "internal-error"
+    assert result.error_code == "handler-exception"
+
+
 # --- 7. Intent / Result are frozen --------------------------------------
 
 def test_intent_and_result_are_frozen_dataclasses():
@@ -184,6 +282,15 @@ def test_intent_and_result_are_frozen_dataclasses():
         intent.type = "y"  # type: ignore[misc]
     with pytest.raises(Exception):
         result.kind = "validation-error"  # type: ignore[misc]
+
+
+def test_principal_scopes_are_immutable():
+    principal = Principal(id="api-key-1", scopes=("market.analyst.write",))
+
+    with pytest.raises(AttributeError):
+        principal.scopes.append("market.reviewer.write")  # type: ignore[attr-defined]
+    with pytest.raises(TypeError):
+        principal.scopes[0] = "market.reviewer.write"  # type: ignore[index]
 
 
 # --- 8. duplicate handler registration is rejected ----------------------

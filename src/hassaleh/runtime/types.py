@@ -11,7 +11,7 @@ See docs/sprint-13-plan.md §2.2. The shapes are fixed in v1:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Literal, Mapping
 
@@ -40,11 +40,11 @@ class Result:
 
 @dataclass(frozen=True)
 class Principal:
-    """Authenticated caller. `scopes` is an exact-match list of capability
+    """Authenticated caller. `scopes` is an exact-match tuple of capability
     strings granted on the ApiKey (plan §2.5)."""
 
     id: str
-    scopes: list[str] = field(default_factory=list)
+    scopes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

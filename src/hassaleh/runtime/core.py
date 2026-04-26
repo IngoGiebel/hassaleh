@@ -18,6 +18,8 @@ rolls back.
 
 from __future__ import annotations
 
+from dataclasses import replace
+from datetime import datetime, timezone
 from typing import Any, Callable, ContextManager, Dict, Tuple
 
 from .types import Ctx, Intent, Principal, Result
@@ -80,26 +82,59 @@ class HassalehRuntime:
                 error_message=f"missing required capability: {required_capability}",
             )
 
-        # 3+4. open tx, run handler (precondition+mutate inside ONE tx).
-        with self._session_factory() as session:
-            tx = session.begin_transaction()
-            try:
-                result = handler(intent, tx, ctx)
-            except Exception as exc:
-                tx.rollback()
-                return Result(
-                    kind="internal-error",
-                    data=None,
-                    error_code="handler-exception",
-                    error_message=f"{type(exc).__name__}: {exc}",
-                )
+        # Runtime-bound values (§2.4): callers supply identity, but the
+        # runtime owns the handler-visible UTC timestamp.
+        runtime_ctx = replace(ctx, now=datetime.now(timezone.utc))
 
-            # Commit IFF handler returned ok; any other kind rolls back.
-            if result.kind == "ok":
-                tx.commit()
-            else:
-                tx.rollback()
-            return result
+        # 3+4. open tx, run handler (precondition+mutate inside ONE tx).
+        try:
+            with self._session_factory() as session:
+                tx = session.begin_transaction()
+                try:
+                    result = handler(intent, tx, runtime_ctx)
+                except Exception as exc:
+                    try:
+                        tx.rollback()
+                    except Exception:
+                        # Preserve the original handler exception mapping;
+                        # Track D will get structured logging later.
+                        pass
+                    return Result(
+                        kind="internal-error",
+                        data=None,
+                        error_code="handler-exception",
+                        error_message=f"{type(exc).__name__}: {exc}",
+                    )
+
+                # Commit IFF handler returned ok; any other kind rolls back.
+                if result.kind == "ok":
+                    try:
+                        tx.commit()
+                    except Exception as exc:
+                        return Result(
+                            kind="internal-error",
+                            data=None,
+                            error_code="commit-failed",
+                            error_message=f"{type(exc).__name__}: {exc}",
+                        )
+                else:
+                    try:
+                        tx.rollback()
+                    except Exception as exc:
+                        return Result(
+                            kind="internal-error",
+                            data=None,
+                            error_code="rollback-failed",
+                            error_message=f"{type(exc).__name__}: {exc}",
+                        )
+                return result
+        except Exception as exc:
+            return Result(
+                kind="internal-error",
+                data=None,
+                error_code="session-open-failed",
+                error_message=f"{type(exc).__name__}: {exc}",
+            )
 
 
 __all__ = [

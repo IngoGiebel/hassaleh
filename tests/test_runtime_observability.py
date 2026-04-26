@@ -77,7 +77,7 @@ def _reset(monkeypatch):
 
 def _ctx(scopes=("market.analyst.write",), principal_id="api-key-7") -> Ctx:
     return Ctx(
-        principal=Principal(id=principal_id, scopes=list(scopes)),
+        principal=Principal(id=principal_id, scopes=tuple(scopes)),
         now=datetime(2026, 4, 24, 12, 0, tzinfo=timezone.utc),
     )
 
