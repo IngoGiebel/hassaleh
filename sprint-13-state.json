@@ -94,7 +94,7 @@
       "scope": "Observability wiring (spans, metrics, logs) per \u00a72.6",
       "author": "worker-opus",
       "reviewer": "inanna",
-      "phase": "dispatched",
+      "phase": "implemented",
       "dispatchedAt": "2026-04-24T17:13:00+02:00",
       "dependsOn": [],
       "round1Verdict": null,

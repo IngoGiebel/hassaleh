@@ -26,6 +26,7 @@ import pytest
 from opentelemetry import trace as otel_trace
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 from opentelemetry.util._once import Once
+from prometheus_client import REGISTRY as DEFAULT_PROM_REGISTRY
 
 from hassaleh.obs import logging as obs_logging
 from hassaleh.obs import tracing as obs_tracing
@@ -89,10 +90,11 @@ def _intent(type_="market.add-analyst-attempt", **payload) -> Intent:
 # ── §2.6 Metrics ─────────────────────────────────────────────────────────
 
 
-def test_record_metric_ticks_counter_with_intent_type_and_kebab_case_result():
+def test_record_metric_ticks_counter_with_intent_type_and_kebab_case_result(monkeypatch):
     """hassaleh_intent_total{intent_type, result} — two labels only.
 
     `result` uses kebab-case verbatim from `Result.kind` (no translation)."""
+    monkeypatch.setenv("HASSALEH_OBS", "on")
     intent = _intent()
     result = Result(
         kind="precondition-failed",
@@ -111,8 +113,9 @@ def test_record_metric_ticks_counter_with_intent_type_and_kebab_case_result():
     assert value == 1.0
 
 
-def test_record_metric_ticks_histogram_with_intent_type_label_only():
+def test_record_metric_ticks_histogram_with_intent_type_label_only(monkeypatch):
     """hassaleh_intent_duration_seconds has exactly one label: intent_type."""
+    monkeypatch.setenv("HASSALEH_OBS", "on")
     intent = _intent(type_="market.set-verdict")
     result = Result(kind="ok", data=None, error_code=None, error_message=None)
 
@@ -132,8 +135,9 @@ def test_record_metric_ticks_histogram_with_intent_type_label_only():
     assert total == pytest.approx(0.100, rel=1e-6)
 
 
-def test_counter_has_only_intent_type_and_result_labels():
+def test_counter_has_only_intent_type_and_result_labels(monkeypatch):
     """G-CR-3: capability_granted label was removed; two labels only."""
+    monkeypatch.setenv("HASSALEH_OBS", "on")
     obs.record_metric(
         _intent(),
         Result(kind="ok", data=None, error_code=None, error_message=None),
@@ -164,9 +168,10 @@ def test_counter_has_only_intent_type_and_result_labels():
         "internal-error",
     ],
 )
-def test_record_metric_per_label_tick_for_every_result_kind(kind):
+def test_record_metric_per_label_tick_for_every_result_kind(kind, monkeypatch):
     """Every §2.2 `ResultKind` value survives the round-trip unchanged
     (kebab-case hyphens, no underscore translation — G-CR-4)."""
+    monkeypatch.setenv("HASSALEH_OBS", "on")
     intent = _intent()
     result = Result(
         kind=kind,  # type: ignore[arg-type]
@@ -354,6 +359,60 @@ def test_emit_log_omits_trace_id_when_no_span_active(monkeypatch, capsys):
 
     payload = _parse_stderr_json(capsys.readouterr().err)
     assert "trace_id" not in payload
+
+
+# ── §4.2 / §5.2 Isolation & HASSALEH_OBS=off ──────────────────────────────
+
+
+def test_record_metric_noop_when_obs_off(monkeypatch):
+    """record_metric() with HASSALEH_OBS=off must NOT increment the counter."""
+    intent = _intent()
+    result = Result(kind="ok", data=None, error_code=None, error_message=None)
+
+    monkeypatch.setenv("HASSALEH_OBS", "on")
+    obs.record_metric(intent, result, duration_ms=10.0)
+    registry = obs.get_runtime_registry()
+    before = registry.get_sample_value(
+        "hassaleh_intent_total",
+        {"intent_type": intent.type, "result": "ok"},
+    )
+
+    monkeypatch.setenv("HASSALEH_OBS", "off")
+    obs.record_metric(intent, result, duration_ms=10.0)
+    after = registry.get_sample_value(
+        "hassaleh_intent_total",
+        {"intent_type": intent.type, "result": "ok"},
+    )
+    assert after == before == 1.0
+
+
+def test_emit_log_noop_when_obs_off(monkeypatch, capsys):
+    """emit_log() with HASSALEH_OBS=off must produce no structured-log output."""
+    monkeypatch.setenv("HASSALEH_OBS", "off")
+    monkeypatch.setenv("HASSALEH_ENV", "prod")
+    obs_logging.setup("hassaleh-daemon", "prod")
+
+    intent = _intent()
+    ctx = _ctx()
+    result = Result(kind="ok", data=None, error_code=None, error_message=None)
+    obs.emit_log(intent, ctx, result, duration_ms=1.0)
+
+    captured = capsys.readouterr()
+    assert "intent executed" not in captured.err
+    assert "intent executed" not in captured.out
+
+
+def test_cross_registry_isolation(monkeypatch):
+    """Ensure record_metric() uses the dedicated registry, not the default one."""
+    monkeypatch.setenv("HASSALEH_OBS", "on")
+    intent = _intent()
+    result = Result(kind="ok", data=None, error_code=None, error_message=None)
+    obs.record_metric(intent, result, duration_ms=1.0)
+    val = DEFAULT_PROM_REGISTRY.get_sample_value(
+        "hassaleh_intent_total",
+        {"intent_type": intent.type, "result": "ok"},
+    )
+    assert val is None
 
 
 # ── helpers are importable for Track A ───────────────────────────────────

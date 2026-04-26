@@ -118,7 +118,12 @@ def mutate_span():
 def record_metric(intent: Intent, result: Result, duration_ms: float) -> None:
     """Tick `hassaleh_intent_total{intent_type, result}` and observe
     `hassaleh_intent_duration_seconds{intent_type}`. `result.kind` is
-    used verbatim (kebab-case, no translation — §2.6 / G-CR-4)."""
+    used verbatim (kebab-case, no translation — §2.6 / G-CR-4).
+
+    Honours `HASSALEH_OBS=off` as a true zero-cost no-op: no registry
+    allocation, no counter/histogram tick, no Prometheus client touch."""
+    if not obs_tracing.is_obs_enabled():
+        return
     counter, histogram = _ensure_metrics()
     counter.labels(intent_type=intent.type, result=result.kind).inc()
     histogram.labels(intent_type=intent.type).observe(duration_ms / 1000.0)
@@ -129,7 +134,12 @@ def emit_log(
 ) -> None:
     """Emit one structlog line `"intent executed"` with the §2.6 field
     set: intent_type, trace_id (when a span is recording), duration_ms,
-    result, principal_id, and error_code (only when result != "ok")."""
+    result, principal_id, and error_code (only when result != "ok").
+
+    Honours `HASSALEH_OBS=off` as a true zero-cost no-op: no logger
+    bind, no field assembly, no stdlib log line."""
+    if not obs_tracing.is_obs_enabled():
+        return
     fields: dict[str, Any] = {
         "intent_type": intent.type,
         "duration_ms": duration_ms,
