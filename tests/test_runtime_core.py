@@ -14,8 +14,7 @@ Scenarios (per dispatch message and plan §2.4):
   6. non-ok handler result       → tx rolled back, result returned as-is
 """
 
-from __future__ import annotations
-
+from dataclasses import FrozenInstanceError
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
@@ -29,15 +28,15 @@ from hassaleh.runtime import (
     Result,
     register_handler,
 )
-from hassaleh.runtime.core import _REGISTRY
+from hassaleh.runtime.core import _reset_registry_for_tests
 
 
 @pytest.fixture(autouse=True)
 def _reset_registry():
     """Handlers are registered at module import; reset between tests."""
-    _REGISTRY.clear()
+    _reset_registry_for_tests()
     yield
-    _REGISTRY.clear()
+    _reset_registry_for_tests()
 
 
 @pytest.fixture
@@ -120,7 +119,7 @@ def test_handler_exception_returns_internal_error_and_rolls_back(session_factory
 def test_successful_dispatch_commits_and_returns_ok(session_factory):
     @register_handler("market.add-analyst-attempt", requires_capability="market.analyst.write")
     def _h(intent, tx, ctx):
-        return Result(kind="ok", data={"attempt_id": "a-1"}, error_code=None, error_message=None)
+        return Result.ok(data={"attempt_id": "a-1"})
 
     runtime = HassalehRuntime(session_factory=session_factory)
     result = runtime.execute(
@@ -141,7 +140,7 @@ def test_runtime_overrides_caller_supplied_now(session_factory):
     @register_handler("market.add-analyst-attempt", requires_capability="market.analyst.write")
     def _h(intent, tx, ctx):
         observed["now"] = ctx.now
-        return Result(kind="ok", data=None, error_code=None, error_message=None)
+        return Result.ok()
 
     runtime = HassalehRuntime(session_factory=session_factory)
     before = datetime.now(timezone.utc)
@@ -180,9 +179,7 @@ def test_canonical_order_validate_runs_before_capability_check(session_factory):
 def test_non_ok_handler_result_rolls_back_and_returns_as_is(session_factory):
     @register_handler("market.set-verdict", requires_capability="market.reviewer.write")
     def _h(intent, tx, ctx):
-        return Result(
-            kind="precondition-failed",
-            data=None,
+        return Result.precondition_failed(
             error_code="terminal-verdict-exists",
             error_message="cannot overwrite terminal verdict",
         )
@@ -203,7 +200,7 @@ def test_non_ok_handler_result_rolls_back_and_returns_as_is(session_factory):
 def test_commit_failure_returns_internal_error_without_raising(session_factory):
     @register_handler("market.add-analyst-attempt", requires_capability="market.analyst.write")
     def _h(intent, tx, ctx):
-        return Result(kind="ok", data=None, error_code=None, error_message=None)
+        return Result.ok()
 
     tx = _tx(session_factory)
     tx.commit.side_effect = RuntimeError("commit unavailable")
@@ -220,9 +217,7 @@ def test_commit_failure_returns_internal_error_without_raising(session_factory):
 def test_rollback_failure_returns_internal_error_without_raising(session_factory):
     @register_handler("market.set-verdict", requires_capability="market.reviewer.write")
     def _h(intent, tx, ctx):
-        return Result(
-            kind="precondition-failed",
-            data=None,
+        return Result.precondition_failed(
             error_code="terminal-verdict-exists",
             error_message="cannot overwrite terminal verdict",
         )
@@ -278,9 +273,9 @@ def test_handler_exception_preserved_when_rollback_also_fails(session_factory):
 def test_intent_and_result_are_frozen_dataclasses():
     intent = Intent(type="x", payload={})
     result = Result(kind="ok", data=None, error_code=None, error_message=None)
-    with pytest.raises(Exception):
+    with pytest.raises(FrozenInstanceError):
         intent.type = "y"  # type: ignore[misc]
-    with pytest.raises(Exception):
+    with pytest.raises(FrozenInstanceError):
         result.kind = "validation-error"  # type: ignore[misc]
 
 
@@ -304,3 +299,35 @@ def test_duplicate_handler_registration_raises():
         @register_handler("market.foo", requires_capability="x.y")
         def _b(intent, tx, ctx):  # pragma: no cover
             return Result(kind="ok", data=None, error_code=None, error_message=None)
+
+
+def test_empty_requires_capability_is_rejected():
+    with pytest.raises(ValueError, match="must be a non-empty string"):
+        @register_handler("market.foo", requires_capability="  ")
+        def _a(intent, tx, ctx):  # pragma: no cover
+            return Result(kind="ok", data=None, error_code=None, error_message=None)
+
+
+def test_instance_registry_isolation(session_factory):
+    """Verify that a runtime with an explicit registry is isolated from the
+    module-level singleton."""
+    local_registry = {}
+
+    def _h(intent, tx, ctx):
+        return Result(kind="ok", data={"source": "local"}, error_code=None, error_message=None)
+
+    # Manual registration into local_registry
+    local_registry["local.type"] = (_h, "local.cap")
+
+    runtime = HassalehRuntime(session_factory=session_factory, registry=local_registry)
+    ctx = _ctx(scopes=["local.cap"])
+
+    # Should succeed with local registry
+    result = runtime.execute(Intent(type="local.type", payload={}), ctx)
+    assert result.kind == "ok"
+    assert result.data == {"source": "local"}
+
+    # Should fail on module-level runtime (not registered there)
+    global_runtime = HassalehRuntime(session_factory=session_factory)
+    result_global = global_runtime.execute(Intent(type="local.type", payload={}), ctx)
+    assert result_global.kind == "validation-error"

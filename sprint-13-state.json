@@ -47,13 +47,20 @@
       "phase": "implemented",
       "dispatchedAt": "2026-04-24T16:53:00+02:00",
       "dependsOn": [],
-      "round1Verdict": null,
-      "mergedAt": null,
+      "round1Verdict": "change-req",
+      "mergedAt": "2026-04-30T14:35:00+02:00",
       "files": [
         "src/hassaleh/runtime/core.py",
         "src/hassaleh/runtime/types.py",
         "tests/test_runtime_core.py"
-      ]
+      ],
+      "round1Findings": [
+        "ctx-now-caller-supplied",
+        "runtime-re-raises-on-commit-rollback-open",
+        "principal-scopes-mutable-list"
+      ],
+      "round1FixCommit": "1499117",
+      "followUpFixesAt": "2026-04-30T13:55:00+02:00"
     },
     "B": {
       "scope": "Six Intent handlers (\u00a73.1-\u00a73.6) with Cypher preconditions and mutations",
@@ -97,14 +104,26 @@
       "phase": "implemented",
       "dispatchedAt": "2026-04-24T17:13:00+02:00",
       "dependsOn": [],
-      "round1Verdict": null,
+      "round1Verdict": "change-req",
       "mergedAt": null,
       "files": [
         "src/hassaleh/runtime/observability.py",
         "tests/test_runtime_observability.py"
       ],
       "originalAuthor": "worker-gemini",
-      "reassignedReason": "Per 2026-04-24 Ingo go: only-opus workers for now due to silent-failure pattern observed today in gemini + codex"
+      "reassignedReason": "Per 2026-04-24 Ingo go: only-opus workers for now due to silent-failure pattern observed today in gemini + codex",
+      "round1Findings": [
+        "record-metric-and-emit-log-ignore-HASSALEH_OBS=off"
+      ],
+      "round1FixCommit": "c0b04f1",
+      "integratedAt": "2026-04-30T14:35:00+02:00",
+      "dioneArbitrations": [
+        {
+          "date": "2026-04-26",
+          "choice": "a-six-line-fix",
+          "rationale": "spec amendment would erode plan discipline"
+        }
+      ]
     },
     "E": {
       "scope": "Market Pipeline migration to Intent dispatch",

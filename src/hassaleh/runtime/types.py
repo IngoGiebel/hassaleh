@@ -37,6 +37,26 @@ class Result:
     error_code: str | None
     error_message: str | None
 
+    @classmethod
+    def ok(cls, data: Mapping[str, Any] | None = None) -> Result:
+        return cls(kind="ok", data=data, error_code=None, error_message=None)
+
+    @classmethod
+    def precondition_failed(cls, error_code: str, error_message: str) -> Result:
+        return cls(kind="precondition-failed", data=None, error_code=error_code, error_message=error_message)
+
+    @classmethod
+    def internal_error(cls, error_code: str, error_message: str) -> Result:
+        return cls(kind="internal-error", data=None, error_code=error_code, error_message=error_message)
+
+    @classmethod
+    def validation_error(cls, error_code: str, error_message: str) -> Result:
+        return cls(kind="validation-error", data=None, error_code=error_code, error_message=error_message)
+
+    @classmethod
+    def capability_denied(cls, error_code: str, error_message: str) -> Result:
+        return cls(kind="capability-denied", data=None, error_code=error_code, error_message=error_message)
+
 
 @dataclass(frozen=True)
 class Principal:
