@@ -1,9 +1,10 @@
 # Sprint 14 — Runtime Operator Closure
 
 **Author:** Dione
-**Status:** v0 — pending agentic plan-review (Inanna + gemini-reviewer Round-1)
+**Status:** v1 — Round-1 CRs integrated (Inanna CLEAN, Nisaba CHANGE-REQ on §5.G + Track-G diff-surface); pending Nisaba Round-2 verify.
 **Created:** 2026-05-03
-**Sprint timeline (tentative):** starts on Round-2 CLEAN from both reviewers; ~3–4 working days.
+**Revised:** 2026-05-04 (v1)
+**Sprint timeline (tentative):** starts on Round-2 CLEAN from Nisaba; ~3–4 working days.
 **Review process:** identical to Sprint 13 §9 — see §6 below for the Round-1 dispatch commands.
 
 **Δ baseline:** Sprint 13 plan v1.1 FROZEN
@@ -152,30 +153,46 @@ shapes (§5 Sprint-13-plan); Track G is new.
 | **C** — Capability enforcement | Sprint-13 §5 Track-C scope. `ApiKey.scopes` schema + index, `check_scope()` helper, capability-test fixtures usable by B and F | worker-opus | Inanna | `src/hassaleh/runtime/capabilities.py`, `schema.cypher` (`CREATE INDEX apikey_scope`) |
 | **E** — Market Pipeline migration | Sprint-13 §5 Track-E scope. `scripts/market_state.py` becomes a thin wrapper that builds Intents and calls `HassalehRuntime.execute()`. Backwards-compat env flag `HASSALEH_RUNTIME_OPERATOR=1` per Sprint-13 §8. **Cleared as a precondition: Track-A's `Result.error_message` is now generic** (no longer leaks Cypher / parameter values to callers — see Track-A §"open items" #2) | worker-opus | Inanna | `scripts/market_state.py`, `scripts/market_state_legacy_export.py`, `tests/test_market_state_migration.py`, migration docs |
 | **F** — Integration tests | Sprint-13 §5 Track-F scope. End-to-end + crash-recovery (kill between precondition and mutation → graph unchanged) | dione-main | Inanna | `tests/test_runtime_e2e.py`, `tests/test_runtime_crash_recovery.py` |
-| **G** — Observability v1.0.1 patch | Closes the seven Track-D Round-1 advisories deferred per Dione's 2026-04-26 arbitration. **Scope is fixed and small** — see §5.G below for the per-advisory breakdown | worker-opus | Inanna (Round-1 only; if CLEAN no Round-2) | `src/hassaleh/runtime/observability.py`, `src/hassaleh/obs/tracing.py`, `tests/test_runtime_observability.py`, change-log entry in `docs/sprint-13-plan.md` |
+| **G** — Observability v1.0.1 patch | Closes the seven Track-D Round-1 advisories deferred per Dione's 2026-04-26 arbitration. **Scope is fixed and small** — see §5.G below for the per-advisory breakdown | worker-opus | Inanna (Round-1 only; if CLEAN no Round-2) | `src/hassaleh/runtime/observability.py`, `tests/test_runtime_observability.py` (~3 new tests), change-log entry in `docs/sprint-13-plan.md`. (D-A3 routes to Track E; not a Track-G code change.) |
 
 ### 5.G Track G — v1.0.1 patch breakdown
 
-The seven advisories from `docs/sprint-13-track-d-review.md` §6 (round-1)
-that Dione's 2026-04-26 arbitration deferred. Lifted from
-`docs/sprint-13-track-d-implement.md` and from Inanna's Round-2
-verification table:
+The seven advisories from `docs/sprint-13-track-d-review.md` §6 (Inanna's
+Sprint-13 Track-D Round-1 review) that Dione's 2026-04-26 arbitration
+deferred to v1.0.1.
 
-| ID | Title | Severity | Fix sketch |
-|----|-------|----------|------------|
-| **D-A1** | Lazy-init thread-safety in `_ensure_metrics()` | P1 (production-load risk) | `threading.Lock` around the `_metrics is None` check + assignment, OR module-load-time eager init guarded by `is_obs_enabled()` |
-| **D-A2** | Strippable `assert _registry is not None` under `python -O` | P2 (defense-in-depth) | Replace `assert` with `if _registry is None: raise RuntimeError(...)` so `python -O` does not strip it |
-| **D-A3** | Cross-sprint `hassaleh_intent_duration_seconds` family collision | P1 (cross-sprint reuse risk) | Add `sprint=` constant label or rename to `hassaleh_intent_duration_seconds_v1` if a Sprint-15 surface re-registers the same family |
-| **D-A4** | Counter-cardinality DoS via `intent_type` | P1 (production-load risk) | Allow-list of registered intent types; `record_metric` emits `intent_type="unknown"` for un-registered types |
-| **D-A5** | Sub-ms histogram resolution / 10ms floor | P2 (latency observability) | Adjust `Histogram` buckets to include sub-ms (e.g. add 0.0005, 0.001, 0.002, 0.005) for the `intent.validate` and `intent.capability_check` short-spans |
-| **D-A6** | `emit_log` does not call `obs_logging.setup()` | P2 (caller-contract surface) | Document the precondition explicitly in `observability.py` module docstring; add an integration test asserting setup-then-emit is the canonical sequence |
-| **D-A7** | `_LOGGER_NAME` vs `SERVICE_ENUM` confirmation | P2 (label naming consistency) | Confirm `_LOGGER_NAME = "hassaleh-daemon"` matches the structlog `service` enum; add cross-reference comment |
+This is a **normalized remediation table**, not a verbatim lift. The
+"Sprint-13 source (verbatim)" column quotes Inanna's §6 summary
+faithfully; the "Severity (Dione)" column is Dione's v1.0.1 priority
+labelling (not present in source); the "Sprint-14 proposed resolution"
+column is Dione's chosen v1.0.1 fix, which may differ from any specific
+suggestion in the source. Reviewers verifying source-fidelity should
+spot-check column 2 against `docs/sprint-13-track-d-review.md` §6 #1–#7.
+
+| ID | Sprint-13 source (verbatim, `docs/sprint-13-track-d-review.md` §6) | Severity (Dione) | Sprint-14 proposed resolution |
+|----|------------------------------------------------------------------|------------------|-------------------------------|
+| **D-A1** | §6 #1: "`_ensure_metrics()` lazy init is not thread-safe. Two concurrent first-callers can each create a `CollectorRegistry`; the second overwrites the first. … **Recommendation:** wrap the body in a `threading.Lock` *or* (preferred) eager-init at daemon startup so Track A never lazy-initializes from a request thread." | P1 (production-load risk) | Eager init at daemon startup, guarded by `is_obs_enabled()`, called from the runtime entrypoint **before** the first dispatch (preferred path from source). `_ensure_metrics()` retains a `threading.Lock` as defense-in-depth for any test or out-of-band caller. |
+| **D-A2** | §6 #2: "`assert _registry is not None` in `get_runtime_registry()` is strippable under `python -O`. … Trivial fix: rebind locally — `_, _ = _ensure_metrics(); return _registry` — or have `_ensure_metrics()` return the registry too." | P2 (defense-in-depth) | Have `_ensure_metrics()` return `(counter, histogram, registry)`; `get_runtime_registry()` calls it and returns the third element. No `assert`. (Equivalent to source's "have `_ensure_metrics()` return the registry too" alternative.) |
+| **D-A3** | §6 #3: "Same-name family collision across Sprint-12 and Sprint-13 — both define `hassaleh_intent_duration_seconds`, with `{stage}` and `{intent_type}` label sets respectively. Track D's dedicated-registry choice contains the implementation-side problem, but **Track E's `/metrics` exposure must scrape both registries (or expose them on separate paths) or Prometheus will reject one family.** This is a **plan-level** inconsistency; flagging for editorial reconciliation, not for Track D rework." | P1 (cross-sprint reuse risk) | Source frames this as a **Track-E /metrics exposure** decision, not a Track-D code change. Sprint-14 routes the resolution into Track E: the migration spec adds an explicit `/metrics` exposure rule (separate paths or merged scrape) and a dashboard-rule reconciliation note. **Track G itself takes no code action on D-A3.** |
+| **D-A4** | §6 #4: "Counter-cardinality DoS by `intent_type` is mitigated only because §3 closes the enum to six types. Track D itself does not validate `intent.type` is in that enum — it trusts Track A's pydantic validator. Defense in depth: a small whitelist guard inside `record_metric` would harden the boundary against a future Track A refactor regression. Non-blocking; out of §2.6 scope." | P1 (production-load risk) | Allow-list of the six §3 Intent types inside `record_metric`; un-registered types emit `intent_type="unknown"` and increment a separate guard counter `hassaleh_intent_unknown_type_total`. (Source called this "non-blocking, out of §2.6 scope"; Sprint-14 elects to land it as defense-in-depth.) |
+| **D-A5** | §6 #5: "Sub-ms histogram resolution. `_DURATION_BUCKETS` floor at 10ms; sub-ms RAM-only intents (e.g., a `validation-error` that fails before any Cypher) collapse into the smallest bucket and ruin p50 resolution. Out of §2.6 scope; v1.0.1 follow-up under 'Histogram-bucket tuning.'" | P2 (latency observability) | Add four sub-ms boundaries to `_DURATION_BUCKETS`: `0.0005, 0.001, 0.002, 0.005` (preserves the existing 0.01 anchor and all higher buckets). |
+| **D-A6** | §6 #6: "`emit_log` does not call `obs_logging.setup()`. Track D assumes Track A or the daemon entrypoint runs `obs_logging.setup('hassaleh-daemon', env)` before the first dispatch. Reasonable separation of concerns, but **worth surfacing in the Track A wire-up review:** failing to call setup means the structlog processor chain (including `pii_redaction_processor`) is bypassed." | P2 (caller-contract surface) | Source asks for **Track-A wire-up review surfacing**. Sprint-14 lands two complementary actions: (a) Track G adds a module-docstring precondition note + integration test asserting setup-then-emit is the canonical sequence; (b) Track-A non-blocking review (Sprint-14 §7.3) explicitly cites D-A6 in its setup-call path verification. |
+| **D-A7** | §6 #7: "`_LOGGER_NAME = 'hassaleh.runtime'` is **not** in `SERVICE_ENUM`. **This is correct** — `_LOGGER_NAME` is a logger name, not a service name; only `obs_logging.setup()` validates against `SERVICE_ENUM`. Track D's `get_logger(_LOGGER_NAME)` correctly bypasses that check. **Verifying for the record so a future refactor doesn't conflate the two.**" | P2 (anti-regression doc) | Source is an OBSERVATION confirming intentional separation, **not** a fix request. Sprint-14 lands a one-line cross-reference comment at the `_LOGGER_NAME` definition in `observability.py` documenting that the name is intentionally outside `SERVICE_ENUM` and pointing at `obs_logging.setup()` as the only `SERVICE_ENUM`-validated surface. **No code-name change.** |
 
 **Track G is bundled as ONE commit** with subject
 `sprint-14 Track G: observability v1.0.1 patch (D-A1..D-A7)`. The
 commit's body lists each advisory and the line-numbered fix.
 `docs/sprint-13-plan.md` change-log gets a v1.0.1 entry pointing at
 the Track-G commit SHA.
+
+**Diff surface (consolidated):** Track G touches **one source file**
+(`src/hassaleh/runtime/observability.py`) and **one test file**
+(`tests/test_runtime_observability.py`, ~3 new tests covering D-A1
+thread-safety, D-A4 unknown-type guard, D-A6 setup-then-emit). Plus
+the change-log entry in `docs/sprint-13-plan.md`. Track G does **not**
+touch `src/hassaleh/obs/tracing.py` (none of D-A1..D-A7 require it);
+the Track-E migration spec (Track E, separate commit) is the routing
+target for D-A3.
 
 ### 5.x Merge order (track sequencing)
 
@@ -220,11 +237,13 @@ audit would be a regression in the very class of bug the runtime
 operator was designed to make structurally impossible.
 
 **Open question for plan reviewers:** Track G's seven advisories are
-small enough (one file, six tests) that worker-codex could plausibly
-author them in a single dispatch under tighter Inanna scrutiny. Should
-Sprint 14 use Track G as a bounded re-trial of codex + gemini, or hold
-the only-opus stance? Default in v0: hold the stance. Reviewers may
-recommend revision.
+small enough (one source file `observability.py` + ~3 new tests in
+`test_runtime_observability.py` + a change-log entry; D-A3 is routed
+to Track E, not a Track-G code change) that worker-codex could
+plausibly author them in a single dispatch under tighter Inanna
+scrutiny. Should Sprint 14 use Track G as a bounded re-trial of codex
++ gemini, or hold the only-opus stance? Default in v0: hold the
+stance. Reviewers may recommend revision.
 
 ### 6.2 Sprint-14 cron + state file
 
@@ -371,5 +390,32 @@ focus on Sprint-14-specific decisions.
 
 - **2026-05-03 v0**: Initial draft. Δ to Sprint-13 plan v1.1.
   Five tracks (B, C, E, F, G). v1 will integrate Round-1 CRs.
+- **2026-05-04 v1**: Round-1 CR integration.
+  - Inanna R1 verdict: CLEAN (no changes required from Inanna).
+  - Nisaba R1 verdict: CHANGE-REQ. Three findings addressed:
+    - **BLOCKING (D-A7 source inversion)**: §5.G restructured as a
+      4-column normalized remediation table (ID | Sprint-13 source
+      verbatim | Severity (Dione's labels) | Sprint-14 proposed
+      resolution). D-A7 corrected: source is an OBSERVATION
+      confirming intentional separation between `_LOGGER_NAME =
+      "hassaleh.runtime"` and `SERVICE_ENUM`; v1.0.1 fix is a
+      cross-reference comment in `observability.py`, **not** a
+      logger-name change. The earlier v0 wording would have inverted
+      the source design intent.
+    - **ADVISORY (editorial fix-sketch drift)**: Each row's "Sprint-14
+      proposed resolution" column now explicitly distinguishes
+      Dione's chosen v1.0.1 fix from the source's wording. D-A3 is
+      explicitly re-routed from Track G to Track E (per source's
+      "plan-level inconsistency, not Track D rework"); D-A6 lands a
+      Track G code+doc change AND a Track-A wire-up review citation
+      (per source's request to surface in Track-A review).
+    - **ADVISORY (Track-G diff-surface inconsistency)**: §5 main
+      table, §5.x point 3, §5.G "Diff surface" paragraph, and §6.1
+      "small enough" wording all consolidated to one source file
+      (`observability.py`) + ~3 new tests + change-log entry.
+      `obs/tracing.py` removed from Track-G files.
+  - `sprint-14-state.json`: `tracks.G.files` updated to drop
+    `obs/tracing.py`.
+  - Inherited §1, §2, §3 untouched (anti-scope guard preserved).
 
 — Dione 🌙

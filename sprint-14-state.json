@@ -2,7 +2,7 @@
   "version": 1,
   "sprint": 14,
   "startedAt": "2026-05-03T22:55:00+02:00",
-  "planVersion": "v0",
+  "planVersion": "v1",
   "planCommitFrozen": null,
   "planBaseline": {
     "sprint": 13,
@@ -13,14 +13,24 @@
   "planReviews": {
     "round1": {
       "inanna": {
-        "verdict": null,
-        "findings": null,
-        "file": "docs/sprint-14-plan-review-1-inanna.md"
+        "verdict": "CLEAN",
+        "findings": "6 OBSERVATIONs, no blockers. Validates track-ordering, only-opus stance, Track-G v1.0.1-bundle scope, A-1 scheduling, Result.error_message cleared, FROZEN-marker (af6803b) vs content-commit (13dce84) convention.",
+        "file": "docs/sprint-14-plan-review-1-inanna.md",
+        "commit": "02d3c0b"
       },
+      "gemini": {
+        "verdict": "CHANGE-REQ",
+        "findings": "1 BLOCKING (§5.G D-A7 source inversion: source says _LOGGER_NAME='hassaleh.runtime' intentionally NOT in SERVICE_ENUM; v0 wrote 'hassaleh-daemon' and demanded enum-match) + 2 ADVISORY (editorial fix-sketches not source-verbatim for #2/#3/#6; Track-G diff-surface inconsistent across §5.x/§6.1/table). All addressed in v1.",
+        "file": "docs/sprint-14-plan-review-1-gemini.md",
+        "commit": "17254b9"
+      }
+    },
+    "round2": {
       "gemini": {
         "verdict": null,
         "findings": null,
-        "file": "docs/sprint-14-plan-review-1-gemini.md"
+        "file": "docs/sprint-14-plan-review-2-gemini.md",
+        "scope": "verify-only on R1 CRs: §5.G restructure + D-A7 correction + Track-G diff-surface consolidation. Do NOT regrade §1/§2/§3 or items already CLEAN in R1."
       }
     }
   },
@@ -95,18 +105,23 @@
       "mergedAt": null,
       "files": [
         "src/hassaleh/runtime/observability.py",
-        "src/hassaleh/obs/tracing.py",
         "tests/test_runtime_observability.py",
         "docs/sprint-13-plan.md"
       ],
       "advisoriesAddressed": [
         "D-A1-thread-safety",
         "D-A2-strippable-assert",
-        "D-A3-metric-family-collision",
         "D-A4-counter-cardinality-dos",
         "D-A5-sub-ms-histogram",
         "D-A6-emit-log-setup-contract",
-        "D-A7-logger-name-service-enum"
+        "D-A7-logger-name-service-enum-doc"
+      ],
+      "advisoriesRoutedElsewhere": [
+        {
+          "id": "D-A3-metric-family-collision",
+          "routedTo": "Track E",
+          "rationale": "Sprint-13 source frames D-A3 as a /metrics exposure plan-level inconsistency, not a Track-D code change; resolution belongs in Track-E migration spec (separate scrape paths or merged registry)."
+        }
       ]
     }
   },
