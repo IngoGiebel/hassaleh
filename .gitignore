@@ -36,3 +36,9 @@ neo4j/
 # Secrets
 .env
 *.key
+
+# Agent / local-dev artifacts
+.codex/
+.codex
+cmd_output.txt
+logs/
