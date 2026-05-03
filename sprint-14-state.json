@@ -2,7 +2,7 @@
   "version": 1,
   "sprint": 14,
   "startedAt": "2026-05-03T22:55:00+02:00",
-  "planVersion": "v1",
+  "planVersion": "v2",
   "planCommitFrozen": null,
   "planBaseline": {
     "sprint": 13,
@@ -27,10 +27,19 @@
     },
     "round2": {
       "gemini": {
+        "verdict": "CHANGE-REQ",
+        "findings": "Narrow: §5.G column-2 labelled 'verbatim' but contains ellipses and quote-style drift. Required correction: byte-faithful column 2 OR relabel as excerpt/paraphrase. Finding 3 (diff-surface) VERIFIED.",
+        "file": "docs/sprint-14-plan-review-2-gemini.md",
+        "commit": "e8c6185",
+        "scope": "verify-only on R1 CRs: §5.G restructure + D-A7 correction + Track-G diff-surface consolidation."
+      }
+    },
+    "round2b": {
+      "gemini": {
         "verdict": null,
         "findings": null,
-        "file": "docs/sprint-14-plan-review-2-gemini.md",
-        "scope": "verify-only on R1 CRs: §5.G restructure + D-A7 correction + Track-G diff-surface consolidation. Do NOT regrade §1/§2/§3 or items already CLEAN in R1."
+        "file": "docs/sprint-14-plan-review-2b-gemini.md",
+        "scope": "verify-only on R2 CR: §5.G column-2 relabel to 'excerpt' + explanatory-para update + D-A6/D-A7 quote-style alignment with source. Do NOT regrade R1 CLEAN items, R1 finding-3 (already VERIFIED), or §1/§2/§3 inheritance."
       }
     }
   },

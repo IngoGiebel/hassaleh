@@ -1,9 +1,9 @@
 # Sprint 14 — Runtime Operator Closure
 
 **Author:** Dione
-**Status:** v1 — Round-1 CRs integrated (Inanna CLEAN, Nisaba CHANGE-REQ on §5.G + Track-G diff-surface); pending Nisaba Round-2 verify.
+**Status:** v2 — Round-2 CR integrated (Nisaba R2 narrow CHANGE-REQ: §5.G column-2 "verbatim" label vs. byte-faithfulness); pending Nisaba Round-2b verify.
 **Created:** 2026-05-03
-**Revised:** 2026-05-04 (v1)
+**Revised:** 2026-05-04 (v1, then v2 same day)
 **Sprint timeline (tentative):** starts on Round-2 CLEAN from Nisaba; ~3–4 working days.
 **Review process:** identical to Sprint 13 §9 — see §6 below for the Round-1 dispatch commands.
 
@@ -161,23 +161,28 @@ The seven advisories from `docs/sprint-13-track-d-review.md` §6 (Inanna's
 Sprint-13 Track-D Round-1 review) that Dione's 2026-04-26 arbitration
 deferred to v1.0.1.
 
-This is a **normalized remediation table**, not a verbatim lift. The
-"Sprint-13 source (verbatim)" column quotes Inanna's §6 summary
-faithfully; the "Severity (Dione)" column is Dione's v1.0.1 priority
-labelling (not present in source); the "Sprint-14 proposed resolution"
-column is Dione's chosen v1.0.1 fix, which may differ from any specific
-suggestion in the source. Reviewers verifying source-fidelity should
-spot-check column 2 against `docs/sprint-13-track-d-review.md` §6 #1–#7.
+This is a **normalized remediation table**, not a byte-faithful lift.
+Column 2 is a **near-quote excerpt** (may include ellipses for
+length and minor punctuation normalization for readability) — the
+canonical, byte-faithful source is `docs/sprint-13-track-d-review.md`
+§6 #1–#7 (Inanna's Sprint-13 Track-D R1 review, FROZEN). Reviewers
+verifying source fidelity should treat that file as authoritative,
+not column 2.
 
-| ID | Sprint-13 source (verbatim, `docs/sprint-13-track-d-review.md` §6) | Severity (Dione) | Sprint-14 proposed resolution |
+The "Severity (Dione)" column is Dione's v1.0.1 priority labelling
+(not present in source). The "Sprint-14 proposed resolution" column
+is Dione's chosen v1.0.1 fix, which may differ from any specific
+suggestion in the source.
+
+| ID | Sprint-13 source (excerpt; canonical: `docs/sprint-13-track-d-review.md` §6) | Severity (Dione) | Sprint-14 proposed resolution |
 |----|------------------------------------------------------------------|------------------|-------------------------------|
 | **D-A1** | §6 #1: "`_ensure_metrics()` lazy init is not thread-safe. Two concurrent first-callers can each create a `CollectorRegistry`; the second overwrites the first. … **Recommendation:** wrap the body in a `threading.Lock` *or* (preferred) eager-init at daemon startup so Track A never lazy-initializes from a request thread." | P1 (production-load risk) | Eager init at daemon startup, guarded by `is_obs_enabled()`, called from the runtime entrypoint **before** the first dispatch (preferred path from source). `_ensure_metrics()` retains a `threading.Lock` as defense-in-depth for any test or out-of-band caller. |
 | **D-A2** | §6 #2: "`assert _registry is not None` in `get_runtime_registry()` is strippable under `python -O`. … Trivial fix: rebind locally — `_, _ = _ensure_metrics(); return _registry` — or have `_ensure_metrics()` return the registry too." | P2 (defense-in-depth) | Have `_ensure_metrics()` return `(counter, histogram, registry)`; `get_runtime_registry()` calls it and returns the third element. No `assert`. (Equivalent to source's "have `_ensure_metrics()` return the registry too" alternative.) |
 | **D-A3** | §6 #3: "Same-name family collision across Sprint-12 and Sprint-13 — both define `hassaleh_intent_duration_seconds`, with `{stage}` and `{intent_type}` label sets respectively. Track D's dedicated-registry choice contains the implementation-side problem, but **Track E's `/metrics` exposure must scrape both registries (or expose them on separate paths) or Prometheus will reject one family.** This is a **plan-level** inconsistency; flagging for editorial reconciliation, not for Track D rework." | P1 (cross-sprint reuse risk) | Source frames this as a **Track-E /metrics exposure** decision, not a Track-D code change. Sprint-14 routes the resolution into Track E: the migration spec adds an explicit `/metrics` exposure rule (separate paths or merged scrape) and a dashboard-rule reconciliation note. **Track G itself takes no code action on D-A3.** |
 | **D-A4** | §6 #4: "Counter-cardinality DoS by `intent_type` is mitigated only because §3 closes the enum to six types. Track D itself does not validate `intent.type` is in that enum — it trusts Track A's pydantic validator. Defense in depth: a small whitelist guard inside `record_metric` would harden the boundary against a future Track A refactor regression. Non-blocking; out of §2.6 scope." | P1 (production-load risk) | Allow-list of the six §3 Intent types inside `record_metric`; un-registered types emit `intent_type="unknown"` and increment a separate guard counter `hassaleh_intent_unknown_type_total`. (Source called this "non-blocking, out of §2.6 scope"; Sprint-14 elects to land it as defense-in-depth.) |
 | **D-A5** | §6 #5: "Sub-ms histogram resolution. `_DURATION_BUCKETS` floor at 10ms; sub-ms RAM-only intents (e.g., a `validation-error` that fails before any Cypher) collapse into the smallest bucket and ruin p50 resolution. Out of §2.6 scope; v1.0.1 follow-up under 'Histogram-bucket tuning.'" | P2 (latency observability) | Add four sub-ms boundaries to `_DURATION_BUCKETS`: `0.0005, 0.001, 0.002, 0.005` (preserves the existing 0.01 anchor and all higher buckets). |
-| **D-A6** | §6 #6: "`emit_log` does not call `obs_logging.setup()`. Track D assumes Track A or the daemon entrypoint runs `obs_logging.setup('hassaleh-daemon', env)` before the first dispatch. Reasonable separation of concerns, but **worth surfacing in the Track A wire-up review:** failing to call setup means the structlog processor chain (including `pii_redaction_processor`) is bypassed." | P2 (caller-contract surface) | Source asks for **Track-A wire-up review surfacing**. Sprint-14 lands two complementary actions: (a) Track G adds a module-docstring precondition note + integration test asserting setup-then-emit is the canonical sequence; (b) Track-A non-blocking review (Sprint-14 §7.3) explicitly cites D-A6 in its setup-call path verification. |
-| **D-A7** | §6 #7: "`_LOGGER_NAME = 'hassaleh.runtime'` is **not** in `SERVICE_ENUM`. **This is correct** — `_LOGGER_NAME` is a logger name, not a service name; only `obs_logging.setup()` validates against `SERVICE_ENUM`. Track D's `get_logger(_LOGGER_NAME)` correctly bypasses that check. **Verifying for the record so a future refactor doesn't conflate the two.**" | P2 (anti-regression doc) | Source is an OBSERVATION confirming intentional separation, **not** a fix request. Sprint-14 lands a one-line cross-reference comment at the `_LOGGER_NAME` definition in `observability.py` documenting that the name is intentionally outside `SERVICE_ENUM` and pointing at `obs_logging.setup()` as the only `SERVICE_ENUM`-validated surface. **No code-name change.** |
+| **D-A6** | §6 #6: "`emit_log` does not call `obs_logging.setup()`. Track D assumes Track A or the daemon entrypoint runs `obs_logging.setup("hassaleh-daemon", env)` before the first dispatch. Reasonable separation of concerns, but **worth surfacing in the Track A wire-up review:** failing to call setup means the structlog processor chain (including `pii_redaction_processor`) is bypassed." | P2 (caller-contract surface) | Source asks for **Track-A wire-up review surfacing**. Sprint-14 lands two complementary actions: (a) Track G adds a module-docstring precondition note + integration test asserting setup-then-emit is the canonical sequence; (b) Track-A non-blocking review (Sprint-14 §7.3) explicitly cites D-A6 in its setup-call path verification. |
+| **D-A7** | §6 #7: "`_LOGGER_NAME = "hassaleh.runtime"` is **not** in `SERVICE_ENUM`. **This is correct** — `_LOGGER_NAME` is a logger name, not a service name; only `obs_logging.setup()` validates against `SERVICE_ENUM`. Track D's `get_logger(_LOGGER_NAME)` correctly bypasses that check. **Verifying for the record so a future refactor doesn't conflate the two.**" | P2 (anti-regression doc) | Source is an OBSERVATION confirming intentional separation, **not** a fix request. Sprint-14 lands a one-line cross-reference comment at the `_LOGGER_NAME` definition in `observability.py` documenting that the name is intentionally outside `SERVICE_ENUM` and pointing at `obs_logging.setup()` as the only `SERVICE_ENUM`-validated surface. **No code-name change.** |
 
 **Track G is bundled as ONE commit** with subject
 `sprint-14 Track G: observability v1.0.1 patch (D-A1..D-A7)`. The
@@ -390,6 +395,20 @@ focus on Sprint-14-specific decisions.
 
 - **2026-05-03 v0**: Initial draft. Δ to Sprint-13 plan v1.1.
   Five tracks (B, C, E, F, G). v1 will integrate Round-1 CRs.
+- **2026-05-04 v2**: Round-2 CR integration (Nisaba R2 narrow CHANGE-REQ).
+  - **Finding 1+2 (column-2 verbatim claim)**: §5.G column-2 header
+    relabelled from "Sprint-13 source (verbatim, ...)" to
+    "Sprint-13 source (excerpt; canonical: docs/sprint-13-track-d-review.md
+    §6)". Explanatory paragraph updated to make explicit that column 2
+    is a near-quote excerpt with elided portions and the canonical
+    byte-faithful source is the FROZEN source file. Quote-style drift
+    fixed in two cells where it was easy to align (D-A6 single→double
+    quotes around "hassaleh-daemon"; D-A7 single→double quotes around
+    "hassaleh.runtime") to keep excerpts close to source.
+  - **Finding 3 (diff-surface)**: VERIFIED in R2; no further changes.
+  - Substance unchanged: D-A7 still resolves as cross-reference comment
+    (no logger-name change); D-A3 still routed to Track E; Track-G
+    diff surface still observability.py + ~3 tests + change-log entry.
 - **2026-05-04 v1**: Round-1 CR integration.
   - Inanna R1 verdict: CLEAN (no changes required from Inanna).
   - Nisaba R1 verdict: CHANGE-REQ. Three findings addressed:
