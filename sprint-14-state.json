@@ -3,7 +3,7 @@
   "sprint": 14,
   "startedAt": "2026-05-03T22:55:00+02:00",
   "planVersion": "v2.1",
-  "planCommitFrozen": "PENDING_MARKER_COMMIT",
+  "planCommitFrozen": "c268bb0",
   "planBaseline": {
     "sprint": 13,
     "planVersion": "v1.1",
