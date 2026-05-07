@@ -228,27 +228,36 @@ before Track F starts (Track F's e2e test exercises the migrated
 
 ### 6.1 Workers
 
-| Worker | Backing model | Sprint-14 role |
-|--------|---------------|----------------|
-| worker-opus | claude-opus-4-7 | Dione (orchestration, integration, Tracks B/C/E/G implementation) + Inanna (security + API reviews, separate session) |
-| dione-main | claude-opus-4-7 (this session) | Track F authoring (per Sprint-13 §5) |
-| worker-codex | gpt-5.4 | **Not used in Sprint 14.** Per 2026-04-24 only-opus policy. |
-| worker-gemini | gemini-3.1-pro-preview | **Not used in Sprint 14.** Per 2026-04-24 only-opus policy. |
+**Worker parity restored 2026-05-07** — S14-OQ-1 resolved by Ingo
+(REVERSED). All three workers are equal Sprint-14 contributors;
+cross-LLM verification (author worker foundation ≠ reviewer persona
+foundation) is now the explicit invariant.
 
-**Rationale for keeping the only-opus stance:** the silent-failure
-pattern in codex + gemini that triggered the 2026-04-24 reassignment
-has not been audited or addressed since. Lifting the policy without
-audit would be a regression in the very class of bug the runtime
-operator was designed to make structurally impossible.
+| Track | Author worker | Author foundation | Reviewer persona | Reviewer foundation | Cross-LLM? |
+|-------|---------------|-------------------|------------------|---------------------|------------|
+| C — Capabilities      | worker-gemini | Gemini | Nisaba 🌾 | Codex  | ✓ |
+| G — Obs v1.0.1 patch  | worker-codex  | Codex  | Dione 🌙  | Opus   | ✓ |
+| B — Intent handlers   | worker-opus   | Opus   | Inanna ⭐ | Gemini | ✓ |
+| E — Market migration  | worker-codex  | Codex  | Inanna ⭐ | Gemini | ✓ |
+| F — E2E + crash-rec   | dione-main    | Opus   | Nisaba 🌾 | Codex  | ✓ |
 
-**Open question for plan reviewers:** Track G's seven advisories are
-small enough (one source file `observability.py` + ~3 new tests in
-`test_runtime_observability.py` + a change-log entry; D-A3 is routed
-to Track E, not a Track-G code change) that worker-codex could
-plausibly author them in a single dispatch under tighter Inanna
-scrutiny. Should Sprint 14 use Track G as a bounded re-trial of codex
-+ gemini, or hold the only-opus stance? Default in v0: hold the
-stance. Reviewers may recommend revision.
+**Worker complexity-load:** worker-opus (B, ~6pt), worker-gemini
+(C, ~2pt), worker-codex (G+E, ~8pt), dione-main (F, ~5pt). Slight
+codex over-weight is intentional — Track G is a bounded test of
+whether worker-codex + opus-review can close the seven advisories
+that codex/gemini missed in Sprint-13 (D-A1..D-A7).
+
+**Reviewer load:** Inanna 2 tracks (B, E), Nisaba 2 tracks (C, F),
+Dione 1 track (G). Inanna additionally serves as Sprint-14 PM —
+see §6.4 below.
+
+### 6.1.b Project lead
+
+**Inanna ⭐ as Sprint-14 Projektleiterin** (added 2026-05-07).
+Cron-driven progress monitoring + autonomous-fix authority on stuck
+states. Full role specification: `skills/sprint-14-pm/SKILL.md`.
+Reporting flow: Inanna → Dione (aggregator) → Telegram to Ingo only
+on actionable issues or sprint-grenzen.
 
 ### 6.2 Sprint-14 cron + state file
 
@@ -393,6 +402,18 @@ focus on Sprint-14-specific decisions.
 
 ## Change log
 
+- **2026-05-07 v2.1**: S14-OQ-1 RESOLVED (Ingo, REVERSED). Worker parity
+  restored: §6.1 worker-allocation table updated to spread all 5 tracks
+  across worker-opus / worker-codex / worker-gemini with cross-LLM
+  verification (author foundation ≠ reviewer foundation) as explicit
+  invariant. Track-author updates: C → worker-gemini, E → worker-codex,
+  G → worker-codex (B and F unchanged). Reviewer updates: C → Nisaba,
+  G → Dione, F → Nisaba (B and E reviewers unchanged: Inanna). Track
+  ordering, scope, dependencies, merge gates, and §1–§5 inheritance
+  unchanged. Plan §6.1.b adds Inanna as Sprint-14 Projektleiterin with
+  PM cron and autonomous-fix authority (full spec in
+  `skills/sprint-14-pm/SKILL.md`). FROZEN-marker commit follows v2.1
+  content commit per Sprint-13 convention.
 - **2026-05-03 v0**: Initial draft. Δ to Sprint-13 plan v1.1.
   Five tracks (B, C, E, F, G). v1 will integrate Round-1 CRs.
 - **2026-05-04 v2**: Round-2 CR integration (Nisaba R2 narrow CHANGE-REQ).

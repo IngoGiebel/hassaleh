@@ -2,8 +2,8 @@
   "version": 1,
   "sprint": 14,
   "startedAt": "2026-05-03T22:55:00+02:00",
-  "planVersion": "v2",
-  "planCommitFrozen": null,
+  "planVersion": "v2.1",
+  "planCommitFrozen": "PENDING_MARKER_COMMIT",
   "planBaseline": {
     "sprint": 13,
     "planVersion": "v1.1",
@@ -35,11 +35,14 @@
       }
     },
     "round2b": {
-      "gemini": {
-        "verdict": null,
-        "findings": null,
+      "nisaba": {
+        "verdict": "CLEAN",
+        "findings": "All 5 narrow R2b verification items VERIFIED: (1a) §5.G col-2 header 'excerpt' not 'verbatim'; (1b) explanatory para declares near-quote excerpt + canonical FROZEN source; (1c) D-A7 double-quote style aligned; (2a) no residual 'verbatim' claim in §5.G; (2b) D-A6 double-quote style aligned. Plan is CLEAN-and-FROZEN-eligible.",
         "file": "docs/sprint-14-plan-review-2b-gemini.md",
-        "scope": "verify-only on R2 CR: §5.G column-2 relabel to 'excerpt' + explanatory-para update + D-A6/D-A7 quote-style alignment with source. Do NOT regrade R1 CLEAN items, R1 finding-3 (already VERIFIED), or §1/§2/§3 inheritance."
+        "commit": "c91d20c",
+        "scope": "verify-only on R2 CR: §5.G column-2 relabel to 'excerpt' + explanatory-para update + D-A6/D-A7 quote-style alignment with source. Do NOT regrade R1 CLEAN items, R1 finding-3 (already VERIFIED), or §1/§2/§3 inheritance.",
+        "verifiedAt": "2026-05-07T10:00:00+02:00",
+        "note": "Reviewer file uses 'gemini' header naming-legacy but reviewer is Nisaba (worker-codex)."
       }
     }
   },
@@ -47,7 +50,9 @@
     "B": {
       "scope": "Six Intent handlers (§3.1-§3.6) with Cypher preconditions and mutations; resolves Sprint-13 advisory A-1 at §3.2 SetVerdict; consumes Track-A's Result.error_message generic-leak fix as a precondition",
       "author": "worker-opus",
+      "authorFoundation": "opus",
       "reviewer": "inanna",
+      "reviewerFoundation": "gemini",
       "phase": "pending",
       "dependsOn": ["C"],
       "carryOverFrom": "sprint-13",
@@ -62,8 +67,10 @@
     },
     "C": {
       "scope": "Capability enforcement (scope list, exact-match check, schema addition + index)",
-      "author": "worker-opus",
-      "reviewer": "inanna",
+      "author": "worker-gemini",
+      "authorFoundation": "gemini",
+      "reviewer": "nisaba",
+      "reviewerFoundation": "codex",
       "phase": "pending",
       "dependsOn": [],
       "carryOverFrom": "sprint-13",
@@ -76,8 +83,10 @@
     },
     "E": {
       "scope": "Market Pipeline migration to Intent dispatch with HASSALEH_RUNTIME_OPERATOR env flag for backwards-compat per Sprint-13 §8",
-      "author": "worker-opus",
+      "author": "worker-codex",
+      "authorFoundation": "codex",
       "reviewer": "inanna",
+      "reviewerFoundation": "gemini",
       "phase": "pending",
       "dependsOn": ["A", "B", "C"],
       "carryOverFrom": "sprint-13",
@@ -92,7 +101,9 @@
     "F": {
       "scope": "End-to-end + crash-recovery integration tests asserting S1-S4 from Sprint-13 §1",
       "author": "dione-main",
-      "reviewer": "inanna",
+      "authorFoundation": "opus",
+      "reviewer": "nisaba",
+      "reviewerFoundation": "codex",
       "phase": "pending",
       "dependsOn": ["A", "B", "C", "D", "E"],
       "carryOverFrom": "sprint-13",
@@ -105,8 +116,10 @@
     },
     "G": {
       "scope": "Observability v1.0.1 patch — closes the seven Track-D Round-1 advisories (D-A1..D-A7) deferred per Dione's 2026-04-26 arbitration",
-      "author": "worker-opus",
-      "reviewer": "inanna",
+      "author": "worker-codex",
+      "authorFoundation": "codex",
+      "reviewer": "dione",
+      "reviewerFoundation": "opus",
       "phase": "pending",
       "dependsOn": [],
       "carryOverFrom": "sprint-13-track-d-review.md §6",
@@ -136,14 +149,45 @@
   },
   "orchestrator": {
     "cronId": "5d854f3b-8dea-4e5c-a680-9ba5eee1c64b",
-    "retarget": "pending",
-    "note": "Re-target to sprint-14-state.json after plan FROZEN. Currently still pointing at sprint-13-state.json from Sprint-13 P2 kickoff."
+    "retarget": "done",
+    "retargetedAt": "2026-05-07T10:30:00+02:00",
+    "note": "Re-targeted to sprint-14-state.json on plan FROZEN. Polls every 2h, fallback path for state-change-driven dispatch when authors/reviewers don't bus-message Dione directly."
+  },
+  "projectLead": {
+    "agent": "inanna",
+    "agentFoundation": "gemini",
+    "since": "2026-05-07",
+    "rationale": "Highest cross-track review load (B+E) + institutional memory across Sprint-12/13/14 + separation from orchestrator role (Dione). Watchdog with autonomous-fix authority per skills/sprint-14-pm/SKILL.md (Option A: process-only autonomy on own-reviewer tracks B/E).",
+    "cronIds": [
+      "PENDING_PM_CRON_MORNING",
+      "PENDING_PM_CRON_MIDDAY",
+      "PENDING_PM_CRON_EVENING",
+      "PENDING_PM_CRON_NIGHT"
+    ],
+    "thresholds": {
+      "reviewPhaseStuckHours": 12,
+      "implementPhaseStuckHours": 24,
+      "ciRedStuckHours": 2,
+      "round2NoRespHours": 18,
+      "noMergeByDay": 4
+    },
+    "loopProtection": {
+      "maxAutonomousAttemptsPerIssue": 2,
+      "followUpCronTtlHours": 6,
+      "maxActiveFollowUpCrons": 5
+    },
+    "reportingFlow": "Inanna PM-cron → bus to Dione (aggregator) → Telegram to Ingo only on actionable issues or sprint-grenze (G1/G2/G3/G4)",
+    "autonomousActions": [],
+    "activeFollowUpCrons": []
   },
   "advisories": [
     {
       "id": "S14-OQ-1",
       "fromReview": "sprint-14-plan v0 §6.1",
-      "scope": "Open question for plan reviewers: should Track G be a bounded re-trial of worker-codex/worker-gemini under tighter Inanna scrutiny, or hold the only-opus stance? v0 default: hold."
+      "scope": "Open question for plan reviewers: should Track G be a bounded re-trial of worker-codex/worker-gemini under tighter Inanna scrutiny, or hold the only-opus stance? v0 default: hold.",
+      "resolution": "REVERSED 2026-05-07 by Ingo: worker parity restored across all 5 tracks; only-opus stance dropped. Cross-LLM verification enforced (author worker foundation ≠ reviewer persona foundation). Track-G specifically: worker-codex authors with Dione (opus) review — bounded test of whether codex+opus-review can close the 7 advisories that codex/gemini missed in Sprint-13.",
+      "resolvedAt": "2026-05-07T09:47:00+02:00",
+      "resolvedBy": "ingo"
     }
   ]
 }
