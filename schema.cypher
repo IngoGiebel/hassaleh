@@ -65,6 +65,16 @@ CREATE CONSTRAINT discussion_id IF NOT EXISTS
 CREATE INDEX intent_lifecycle IF NOT EXISTS
   FOR (i:Intent) ON (i.lifecycle);
 
+// Sprint 13 / Track C — runtime capability checks
+// ApiKey.scopes is a list<string> property used for exact-match capability
+// checks at the Intent runtime boundary.
+CREATE INDEX apikey_scope IF NOT EXISTS
+  FOR (k:ApiKey) ON (k.scopes);
+
+// Sprint 13 / I-CR-4.2 — atomic duplicate-attempt guard.
+CREATE CONSTRAINT attempt_unique_per_segment IF NOT EXISTS
+  FOR (a:Attempt) REQUIRE (a.segment_id, a.n) IS UNIQUE;
+
 // ──────────────────────────────────────────
 // Sprint 12 / Track C — distributed tracing
 // ──────────────────────────────────────────

@@ -317,10 +317,10 @@ def test_instance_registry_isolation(session_factory):
         return Result(kind="ok", data={"source": "local"}, error_code=None, error_message=None)
 
     # Manual registration into local_registry
-    local_registry["local.type"] = (_h, "local.cap")
+    local_registry["local.type"] = (_h, "market.analyst.write")
 
     runtime = HassalehRuntime(session_factory=session_factory, registry=local_registry)
-    ctx = _ctx(scopes=["local.cap"])
+    ctx = _ctx(scopes=["market.analyst.write"])
 
     # Should succeed with local registry
     result = runtime.execute(Intent(type="local.type", payload={}), ctx)

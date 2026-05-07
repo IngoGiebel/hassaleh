@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 from typing import Any, Callable, Dict, Protocol, Tuple
 
 from . import observability as obs
+from .capabilities import check_scope
 from .types import Ctx, Intent, Result
 
 
@@ -113,7 +114,7 @@ class HassalehRuntime:
 
             # 2. capability_check — exact match against ApiKey.scopes (§2.5).
             with obs.capability_check_span():
-                if required_capability not in ctx.principal.scopes:
+                if not check_scope(ctx.principal, required_capability):
                     result = Result.capability_denied(
                         error_code="scope-not-granted",
                         error_message=f"missing required capability: {required_capability}",
