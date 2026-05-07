@@ -58,9 +58,9 @@
     "B": {
       "scope": "Six Intent handlers (§3.1-§3.6) with Cypher preconditions and mutations; resolves Sprint-13 advisory A-1 at §3.2 SetVerdict; consumes Track-A's Result.error_message generic-leak fix as a precondition",
       "author": "worker-opus",
-      "authorFoundation": "opus",
+      "authorFoundation": "Opus",
       "reviewer": "inanna",
-      "reviewerFoundation": "gemini",
+      "reviewerFoundation": "Gemini",
       "phase": "pending",
       "dependsOn": [
         "C"
@@ -80,12 +80,12 @@
     "C": {
       "scope": "Capability enforcement (scope list, exact-match check, schema addition + index)",
       "author": "worker-gemini",
-      "authorFoundation": "gemini",
+      "authorFoundation": "Gemini",
       "reviewer": "nisaba",
-      "reviewerFoundation": "codex",
-      "phase": "blocked",
-      "blockedReason": "gemini-3.1-pro-preview capacity exhausted across 2 dispatch attempts (11:00 + 11:39); maxAutonomousAttemptsPerIssue=2 reached; Ingo decision required (reroute author to codex/Nisaba vs hold for capacity recovery)",
-      "blockedSince": "2026-05-07T13:34:35+02:00",
+      "reviewerFoundation": "Codex",
+      "phase": "implement",
+      "blockedReason": null,
+      "blockedSince": null,
       "dependsOn": [],
       "carryOverFrom": "sprint-13",
       "round1Verdict": null,
@@ -99,31 +99,44 @@
       "dispatchHistory": [
         {
           "attempt": 1,
+          "workerId": "worker-gemini",
+          "foundation": "Gemini",
           "dispatchedAt": "2026-05-07T11:00:10+02:00",
           "dispatchBusJobId": "20260507-110010-dione-to-inanna-475452f4",
           "result": "failed",
+          "writtenBy": "orchestrator-cron-5d854f3b",
+          "viaFailover": false,
           "failureReason": "FailoverError: No capacity available for model gemini-3.1-pro-preview on the server",
-          "discoveredAt": "2026-05-07T11:34:00+02:00",
-          "discoveredBy": "orchestrator-cron-5d854f3b"
+          "discoveredAt": "2026-05-07T11:34:00+02:00"
         },
         {
           "attempt": 2,
+          "workerId": "worker-gemini",
+          "foundation": "Gemini",
           "dispatchedAt": "2026-05-07T11:39:30+02:00",
           "dispatchBusJobId": "20260507-113930-dione-to-inanna-5b96051a",
           "result": "failed",
+          "writtenBy": "orchestrator-cron-5d854f3b",
+          "viaFailover": false,
           "failureReason": "FailoverError: No capacity available for model gemini-3.1-pro-preview on the server (same as attempt 1; rc=1 finishedAt 11:43:22)",
-          "discoveredAt": "2026-05-07T13:34:35+02:00",
-          "discoveredBy": "orchestrator-cron-5d854f3b",
-          "lookErrorPriorObservation": "11:43 follow-up cron polled status mid-failure and read state=running; the job actually completed with rc=1 at 11:43:22 — three seconds after the snapshot. Single-poll gating is unsafe under fast-fail semantics."
+          "discoveredAt": "2026-05-07T13:34:35+02:00"
+        }
+      ],
+      "lastDispatchPrompt": "SPRINT-14 TRACK C — AUTHOR (worker-gemini × Nisaba review)\n\nYou are Inanna ⭐ (worker-gemini, Gemini foundation), authoring Track C of Sprint-14 in Hassaleh. Reviewer will be Nisaba (Codex foundation) — cross-LLM check.\n\n## Repo + branch\n\nRepo: ~/projects/hassaleh\nDefault: trunk (FROZEN at planCommitFrozen=c268bb0)\nAuthor branch: sprint-14/track-c (create from trunk)\nPush to: origin/sprint-14/track-c\n\n## Authoritative spec\n\nRead in this order before coding:\n1. ~/projects/hassaleh/docs/sprint-14-plan.md §5 Track C row (Capability enforcement scope) and §6.1 (worker parity)\n2. Sprint-13 §5 Track-C scope (carry-over baseline)\n3. Plan §3 Interface Specification (six Intent types — Track C must support all six's capability declarations)\n\n## Deliverables\n\nFiles to write/modify:\n- src/hassaleh/runtime/capabilities.py — new module with: ApiKey schema field `scopes: list[str]`, `check_scope(api_key, required_scope) -> bool`, capability-test fixtures usable by Track B + F. Ensure exact-match semantics (no prefix wildcards).\n- schema.cypher — add `CREATE INDEX apikey_scope IF NOT EXISTS FOR (k:ApiKey) ON (k.scopes)` and any uniqueness constraint Sprint-13 §8 / I-CR-4.2 prescribes for capabilities.\n- tests covering check_scope happy-path, missing-scope, empty-scopes-list, and scope-not-in-allowed-set.\n\nOut of scope: actual Intent handlers (Track B), market migration (Track E).\n\n## Process gates\n\n- One bundled commit on sprint-14/track-c branch with subject `sprint-14 Track C: capability enforcement`. Body lists the changes.\n- Push branch when ready.\n- DO NOT merge to trunk yourself — Nisaba reviews, then Dione merges per gate §7.1.\n- DO NOT modify sprint-14-state.json yourself — Dione/orchestrator owns that.\n\n## When done\n\nUpdate authorImplementedAt by emitting a Trinity Bus message back to Dione:\ntrinity-bus send --from inanna --to dione -m \"Track C author done: branch sprint-14/track-c at <SHA>\"\n\nIf blocked on something the spec doesn't cover, send a clarification request via Bus to Dione FIRST before committing partial work.\n",
+      "phaseHistory": [
+        {
+          "phase": "implement",
+          "at": "2026-05-07T12:31:30Z",
+          "note": "unblocked from blocked via Option X (failover-watcher takeover); state cleared for next watcher fire to dispatch fresh worker"
         }
       ]
     },
     "E": {
       "scope": "Market Pipeline migration to Intent dispatch with HASSALEH_RUNTIME_OPERATOR env flag for backwards-compat per Sprint-13 §8",
       "author": "worker-codex",
-      "authorFoundation": "codex",
+      "authorFoundation": "Codex",
       "reviewer": "inanna",
-      "reviewerFoundation": "gemini",
+      "reviewerFoundation": "Gemini",
       "phase": "pending",
       "dependsOn": [
         "A",
@@ -164,9 +177,9 @@
     "G": {
       "scope": "Observability v1.0.1 patch — closes the seven Track-D Round-1 advisories (D-A1..D-A7) deferred per Dione's 2026-04-26 arbitration",
       "author": "worker-codex",
-      "authorFoundation": "codex",
+      "authorFoundation": "Codex",
       "reviewer": "dione",
-      "reviewerFoundation": "opus",
+      "reviewerFoundation": "Opus",
       "phase": "review-pending",
       "dependsOn": [],
       "carryOverFrom": "sprint-13-track-d-review.md §6",
@@ -199,7 +212,20 @@
       "authorReturnedBranch": "sprint-14/track-g",
       "authorReturnedFiles": 4,
       "authorReturnedLines": "+195/-29",
-      "authorReturnedNotice": "trinity-bus from nisaba (worker-codex) → dione (worker-opus) at 2026-05-07T11:09:18+02:00"
+      "authorReturnedNotice": "trinity-bus from nisaba (worker-codex) → dione (worker-opus) at 2026-05-07T11:09:18+02:00",
+      "lastDispatchPrompt": "SPRINT-14 TRACK G — AUTHOR (worker-codex × Dione review)\n\nYou are Nisaba 🌾 (worker-codex, Codex foundation), authoring Track G (Observability v1.0.1 patch) of Sprint-14 in Hassaleh. Reviewer will be Dione (Opus foundation) — cross-LLM check.\n\n## Repo + branch\n\nRepo: ~/projects/hassaleh\nDefault: trunk (FROZEN at planCommitFrozen=c268bb0)\nAuthor branch: sprint-14/track-g (create from trunk)\nPush to: origin/sprint-14/track-g\n\n## Authoritative spec\n\nRead in this order before coding:\n1. ~/projects/hassaleh/docs/sprint-14-plan.md §5.G — the seven advisories table (D-A1..D-A7) with severity + chosen resolution.\n2. Canonical source: ~/projects/hassaleh/docs/sprint-13-track-d-review.md §6 #1–#7 — Inanna's Sprint-13 Track-D R1 review, FROZEN. Treat that file as authoritative for source fidelity, NOT the plan's column-2 excerpts.\n\n## Deliverables (one bundled commit)\n\nCode changes per §5.G:\n- D-A1: Eager init at daemon startup, guarded by `is_obs_enabled()`, called from runtime entrypoint BEFORE first dispatch. `_ensure_metrics()` retains `threading.Lock` as defense-in-depth.\n- D-A2: `_ensure_metrics()` returns `(counter, histogram, registry)`; `get_runtime_registry()` calls it and returns the registry. Remove the `assert _registry is not None`.\n- D-A3: NO Track-G code change. Routed to Track E.\n- D-A4: Allow-list of the six §3 Intent types inside `record_metric`; un-registered types emit `intent_type=\"unknown\"` and increment a separate guard counter `hassaleh_intent_unknown_type_total`.\n- D-A5: Add four sub-ms boundaries to `_DURATION_BUCKETS`: 0.0005, 0.001, 0.002, 0.005 (preserve existing 0.01 anchor and all higher buckets).\n- D-A6: (a) module-docstring precondition note in `observability.py` + (b) integration test asserting setup-then-emit canonical sequence.\n- D-A7: One-line cross-reference comment at `_LOGGER_NAME` definition documenting the intentional separation from `SERVICE_ENUM`. NO code-name change.\n\nFiles touched (per plan):\n- src/hassaleh/runtime/observability.py\n- tests/test_runtime_observability.py — ~3 new tests covering D-A1 thread-safety, D-A4 unknown-type guard, D-A6 setup-then-emit\n- docs/sprint-13-plan.md — change-log entry for v1.0.1 with this commit's SHA\n\nDO NOT touch src/hassaleh/obs/tracing.py (none of D-A1..D-A7 require it).\n\n## Process gates\n\n- ONE bundled commit on sprint-14/track-g with subject `sprint-14 Track G: observability v1.0.1 patch (D-A1..D-A7)`. Body lists each advisory and the line-numbered fix.\n- Push branch when ready.\n- DO NOT merge to trunk — Dione reviews, then merges per §7.1.\n- DO NOT modify sprint-14-state.json — Dione/orchestrator owns that.\n\n## When done\n\ntrinity-bus send --from nisaba --to dione -m \"Track G author done: branch sprint-14/track-g at <SHA>\"\n\nIf blocked, send Bus clarification to Dione before committing partial work.\n",
+      "dispatchHistory": [
+        {
+          "attempt": 1,
+          "workerId": "worker-codex",
+          "foundation": "Codex",
+          "dispatchedAt": "2026-05-07T09:00:44Z",
+          "dispatchBusJobId": "20260507-110014-dione-to-nisaba-a6707845",
+          "result": "dispatched",
+          "writtenBy": "backfill-2026-05-07-failover-migration",
+          "viaFailover": false
+        }
+      ]
     }
   },
   "orchestrator": {

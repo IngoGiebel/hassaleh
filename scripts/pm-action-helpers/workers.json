@@ -1,0 +1,29 @@
+{
+  "$schema": "Workers registry — source of truth for failover dispatcher. Add/remove workers here.",
+  "workers": [
+    {
+      "id": "worker-gemini",
+      "persona": "inanna",
+      "foundation": "Gemini",
+      "model": "google/gemini-3.1-pro-preview",
+      "enabled": true,
+      "notes": "Inanna ⭐ — primary author for Gemini-foundation tracks; PM-watchdog role parallel."
+    },
+    {
+      "id": "worker-codex",
+      "persona": "nisaba",
+      "foundation": "Codex",
+      "model": "openai-codex/gpt-5.5",
+      "enabled": true,
+      "notes": "Nisaba 🌾 — primary author for Codex-foundation tracks."
+    },
+    {
+      "id": "worker-opus",
+      "persona": "dione",
+      "foundation": "Opus",
+      "model": "anthropic/claude-opus-4-7",
+      "enabled": true,
+      "notes": "Dione 🌙 — primary author for Opus-foundation tracks; orchestrator role parallel."
+    }
+  ]
+}

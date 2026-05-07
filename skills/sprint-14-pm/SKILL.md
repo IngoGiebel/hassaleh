@@ -51,6 +51,33 @@ round2Verdict=CHANGE-REQ                                  → ESCALATE_ROUND3
 state-change >2h ago ∧ no bus-message logged from Dione   → DIONE_STALLED
 ```
 
+### 1c'. Failover-managed stalls — DEFER, do not act
+
+The failover-watcher cron (`hassaleh-failover-watcher`, every 15 min)
+is the **single writer** for `tracks.X.dispatchHistory[]` and the
+sole responder to capacity-errors. PM **must not** apply A1 (re-trigger)
+on a track that is in a failover-managed state.
+
+Detection rule:
+
+```
+track.phase = implement
+∧ track.dispatchHistory[].any(h.failureReason ~ /capacity|429|FailoverError/i)
+∧ (track.dispatchBusJobId = null
+    ∨ last-history-entry.result = "failed")
+→ FAILOVER_DOMAIN  → log-only, no autonomous action
+```
+
+For `FAILOVER_DOMAIN` issues:
+- Log a single A6 entry noting the deferral.
+- Do **not** dispatch A1, A4, A5 against the track.
+- Do **not** write to `dispatchHistory[]` from PM helpers.
+
+Rationale: parallel writers create dispatch-history schema drift and
+double-dispatches. Watcher owns capacity-recovery; PM owns process-level
+stalls. If failover-watcher itself looks broken (no fires in >30 min),
+that becomes a `DIONE_STALLED` issue against Dione, not a track-level one.
+
 ### 1d. Sprint-velocity
 
 ```

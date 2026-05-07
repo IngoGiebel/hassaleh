@@ -42,3 +42,6 @@ neo4j/
 .codex
 cmd_output.txt
 logs/
+
+# State-file cross-process locks (failover-watcher flock sentinels)
+*.json.lock
