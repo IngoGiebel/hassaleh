@@ -158,12 +158,18 @@
     "agentFoundation": "gemini",
     "since": "2026-05-07",
     "rationale": "Highest cross-track review load (B+E) + institutional memory across Sprint-12/13/14 + separation from orchestrator role (Dione). Watchdog with autonomous-fix authority per skills/sprint-14-pm/SKILL.md (Option A: process-only autonomy on own-reviewer tracks B/E).",
-    "cronIds": [
-      "PENDING_PM_CRON_MORNING",
-      "PENDING_PM_CRON_MIDDAY",
-      "PENDING_PM_CRON_EVENING",
-      "PENDING_PM_CRON_NIGHT"
-    ],
+    "cronIds": {
+      "morning": "33630c8f-57b1-41c1-a1f7-81d72a51ae32",
+      "midday":  "2b3b773a-9c5d-4ebf-b65d-c32297acc2c0",
+      "evening": "6ac9595a-849e-45e8-b48a-266d30050699",
+      "night":   "fa7c23c2-63e9-44ae-83f9-9d24f5cf573a"
+    },
+    "cronSchedule": {
+      "morning": "42 7 * * *",
+      "midday":  "23 12 * * *",
+      "evening": "38 17 * * *",
+      "night":   "17 23 * * *"
+    },
     "thresholds": {
       "reviewPhaseStuckHours": 12,
       "implementPhaseStuckHours": 24,
