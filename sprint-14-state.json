@@ -83,7 +83,9 @@
       "authorFoundation": "gemini",
       "reviewer": "nisaba",
       "reviewerFoundation": "codex",
-      "phase": "implement",
+      "phase": "blocked",
+      "blockedReason": "gemini-3.1-pro-preview capacity exhausted across 2 dispatch attempts (11:00 + 11:39); maxAutonomousAttemptsPerIssue=2 reached; Ingo decision required (reroute author to codex/Nisaba vs hold for capacity recovery)",
+      "blockedSince": "2026-05-07T13:34:35+02:00",
       "dependsOn": [],
       "carryOverFrom": "sprint-13",
       "round1Verdict": null,
@@ -92,8 +94,8 @@
         "src/hassaleh/runtime/capabilities.py",
         "schema.cypher"
       ],
-      "dispatchedAt": "2026-05-07T11:39:30+02:00",
-      "dispatchBusJobId": "20260507-113930-dione-to-inanna-5b96051a",
+      "dispatchedAt": null,
+      "dispatchBusJobId": null,
       "dispatchHistory": [
         {
           "attempt": 1,
@@ -108,9 +110,11 @@
           "attempt": 2,
           "dispatchedAt": "2026-05-07T11:39:30+02:00",
           "dispatchBusJobId": "20260507-113930-dione-to-inanna-5b96051a",
-          "result": "running",
-          "lastObservedAt": "2026-05-07T11:43:09+02:00",
-          "lastObservedBy": "orchestrator-cron-5d854f3b-followup"
+          "result": "failed",
+          "failureReason": "FailoverError: No capacity available for model gemini-3.1-pro-preview on the server (same as attempt 1; rc=1 finishedAt 11:43:22)",
+          "discoveredAt": "2026-05-07T13:34:35+02:00",
+          "discoveredBy": "orchestrator-cron-5d854f3b",
+          "lookErrorPriorObservation": "11:43 follow-up cron polled status mid-failure and read state=running; the job actually completed with rc=1 at 11:43:22 — three seconds after the snapshot. Single-poll gating is unsafe under fast-fail semantics."
         }
       ]
     },
@@ -253,6 +257,11 @@
       "phase": "phase-1",
       "at": "2026-05-07T09:00:44Z",
       "note": "Track C+G author dispatch fired async via trinity-bus"
+    },
+    {
+      "phase": "phase-1",
+      "at": "2026-05-07T13:34:35+02:00",
+      "note": "Track-C blocked at maxAutonomousAttemptsPerIssue=2 cap (gemini-3.1-pro-preview capacity exhausted on attempts 1+2); Track-G review-pending (review queued with Dione). Phase-1 cannot progress until Track-C author dispatches successfully; Phase-2 (Track-B), Phase-3 (Track-E), Phase-4 (Track-F) all gated. Ingo escalation issued."
     }
   ]
 }
