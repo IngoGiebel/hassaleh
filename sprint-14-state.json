@@ -330,7 +330,7 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-07T17:45:00+02:00",
+    "at": "2026-05-07T19:45:20+02:00",
     "observedBy": "orchestrator-cron-5d854f3b",
     "firePrompt": "cron 2h fallback dispatcher",
     "observations": {
@@ -340,7 +340,7 @@
         "reviewerFoundation": "Opus",
         "authorReturnedCommit": "e603f42c618e07c4a5970570292c0b8fd711b42e",
         "reviewerDispatchedAt": null,
-        "note": "review-pending since 15:08 (≈2.5h); reviewer=dione/Opus self; no auto-dispatch (substantive review = deliberate handling); next fire 19:45 escalates if still undispatched"
+        "note": "review-pending since 15:08 (≈4.6h); reviewer=dione/Opus self (main-session); below Inanna PM threshold of 12h"
       },
       "G": {
         "phase": "review-pending",
@@ -348,7 +348,7 @@
         "reviewerFoundation": "Opus",
         "authorReturnedCommit": "e49338c144363aaca52d7ff52408b9575f6a4cb7",
         "reviewerDispatchedAt": null,
-        "note": "review-pending since 11:09 (≈6.5h); reviewer=dione/Opus self; no auto-dispatch; next fire 19:45 escalates if still undispatched"
+        "note": "review-pending since 11:09 (≈8.6h); reviewer=dione/Opus self (main-session); approaching but still below Inanna PM threshold of 12h (would cross at 23:09)"
       },
       "B": {
         "phase": "pending",
@@ -364,7 +364,8 @@
       }
     },
     "actionsTaken": [],
-    "silentReason": "mid-sprint per Ingo policy (Sprint-Reviews: Zwischenschritte geloggt, nicht Telegram-gemeldet); no phase transition NEW since fire (last transitions logged in main-Dione memory at 11:09 + 15:08)"
+    "silentReason": "mid-sprint per Ingo policy (Sprint-Reviews: Zwischenschritte geloggt, nicht Telegram-gemeldet); no phase transition NEW since 17:45 fire; both review-pending tracks still below Inanna PM 12h threshold; Inanna evening PM cron (17:38) is canonical actionable-issue surface; orchestrator stays silent",
+    "supersedesPriorEscalationCommitment": "17:45 note suggested 'escalate at 19:45 if undispatched'; corrected by threshold-based policy — Track G at 8.6h is still pre-threshold, so no Telegram escalation"
   },
-  "updatedAt": "2026-05-07T17:45:00+02:00"
+  "updatedAt": "2026-05-07T19:45:20+02:00"
 }
