@@ -144,7 +144,7 @@
       "authorFoundation": "codex",
       "reviewer": "dione",
       "reviewerFoundation": "opus",
-      "phase": "implement",
+      "phase": "review-pending",
       "dependsOn": [],
       "carryOverFrom": "sprint-13-track-d-review.md §6",
       "round1Verdict": null,
@@ -170,7 +170,13 @@
         }
       ],
       "dispatchedAt": "2026-05-07T09:00:44Z",
-      "dispatchBusJobId": "20260507-110014-dione-to-nisaba-a6707845"
+      "dispatchBusJobId": "20260507-110014-dione-to-nisaba-a6707845",
+      "authorCompletedAt": "2026-05-07T11:09:18+02:00",
+      "authorReturnedCommit": "e49338c144363aaca52d7ff52408b9575f6a4cb7",
+      "authorReturnedBranch": "sprint-14/track-g",
+      "authorReturnedFiles": 4,
+      "authorReturnedLines": "+195/-29",
+      "authorReturnedNotice": "trinity-bus from nisaba (worker-codex) → dione (worker-opus) at 2026-05-07T11:09:18+02:00"
     }
   },
   "orchestrator": {
