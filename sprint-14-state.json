@@ -79,11 +79,11 @@
     },
     "C": {
       "scope": "Capability enforcement (scope list, exact-match check, schema addition + index)",
-      "author": "worker-gemini",
-      "authorFoundation": "Gemini",
-      "reviewer": "nisaba",
-      "reviewerFoundation": "Codex",
-      "phase": "implement",
+      "author": "worker-codex",
+      "authorFoundation": "Codex",
+      "reviewer": "dione",
+      "reviewerFoundation": "Opus",
+      "phase": "review-pending",
       "blockedReason": null,
       "blockedSince": null,
       "dependsOn": [],
@@ -94,8 +94,8 @@
         "src/hassaleh/runtime/capabilities.py",
         "schema.cypher"
       ],
-      "dispatchedAt": null,
-      "dispatchBusJobId": null,
+      "dispatchedAt": "2026-05-07T13:01:09Z",
+      "dispatchBusJobId": "20260507-150109-dione-to-nisaba-fbcc09b7",
       "dispatchHistory": [
         {
           "attempt": 1,
@@ -120,6 +120,16 @@
           "viaFailover": false,
           "failureReason": "FailoverError: No capacity available for model gemini-3.1-pro-preview on the server (same as attempt 1; rc=1 finishedAt 11:43:22)",
           "discoveredAt": "2026-05-07T13:34:35+02:00"
+        },
+        {
+          "attempt": 3,
+          "workerId": "worker-codex",
+          "foundation": "Codex",
+          "dispatchedAt": "2026-05-07T13:01:09Z",
+          "dispatchBusJobId": "20260507-150109-dione-to-nisaba-fbcc09b7",
+          "result": "dispatched",
+          "writtenBy": "failover-watcher",
+          "viaFailover": true
         }
       ],
       "lastDispatchPrompt": "SPRINT-14 TRACK C — AUTHOR (worker-gemini × Nisaba review)\n\nYou are Inanna ⭐ (worker-gemini, Gemini foundation), authoring Track C of Sprint-14 in Hassaleh. Reviewer will be Nisaba (Codex foundation) — cross-LLM check.\n\n## Repo + branch\n\nRepo: ~/projects/hassaleh\nDefault: trunk (FROZEN at planCommitFrozen=c268bb0)\nAuthor branch: sprint-14/track-c (create from trunk)\nPush to: origin/sprint-14/track-c\n\n## Authoritative spec\n\nRead in this order before coding:\n1. ~/projects/hassaleh/docs/sprint-14-plan.md §5 Track C row (Capability enforcement scope) and §6.1 (worker parity)\n2. Sprint-13 §5 Track-C scope (carry-over baseline)\n3. Plan §3 Interface Specification (six Intent types — Track C must support all six's capability declarations)\n\n## Deliverables\n\nFiles to write/modify:\n- src/hassaleh/runtime/capabilities.py — new module with: ApiKey schema field `scopes: list[str]`, `check_scope(api_key, required_scope) -> bool`, capability-test fixtures usable by Track B + F. Ensure exact-match semantics (no prefix wildcards).\n- schema.cypher — add `CREATE INDEX apikey_scope IF NOT EXISTS FOR (k:ApiKey) ON (k.scopes)` and any uniqueness constraint Sprint-13 §8 / I-CR-4.2 prescribes for capabilities.\n- tests covering check_scope happy-path, missing-scope, empty-scopes-list, and scope-not-in-allowed-set.\n\nOut of scope: actual Intent handlers (Track B), market migration (Track E).\n\n## Process gates\n\n- One bundled commit on sprint-14/track-c branch with subject `sprint-14 Track C: capability enforcement`. Body lists the changes.\n- Push branch when ready.\n- DO NOT merge to trunk yourself — Nisaba reviews, then Dione merges per gate §7.1.\n- DO NOT modify sprint-14-state.json yourself — Dione/orchestrator owns that.\n\n## When done\n\nUpdate authorImplementedAt by emitting a Trinity Bus message back to Dione:\ntrinity-bus send --from inanna --to dione -m \"Track C author done: branch sprint-14/track-c at <SHA>\"\n\nIf blocked on something the spec doesn't cover, send a clarification request via Bus to Dione FIRST before committing partial work.\n",
@@ -128,8 +138,37 @@
           "phase": "implement",
           "at": "2026-05-07T12:31:30Z",
           "note": "unblocked from blocked via Option X (failover-watcher takeover); state cleared for next watcher fire to dispatch fresh worker"
+        },
+        {
+          "phase": "review-pending",
+          "at": "2026-05-07T15:08:00+02:00",
+          "note": "Author worker-codex (Nisaba) committed e603f42 on sprint-14/track-c. Reviewer reassigned dione/Opus (cross-LLM restoration). See reviewerReassignment for rationale."
         }
-      ]
+      ],
+      "crossLLMViolated": true,
+      "crossLLMViolations": [
+        {
+          "at": "2026-05-07T13:01:09Z",
+          "newAuthor": "worker-codex",
+          "newFoundation": "Codex",
+          "reviewerFoundation": "Codex",
+          "reason": "failover-capacity",
+          "resolvedAt": "2026-05-07T15:08:00+02:00",
+          "resolvedBy": "reviewer-reassignment-dione-opus"
+        }
+      ],
+      "authorCompletedAt": "2026-05-07T15:05:42+02:00",
+      "authorReturnedCommit": "e603f42c618e07c4a5970570292c0b8fd711b42e",
+      "authorReturnedBranch": "sprint-14/track-c",
+      "authorReturnedNotice": "trinity-bus from nisaba (worker-codex) → dione (worker-opus) at 2026-05-07T15:05:42+02:00",
+      "reviewerReassignment": {
+        "originalReviewer": "nisaba",
+        "originalReviewerFoundation": "Codex",
+        "newReviewer": "dione",
+        "newReviewerFoundation": "Opus",
+        "at": "2026-05-07T15:08:00+02:00",
+        "reason": "crossLLMViolated=true after failover-watcher reassigned author worker-gemini→worker-codex (Codex). Original reviewer Nisaba is also Codex; self-review would compound the violation. Dione/Opus restores cross-foundation review (Codex × Opus). Routes around the Gemini capacity failure that triggered the failover."
+      }
     },
     "E": {
       "scope": "Market Pipeline migration to Intent dispatch with HASSALEH_RUNTIME_OPERATOR env flag for backwards-compat per Sprint-13 §8",
