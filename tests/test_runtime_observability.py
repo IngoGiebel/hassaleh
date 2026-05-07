@@ -20,6 +20,7 @@ Covers §2.6 (authoritative):
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
 import pytest
@@ -30,7 +31,7 @@ from prometheus_client import REGISTRY as DEFAULT_PROM_REGISTRY
 
 from hassaleh.obs import logging as obs_logging
 from hassaleh.obs import tracing as obs_tracing
-from hassaleh.runtime import Ctx, Intent, Principal, Result
+from hassaleh.runtime import Ctx, HassalehRuntime, Intent, Principal, Result
 from hassaleh.runtime import observability as obs
 
 
@@ -90,6 +91,30 @@ def _intent(type_="market.add-analyst-attempt", **payload) -> Intent:
 # ── §2.6 Metrics ─────────────────────────────────────────────────────────
 
 
+def test_ensure_metrics_is_thread_safe_under_concurrent_cold_start(monkeypatch):
+    """D-A1: concurrent first-callers all observe the same registry."""
+    monkeypatch.setenv("HASSALEH_OBS", "on")
+
+    def _registry_id(_: int) -> int:
+        return id(obs.get_runtime_registry())
+
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        registry_ids = set(pool.map(_registry_id, range(64)))
+
+    assert len(registry_ids) == 1
+
+
+def test_runtime_constructor_eager_initializes_metrics_when_obs_enabled(monkeypatch):
+    """D-A1: runtime entrypoint initializes metrics before first dispatch."""
+    monkeypatch.setenv("HASSALEH_OBS", "on")
+
+    HassalehRuntime(session_factory=lambda: None)  # type: ignore[arg-type]
+
+    assert obs.get_runtime_registry().get_sample_value(
+        "hassaleh_intent_unknown_type_total"
+    ) == 0.0
+
+
 def test_record_metric_ticks_counter_with_intent_type_and_kebab_case_result(monkeypatch):
     """hassaleh_intent_total{intent_type, result} — two labels only.
 
@@ -133,6 +158,14 @@ def test_record_metric_ticks_histogram_with_intent_type_label_only(monkeypatch):
     assert count == 1.0
     # duration passed in ms, exposed in seconds.
     assert total == pytest.approx(0.100, rel=1e-6)
+    assert registry.get_sample_value(
+        "hassaleh_intent_duration_seconds_bucket",
+        {"intent_type": "market.set-verdict", "le": "0.005"},
+    ) == 0.0
+    assert registry.get_sample_value(
+        "hassaleh_intent_duration_seconds_bucket",
+        {"intent_type": "market.set-verdict", "le": "0.1"},
+    ) == 1.0
 
 
 def test_counter_has_only_intent_type_and_result_labels(monkeypatch):
@@ -189,6 +222,29 @@ def test_record_metric_per_label_tick_for_every_result_kind(kind, monkeypatch):
     )
     assert value == 1.0, f"expected one tick for result={kind!r}"
 
+
+
+def test_record_metric_maps_unregistered_intent_type_to_unknown(monkeypatch):
+    """D-A4: unknown intent types do not create unbounded label cardinality."""
+    monkeypatch.setenv("HASSALEH_OBS", "on")
+    result = Result(
+        kind="validation-error", data=None, error_code="x", error_message=None
+    )
+
+    obs.record_metric(
+        _intent(type_="future.unregistered-intent"), result, duration_ms=1.0
+    )
+
+    registry = obs.get_runtime_registry()
+    assert registry.get_sample_value(
+        "hassaleh_intent_total",
+        {"intent_type": "unknown", "result": "validation-error"},
+    ) == 1.0
+    assert registry.get_sample_value("hassaleh_intent_unknown_type_total") == 1.0
+    assert registry.get_sample_value(
+        "hassaleh_intent_total",
+        {"intent_type": "future.unregistered-intent", "result": "validation-error"},
+    ) is None
 
 # ── §2.6 Tracing: four child spans in order ──────────────────────────────
 
@@ -361,6 +417,25 @@ def test_emit_log_omits_trace_id_when_no_span_active(monkeypatch, capsys):
     assert "trace_id" not in payload
 
 
+
+def test_setup_then_emit_is_canonical_sequence(monkeypatch, capsys):
+    """D-A6: daemon setup installs the structlog processor chain before emit."""
+    monkeypatch.setenv("HASSALEH_OBS", "on")
+    monkeypatch.setenv("HASSALEH_ENV", "prod")
+
+    obs_logging.setup("hassaleh-daemon", "prod")
+    obs.emit_log(
+        _intent(),
+        _ctx(),
+        Result(kind="ok", data=None, error_code=None, error_message=None),
+        duration_ms=3.5,
+    )
+
+    payload = _parse_stderr_json(capsys.readouterr().err)
+    assert payload["msg"] == "intent executed"
+    assert payload["service"] == "hassaleh-daemon"
+    assert payload["env"] == "prod"
+
 # ── §4.2 / §5.2 Isolation & HASSALEH_OBS=off ──────────────────────────────
 
 
@@ -429,5 +504,6 @@ def test_public_surface_is_exported():
         "record_metric",
         "emit_log",
         "get_runtime_registry",
+        "initialize_runtime_metrics",
     ):
         assert hasattr(obs, name), f"observability module missing {name!r}"

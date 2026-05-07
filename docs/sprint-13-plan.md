@@ -1250,3 +1250,24 @@ issue rather than v1.1.
   hand. The plan is FROZEN as v1.1 and ready for §6.5 Phase P2
   (Track A + Track D kickoff) pending Ingo's operational go for worker
   dispatch.
+- **2026-05-07 v1.0.1 Track G observability patch**: Sprint-14 Track G
+  closes the seven Sprint-13 Track-D Round-1 advisories D-A1..D-A7 in
+  one bundled author commit on `sprint-14/track-g` (commit SHA recorded
+  by the branch HEAD that contains this change-log entry; self-embedding
+  the final Git SHA in the file is intentionally avoided because it would
+  change the commit hash). Summary:
+  - D-A1: eager runtime metrics initialization from `HassalehRuntime.__init__`,
+    guarded by `HASSALEH_OBS=on`; `_ensure_metrics()` now retains a lock
+    for concurrent cold-start callers.
+  - D-A2: `_ensure_metrics()` returns counter, histogram, and registry;
+    `get_runtime_registry()` returns the local registry without a
+    strippable `assert`.
+  - D-A3: no Track-G code change; routed to Track E per Sprint-14 plan.
+  - D-A4: runtime metrics clamp unregistered intent types to
+    `intent_type="unknown"` and tick `hassaleh_intent_unknown_type_total`.
+  - D-A5: histogram buckets add `0.0005`, `0.001`, `0.002`, and `0.005`
+    while preserving the existing `0.01` anchor and higher buckets.
+  - D-A6: `observability.py` documents the setup-before-emit precondition
+    and tests lock the canonical setup-then-emit sequence.
+  - D-A7: `_LOGGER_NAME` now carries an anti-regression comment documenting
+    logger-name separation from the `SERVICE_ENUM`-validated setup surface.

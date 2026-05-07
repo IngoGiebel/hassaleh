@@ -90,6 +90,7 @@ class HassalehRuntime:
         session_factory: SessionFactory,
         registry: Dict[str, Tuple[Handler, str]] | None = None,
     ) -> None:
+        obs.initialize_runtime_metrics()
         self._session_factory = session_factory
         self._registry = registry if registry is not None else _REGISTRY
 

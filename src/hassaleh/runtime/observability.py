@@ -20,11 +20,17 @@ coexist with the existing Sprint-12 metric family — the Sprint-12
 §2.6 declares an ``intent_type``-labelled histogram under the same
 name. Prometheus rejects two same-named metrics with different label
 sets in one registry, so this module keeps its own registry.
+
+Caller precondition: the daemon/runtime entrypoint must run
+``hassaleh.obs.logging.setup("hassaleh-daemon", env)`` before the first
+dispatch. ``emit_log`` deliberately does not configure structlog itself;
+it assumes the entrypoint-installed processor chain is already active.
 """
 
 from __future__ import annotations
 
 import contextlib
+import threading
 from typing import Any, Iterator
 
 from opentelemetry import trace as otel_trace
@@ -42,39 +48,93 @@ _CHILD_SPAN_NAMES = (
     "intent.precondition",
     "intent.mutate",
 )
-_DURATION_BUCKETS = (0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0)
+_DURATION_BUCKETS = (
+    0.0005,
+    0.001,
+    0.002,
+    0.005,
+    0.01,
+    0.05,
+    0.1,
+    0.25,
+    0.5,
+    1.0,
+    2.5,
+    5.0,
+    10.0,
+)
+# Logger names intentionally bypass SERVICE_ENUM; obs_logging.setup() is the
+# only SERVICE_ENUM-validated service-name surface.
 _LOGGER_NAME = "hassaleh.runtime"
+
+_ALLOWED_INTENT_TYPES = frozenset(
+    {
+        "market.add-analyst-attempt",
+        "market.set-verdict",
+        "market.register-writer-attempt",
+        "market.update-writer-attempt",
+        "market.update-writer-attempt-by-publisher",
+        "market.set-published",
+    }
+)
 
 _registry: CollectorRegistry | None = None
 _intent_total: Counter | None = None
 _intent_duration: Histogram | None = None
+_intent_unknown_type_total: Counter | None = None
+_metrics_lock = threading.Lock()
 
 
-def _ensure_metrics() -> tuple[Counter, Histogram]:
-    global _registry, _intent_total, _intent_duration
-    if _intent_total is None or _intent_duration is None:
-        _registry = CollectorRegistry(auto_describe=True)
-        _intent_total = Counter(
-            "hassaleh_intent_total",
-            "Intent dispatch terminal outcomes (Sprint-13 runtime).",
-            labelnames=("intent_type", "result"),
-            registry=_registry,
-        )
-        _intent_duration = Histogram(
-            "hassaleh_intent_duration_seconds",
-            "Intent dispatch wall duration from validate through commit/rollback.",
-            labelnames=("intent_type",),
-            buckets=_DURATION_BUCKETS,
-            registry=_registry,
-        )
-    return _intent_total, _intent_duration
+def _ensure_metrics() -> tuple[Counter, Histogram, CollectorRegistry]:
+    global _registry, _intent_total, _intent_duration, _intent_unknown_type_total
+    if (
+        _registry is None
+        or _intent_total is None
+        or _intent_duration is None
+        or _intent_unknown_type_total is None
+    ):
+        with _metrics_lock:
+            if (
+                _registry is None
+                or _intent_total is None
+                or _intent_duration is None
+                or _intent_unknown_type_total is None
+            ):
+                registry = CollectorRegistry(auto_describe=True)
+                _registry = registry
+                _intent_total = Counter(
+                    "hassaleh_intent_total",
+                    "Intent dispatch terminal outcomes (Sprint-13 runtime).",
+                    labelnames=("intent_type", "result"),
+                    registry=registry,
+                )
+                _intent_duration = Histogram(
+                    "hassaleh_intent_duration_seconds",
+                    "Intent dispatch wall duration from validate through commit/rollback.",
+                    labelnames=("intent_type",),
+                    buckets=_DURATION_BUCKETS,
+                    registry=registry,
+                )
+                _intent_unknown_type_total = Counter(
+                    "hassaleh_intent_unknown_type_total",
+                    "Intent metric emissions with unregistered intent.type labels.",
+                    registry=registry,
+                )
+    if _intent_total is None or _intent_duration is None or _registry is None:
+        raise RuntimeError("runtime metrics registry not initialized")
+    return _intent_total, _intent_duration, _registry
+
+
+def initialize_runtime_metrics() -> None:
+    """Eagerly initialize the runtime metrics registry when OBS is enabled."""
+    if obs_tracing.is_obs_enabled():
+        _ensure_metrics()
 
 
 def get_runtime_registry() -> CollectorRegistry:
     """Dedicated registry for the two Sprint-13 runtime metrics."""
-    _ensure_metrics()
-    assert _registry is not None  # _ensure_metrics() establishes it
-    return _registry
+    _, _, registry = _ensure_metrics()
+    return registry
 
 
 @contextlib.contextmanager
@@ -124,9 +184,15 @@ def record_metric(intent: Intent, result: Result, duration_ms: float) -> None:
     allocation, no counter/histogram tick, no Prometheus client touch."""
     if not obs_tracing.is_obs_enabled():
         return
-    counter, histogram = _ensure_metrics()
-    counter.labels(intent_type=intent.type, result=result.kind).inc()
-    histogram.labels(intent_type=intent.type).observe(duration_ms / 1000.0)
+    counter, histogram, _ = _ensure_metrics()
+    intent_type = intent.type
+    if intent_type not in _ALLOWED_INTENT_TYPES:
+        intent_type = "unknown"
+        if _intent_unknown_type_total is None:  # defensive; _ensure_metrics establishes it
+            raise RuntimeError("runtime metrics guard counter not initialized")
+        _intent_unknown_type_total.inc()
+    counter.labels(intent_type=intent_type, result=result.kind).inc()
+    histogram.labels(intent_type=intent_type).observe(duration_ms / 1000.0)
 
 
 def emit_log(
@@ -166,10 +232,11 @@ def _current_trace_id() -> str | None:
 
 def _reset_for_tests() -> None:
     """Tear down module-level metrics so tests can start from zero."""
-    global _registry, _intent_total, _intent_duration
+    global _registry, _intent_total, _intent_duration, _intent_unknown_type_total
     _registry = None
     _intent_total = None
     _intent_duration = None
+    _intent_unknown_type_total = None
 
 
 __all__ = [
@@ -181,4 +248,5 @@ __all__ = [
     "record_metric",
     "emit_log",
     "get_runtime_registry",
+    "initialize_runtime_metrics",
 ]
