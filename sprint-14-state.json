@@ -8,7 +8,15 @@
     "sprint": 13,
     "planVersion": "v1.1",
     "planCommitFrozen": "13dce84",
-    "inheritedSections": ["§1", "§2", "§3", "§7.1", "§7.2", "§8", "§9"]
+    "inheritedSections": [
+      "§1",
+      "§2",
+      "§3",
+      "§7.1",
+      "§7.2",
+      "§8",
+      "§9"
+    ]
   },
   "planReviews": {
     "round1": {
@@ -54,7 +62,9 @@
       "reviewer": "inanna",
       "reviewerFoundation": "gemini",
       "phase": "pending",
-      "dependsOn": ["C"],
+      "dependsOn": [
+        "C"
+      ],
       "carryOverFrom": "sprint-13",
       "round1Verdict": null,
       "mergedAt": null,
@@ -63,7 +73,9 @@
         "tests/test_runtime_market_intents.py",
         "schema.cypher"
       ],
-      "advisoriesAddressed": ["sprint-13-A-1"]
+      "advisoriesAddressed": [
+        "sprint-13-A-1"
+      ]
     },
     "C": {
       "scope": "Capability enforcement (scope list, exact-match check, schema addition + index)",
@@ -71,7 +83,7 @@
       "authorFoundation": "gemini",
       "reviewer": "nisaba",
       "reviewerFoundation": "codex",
-      "phase": "pending",
+      "phase": "implement",
       "dependsOn": [],
       "carryOverFrom": "sprint-13",
       "round1Verdict": null,
@@ -79,7 +91,9 @@
       "files": [
         "src/hassaleh/runtime/capabilities.py",
         "schema.cypher"
-      ]
+      ],
+      "dispatchedAt": "2026-05-07T09:00:44Z",
+      "dispatchBusJobId": "20260507-110010-dione-to-inanna-475452f4"
     },
     "E": {
       "scope": "Market Pipeline migration to Intent dispatch with HASSALEH_RUNTIME_OPERATOR env flag for backwards-compat per Sprint-13 §8",
@@ -88,7 +102,11 @@
       "reviewer": "inanna",
       "reviewerFoundation": "gemini",
       "phase": "pending",
-      "dependsOn": ["A", "B", "C"],
+      "dependsOn": [
+        "A",
+        "B",
+        "C"
+      ],
       "carryOverFrom": "sprint-13",
       "round1Verdict": null,
       "mergedAt": null,
@@ -105,7 +123,13 @@
       "reviewer": "nisaba",
       "reviewerFoundation": "codex",
       "phase": "pending",
-      "dependsOn": ["A", "B", "C", "D", "E"],
+      "dependsOn": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
       "carryOverFrom": "sprint-13",
       "round1Verdict": null,
       "mergedAt": null,
@@ -120,7 +144,7 @@
       "authorFoundation": "codex",
       "reviewer": "dione",
       "reviewerFoundation": "opus",
-      "phase": "pending",
+      "phase": "implement",
       "dependsOn": [],
       "carryOverFrom": "sprint-13-track-d-review.md §6",
       "round1Verdict": null,
@@ -144,7 +168,9 @@
           "routedTo": "Track E",
           "rationale": "Sprint-13 source frames D-A3 as a /metrics exposure plan-level inconsistency, not a Track-D code change; resolution belongs in Track-E migration spec (separate scrape paths or merged registry)."
         }
-      ]
+      ],
+      "dispatchedAt": "2026-05-07T09:00:44Z",
+      "dispatchBusJobId": "20260507-110014-dione-to-nisaba-a6707845"
     }
   },
   "orchestrator": {
@@ -160,15 +186,15 @@
     "rationale": "Highest cross-track review load (B+E) + institutional memory across Sprint-12/13/14 + separation from orchestrator role (Dione). Watchdog with autonomous-fix authority per skills/sprint-14-pm/SKILL.md (Option A: process-only autonomy on own-reviewer tracks B/E).",
     "cronIds": {
       "morning": "33630c8f-57b1-41c1-a1f7-81d72a51ae32",
-      "midday":  "2b3b773a-9c5d-4ebf-b65d-c32297acc2c0",
+      "midday": "2b3b773a-9c5d-4ebf-b65d-c32297acc2c0",
       "evening": "6ac9595a-849e-45e8-b48a-266d30050699",
-      "night":   "fa7c23c2-63e9-44ae-83f9-9d24f5cf573a"
+      "night": "fa7c23c2-63e9-44ae-83f9-9d24f5cf573a"
     },
     "cronSchedule": {
       "morning": "42 7 * * *",
-      "midday":  "23 12 * * *",
+      "midday": "23 12 * * *",
       "evening": "38 17 * * *",
-      "night":   "17 23 * * *"
+      "night": "17 23 * * *"
     },
     "thresholds": {
       "reviewPhaseStuckHours": 12,
@@ -194,6 +220,14 @@
       "resolution": "REVERSED 2026-05-07 by Ingo: worker parity restored across all 5 tracks; only-opus stance dropped. Cross-LLM verification enforced (author worker foundation ≠ reviewer persona foundation). Track-G specifically: worker-codex authors with Dione (opus) review — bounded test of whether codex+opus-review can close the 7 advisories that codex/gemini missed in Sprint-13.",
       "resolvedAt": "2026-05-07T09:47:00+02:00",
       "resolvedBy": "ingo"
+    }
+  ],
+  "phase": "phase-1",
+  "phaseHistory": [
+    {
+      "phase": "phase-1",
+      "at": "2026-05-07T09:00:44Z",
+      "note": "Track C+G author dispatch fired async via trinity-bus"
     }
   ]
 }
