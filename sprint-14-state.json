@@ -328,5 +328,43 @@
       "at": "2026-05-07T13:34:35+02:00",
       "note": "Track-C blocked at maxAutonomousAttemptsPerIssue=2 cap (gemini-3.1-pro-preview capacity exhausted on attempts 1+2); Track-G review-pending (review queued with Dione). Phase-1 cannot progress until Track-C author dispatches successfully; Phase-2 (Track-B), Phase-3 (Track-E), Phase-4 (Track-F) all gated. Ingo escalation issued."
     }
-  ]
+  ],
+  "lastOrchestratorFire": {
+    "at": "2026-05-07T17:45:00+02:00",
+    "observedBy": "orchestrator-cron-5d854f3b",
+    "firePrompt": "cron 2h fallback dispatcher",
+    "observations": {
+      "C": {
+        "phase": "review-pending",
+        "reviewer": "dione",
+        "reviewerFoundation": "Opus",
+        "authorReturnedCommit": "e603f42c618e07c4a5970570292c0b8fd711b42e",
+        "reviewerDispatchedAt": null,
+        "note": "review-pending since 15:08 (≈2.5h); reviewer=dione/Opus self; no auto-dispatch (substantive review = deliberate handling); next fire 19:45 escalates if still undispatched"
+      },
+      "G": {
+        "phase": "review-pending",
+        "reviewer": "dione",
+        "reviewerFoundation": "Opus",
+        "authorReturnedCommit": "e49338c144363aaca52d7ff52408b9575f6a4cb7",
+        "reviewerDispatchedAt": null,
+        "note": "review-pending since 11:09 (≈6.5h); reviewer=dione/Opus self; no auto-dispatch; next fire 19:45 escalates if still undispatched"
+      },
+      "B": {
+        "phase": "pending",
+        "note": "pending; depends on C-merge"
+      },
+      "E": {
+        "phase": "pending",
+        "note": "pending; depends on A,B,C-merge"
+      },
+      "F": {
+        "phase": "pending",
+        "note": "pending; depends on A,B,C,D,E-merge"
+      }
+    },
+    "actionsTaken": [],
+    "silentReason": "mid-sprint per Ingo policy (Sprint-Reviews: Zwischenschritte geloggt, nicht Telegram-gemeldet); no phase transition NEW since fire (last transitions logged in main-Dione memory at 11:09 + 15:08)"
+  },
+  "updatedAt": "2026-05-07T17:45:00+02:00"
 }
