@@ -378,7 +378,7 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-08T17:40:00+02:00",
+    "at": "2026-05-08T20:13:00+02:00",
     "observedBy": "orchestrator-cron-5d854f3b",
     "firePrompt": "cron 2h fallback dispatcher",
     "observations": {
@@ -388,7 +388,7 @@
         "reviewerFoundation": "Opus",
         "authorReturnedCommit": "e603f42c618e07c4a5970570292c0b8fd711b42e",
         "reviewerDispatchedAt": "2026-05-08T17:01:46+02:00",
-        "note": "review-pending since 2026-05-07T15:08+02:00; reviewer dispatched 17:01:46 (~39min ago) by Dione main-session; queue-position=2 (after G); FRESH review, no longer stuck"
+        "note": "review in-flight ~3h12min (well under 12h stuck threshold); no review artifact yet (docs/sprint-14-track-c-review.md absent)"
       },
       "G": {
         "phase": "review-pending",
@@ -396,7 +396,7 @@
         "reviewerFoundation": "Opus",
         "authorReturnedCommit": "e49338c144363aaca52d7ff52408b9575f6a4cb7",
         "reviewerDispatchedAt": "2026-05-08T17:01:46+02:00",
-        "note": "review-pending since 2026-05-07T11:09+02:00; reviewer dispatched 17:01:46 (~39min ago) by Dione main-session; queue-position=1 (FIFO leaf); FRESH review, no longer stuck"
+        "note": "review in-flight ~3h12min (queue-position=1 FIFO leaf); no review artifact yet (docs/sprint-14-track-g-review.md absent)"
       },
       "B": {
         "phase": "pending",
@@ -411,14 +411,19 @@
         "note": "pending; depends on A,B,C,D,E-merge"
       }
     },
+    "failoverWatcherHealth": {
+      "lastFireAt": "2026-05-08T20:06:49+02:00",
+      "ageMinutes": 7,
+      "lastSummary": "NO_REPLY",
+      "verdict": "healthy"
+    },
     "actionsTaken": [
-      "no phase transitions since 15:37 fire; tracks C+G transitioned reviewer-dispatched at 17:01:46 by Dione main-session (commit e7d7418)",
-      "previous fire's dioneStalledNote prediction RESOLVED: Dione main-session did intake both reviews within 1h36m of 15:37 fire",
-      "failover-watcher healthy through 17:01 (clean cap-error=0; domain boundary intact)",
-      "reviewer-dispatched <40min ago — no stuck-review condition; Inanna PM A4+A5 actions (issueIds 9ff59f9b, a73a1824) effectively answered by reviewer-intake",
+      "no phase transitions since 17:40 fire; both reviews still in-flight (~3h12min)",
+      "no review artifacts on disk yet; reviewer thresholds (12h) not crossed",
+      "failover-watcher last fire 20:06 CEST (~7min ago) — healthy; cap-error=0 domain boundary intact",
       "silent fire; logged to memory + state.json"
     ],
-    "silentReason": "Per silent-unless rules: no phase transition (review-pending unchanged), no dependency violation, no sprint-completion gate, failover-watcher healthy, reviews freshly dispatched (<40min). Inanna PM lane resolved organically by Dione reviewer-intake."
+    "silentReason": "Per silent-unless rules: no phase transition, no dependency violation, no sprint-completion gate, failover-watcher healthy, reviews not yet stuck (3h12min ≪ 12h)."
   },
-  "updatedAt": "2026-05-08T17:40:00+02:00"
+  "updatedAt": "2026-05-08T20:13:00+02:00"
 }
