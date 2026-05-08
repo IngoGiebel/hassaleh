@@ -168,7 +168,11 @@
         "newReviewerFoundation": "Opus",
         "at": "2026-05-07T15:08:00+02:00",
         "reason": "crossLLMViolated=true after failover-watcher reassigned author worker-gemini\u2192worker-codex (Codex). Original reviewer Nisaba is also Codex; self-review would compound the violation. Dione/Opus restores cross-foundation review (Codex \u00d7 Opus). Routes around the Gemini capacity failure that triggered the failover."
-      }
+      },
+      "reviewerDispatchedAt": "2026-05-08T17:01:46+02:00",
+      "reviewerSession": "dione-main-opus-2026-05-08-1700",
+      "reviewerQueuePosition": 2,
+      "reviewerIntakeNote": "Picked up by Dione/Opus main-session 2026-05-08T17:00 CEST. Reviewed sequentially after Track G in same Dione main session. Cross-LLM property preserved: Codex author x Opus reviewer (per S14-OQ-1 reversal). Cascade unblock priority: completing this verdict gates B-dispatch, then E, then F."
     },
     "E": {
       "scope": "Market Pipeline migration to Intent dispatch with HASSALEH_RUNTIME_OPERATOR env flag for backwards-compat per Sprint-13 \u00a78",
@@ -264,7 +268,10 @@
           "writtenBy": "backfill-2026-05-07-failover-migration",
           "viaFailover": false
         }
-      ]
+      ],
+      "reviewerDispatchedAt": "2026-05-08T17:01:46+02:00",
+      "reviewerSession": "dione-main-opus-2026-05-08-1700",
+      "reviewerIntakeNote": "Picked up by Dione/Opus main-session 2026-05-08T17:00 CEST in response to Nisaba bus prompt 16:51. FIFO order: G first (28.5h queue, leaf - no downstream gate), C second (24.5h queue, gates B/E/F). Cross-LLM property preserved: Codex author x Opus reviewer."
     }
   },
   "orchestrator": {
@@ -413,5 +420,5 @@
     "silentReason": "Per Ingo mid-sprint policy (Zwischenschritte geloggt, nicht Telegram-gemeldet) and orchestrator silent-unless rules \u2014 no phase transition, no dependency violation, no sprint-completion gate, failover-watcher not stuck. Reviews-stuck is Inanna PM's lane (already escalated 10:23). Orchestrator does not duplicate.",
     "dioneStalledNote": "Both review-pending tracks have reviewer=dione/Opus main-session. Pattern persists 4h+ now. Track-C 24.5h, Track-G 28.5h. Inanna f68e0f63 ESCALATE_TO_DIONE has had at least one PM-cron cycle (~14:23) to resurface; if she has filed actionable retry, that's her lane. If next 17:37 fire still shows no review work, dioneStalledNote should be promoted to silentReason exception."
   },
-  "updatedAt": "2026-05-08T11:35:42+02:00"
+  "updatedAt": "2026-05-08T17:01:46+02:00"
 }
