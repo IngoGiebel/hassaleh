@@ -486,6 +486,30 @@
         "resolved": true,
         "resolvedAt": "2026-05-09T14:00:57.480631+02:00",
         "resolvedBy": "follow-up-cron"
+      },
+      {
+        "timestamp": "2026-05-09T23:31:46.424224+02:00",
+        "issueId": "ae111912",
+        "actionTaken": "A1",
+        "result": "success",
+        "attempt": 1,
+        "resolved": false
+      },
+      {
+        "timestamp": "2026-05-09T23:31:46.639665+02:00",
+        "issueId": "ae111912",
+        "actionTaken": "A4",
+        "result": "success",
+        "attempt": 2,
+        "resolved": false
+      },
+      {
+        "timestamp": "2026-05-09T23:31:49.352976+02:00",
+        "issueId": "ae111912",
+        "actionTaken": "A5",
+        "result": "success",
+        "attempt": 3,
+        "resolved": false
       }
     ],
     "activeFollowUpCrons": []
