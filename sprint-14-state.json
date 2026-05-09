@@ -310,6 +310,7 @@
       "round2AuthorReturnedNotice": "trinity-bus from nisaba (worker-codex) → dione (worker-opus) at 2026-05-09T12:36:56+02:00; rebased onto trunk@dfa436b, force-pushed.",
       "round2ReviewedAt": "2026-05-09T12:51:40+02:00",
       "round2ReviewFile": "docs/sprint-14-track-g-review-2-dione.md",
+      "round2ReviewCommit": "f815adb",
       "round2ReviewBlocker": null,
       "phaseAdvancedAt_review_complete_approved": "2026-05-09T12:51:40+02:00",
       "reviewerAuditRound2": {
