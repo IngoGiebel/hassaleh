@@ -223,7 +223,7 @@
       "authorFoundation": "Codex",
       "reviewer": "dione",
       "reviewerFoundation": "Opus",
-      "phase": "review-pending",
+      "phase": "implement",
       "dependsOn": [],
       "carryOverFrom": "sprint-13-track-d-review.md \u00a76",
       "round1Verdict": "CHANGE-REQ",
@@ -276,7 +276,14 @@
       "round1ReviewFile": "docs/sprint-14-track-g-review-1-dione.md",
       "round1ReviewBlocker": "branch-hygiene: rebase onto current trunk required (phantom-deletes failover infra from de191a3)",
       "reviewedAt": "2026-05-09T10:25:15.331244+02:00",
-      "reviewedBy": "dione"
+      "reviewedBy": "dione",
+      "phaseAdvancedAt_implement": "2026-05-09T10:27:14.532616+02:00",
+      "lastPmAdvance": {
+        "by": "dione-A2",
+        "to": "implement",
+        "at": "2026-05-09T10:27:14.532713+02:00",
+        "reason": "round1Verdict=CHANGE-REQ acked; Inanna (PM-role) declined A2 in bus reply, falling back to Dione-A2 per SKILL \u00a71d (A2 = All EXCEPT B, E)."
+      }
     }
   },
   "orchestrator": {
