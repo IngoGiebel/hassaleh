@@ -244,10 +244,11 @@
       "authorFoundation": "Codex",
       "reviewer": "dione",
       "reviewerFoundation": "Opus",
-      "phase": "implement",
+      "phase": "review-complete-approved",
       "dependsOn": [],
       "carryOverFrom": "sprint-13-track-d-review.md §6",
       "round1Verdict": "CHANGE-REQ",
+      "round2Verdict": "APPROVED",
       "mergedAt": null,
       "files": [
         "src/hassaleh/runtime/observability.py",
@@ -304,6 +305,27 @@
         "to": "implement",
         "at": "2026-05-09T10:27:14.532713+02:00",
         "reason": "round1Verdict=CHANGE-REQ acked; Inanna (PM-role) declined A2 in bus reply, falling back to Dione-A2 per SKILL §1d (A2 = All EXCEPT B, E)."
+      },
+      "round2AuthorReturnedCommit": "abba44d658f65e4c6a7fb2e7b5e439699e70bf1a",
+      "round2AuthorReturnedNotice": "trinity-bus from nisaba (worker-codex) → dione (worker-opus) at 2026-05-09T12:36:56+02:00; rebased onto trunk@dfa436b, force-pushed.",
+      "round2ReviewedAt": "2026-05-09T12:51:40+02:00",
+      "round2ReviewFile": "docs/sprint-14-track-g-review-2-dione.md",
+      "round2ReviewBlocker": null,
+      "phaseAdvancedAt_review_complete_approved": "2026-05-09T12:51:40+02:00",
+      "reviewerAuditRound2": {
+        "reviewer": "dione",
+        "reviewerFoundation": "Opus",
+        "reviewedAt": "2026-05-09T12:51:40+02:00",
+        "reviewSha": "abba44d658f65e4c6a7fb2e7b5e439699e70bf1a",
+        "verdict": "APPROVED",
+        "scope": "verify-only on R1 CR (branch-hygiene): rebase resolved phantom-delete risk, substantive D-A1..D-A7 preserved (test-count + line-count parity).",
+        "testsRun": "PYTHONPATH=/tmp/hassaleh-track-g-rebase-dione-r2/src tests/test_runtime_observability.py = 22 passed",
+        "branchBaseOk": true,
+        "phantomDeleteRisk": false,
+        "rebaseRaceObserved": "trunk advanced 6c20d30 + 1ad7610 (Track-C round-1 review + state.json) AFTER Nisaba's 12:39 force-push; file-domain-disjoint with track-g; merge requires either re-rebase to trunk@1ad7610 OR 3-way merge-commit. Decision deferred to merge step.",
+        "advisoryNotes": [
+          "process-fix: future round-2 reviewer holds trunk commits during rebase-window-pending state, OR author signals rebase-window-closed before reviewer resumes — candidate for feedback_corrections_on_checked_in_state.md sub-rule"
+        ]
       }
     }
   },
