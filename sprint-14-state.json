@@ -83,7 +83,7 @@
       "authorFoundation": "Codex",
       "reviewer": "dione",
       "reviewerFoundation": "Opus",
-      "phase": "review-pending",
+      "phase": "review-complete-clean",
       "blockedReason": null,
       "blockedSince": null,
       "dependsOn": [],
