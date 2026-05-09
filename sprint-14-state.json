@@ -193,6 +193,18 @@
         ],
         "branchBaseOk": true,
         "phantomDeleteRisk": false
+      },
+      "rebaseDispatch": {
+        "dispatchedAt": "2026-05-09T15:51:32+02:00",
+        "dispatchedBy": "orchestrator-cron-5d854f3b",
+        "dispatchBusJobId": "20260509-155103-dione-to-nisaba-cab737ab",
+        "to": "nisaba",
+        "toFoundation": "Codex",
+        "reason": "rebase-window-stale: branch base de191a3 vs trunk@9f6a657; phantom-delete risk on naive FF (800-line state.json + 4 review docs + Track G obs v1.0.1).",
+        "pattern": "Option-1 (rebase + force-with-lease), identical to Track G reviewerAuditRound2 process-fix advisory.",
+        "asyncTimeoutSec": 900,
+        "expectedReturn": "trinity-bus reply with new SHA on sprint-14/track-c",
+        "blockingPhaseGate": "Track C cannot phase=merged until rebase completes; Track B (Phase-2) gated."
       }
     },
     "E": {
@@ -425,6 +437,16 @@
         "result": "success",
         "attempt": 1,
         "resolved": false
+      },
+      {
+        "timestamp": "2026-05-09T14:00:57.480631+02:00",
+        "issueId": "1b93ae5e",
+        "actionTaken": "A6",
+        "result": "success",
+        "attempt": 1,
+        "resolved": true,
+        "resolvedAt": "2026-05-09T14:00:57.480631+02:00",
+        "resolvedBy": "follow-up-cron"
       }
     ],
     "activeFollowUpCrons": []
@@ -453,54 +475,51 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-08T22:17:31+02:00",
+    "at": "2026-05-09T15:51:32+02:00",
     "observedBy": "orchestrator-cron-5d854f3b",
     "firePrompt": "cron 2h fallback dispatcher",
     "observations": {
-      "C": {
-        "phase": "review-pending",
-        "reviewer": "dione",
-        "reviewerFoundation": "Opus",
-        "authorReturnedCommit": "e603f42c618e07c4a5970570292c0b8fd711b42e",
-        "reviewerDispatchedAt": "2026-05-08T17:01:46+02:00",
-        "note": "review in-flight ~5h14min (well under 12h stuck threshold); no review artifact yet (docs/sprint-14-track-c-review.md absent)"
-      },
       "G": {
-        "phase": "review-pending",
+        "phase": "merged",
+        "mergedAt": "2026-05-09T12:59:49+02:00",
+        "mergedAtCommit": "38a4f8abf5a672e5faccc0c05d50e44b30fbeded",
+        "note": "Phase transition merged (since prior fire 22:17). Cross-LLM (Codex×Opus) preserved; gates §7.1 advanced for Track G's slice."
+      },
+      "C": {
+        "phase": "review-complete-clean",
+        "round1Verdict": "CLEAN @ e603f42",
+        "reviewedAt": "2026-05-09T12:30:00+02:00",
         "reviewer": "dione",
-        "reviewerFoundation": "Opus",
-        "authorReturnedCommit": "e49338c144363aaca52d7ff52408b9575f6a4cb7",
-        "reviewerDispatchedAt": "2026-05-08T17:01:46+02:00",
-        "note": "review in-flight ~5h14min (queue-position=1 FIFO leaf); no review artifact yet (docs/sprint-14-track-g-review.md absent)"
+        "mergedAt": null,
+        "mergeBlocker": "rebase-window-stale: branch base de191a3 is 28 commits behind trunk@9f6a657; FF-merge would phantom-delete 800 lines state.json + 4 review docs + Track G obs v1.0.1 (124 lines).",
+        "actionDispatched": "20260509-155103-dione-to-nisaba-cab737ab (Option-1 rebase req to Nisaba, async 900s)"
       },
       "B": {
         "phase": "pending",
-        "note": "pending; depends on C-merge"
+        "note": "Phase-2 gate: Track C merge required first."
       },
       "E": {
         "phase": "pending",
-        "note": "pending; depends on A,B,C-merge"
+        "note": "Phase-3 gate."
       },
       "F": {
         "phase": "pending",
-        "note": "pending; depends on A,B,C,D,E-merge"
+        "note": "Phase-4 gate."
       }
     },
     "failoverWatcherHealth": {
-      "lastFireAt": "2026-05-08T22:04:10+02:00",
-      "ageMinutes": 11,
-      "nextFireAt": "2026-05-08T22:19:10+02:00",
-      "lastRunStatus": "ok",
-      "consecutiveErrors": 0,
-      "verdict": "healthy"
+      "verdict": "healthy",
+      "note": "No active capacity-failure dispatch in flight; watcher silent is expected. C+G workers are post-author phase."
     },
     "actionsTaken": [
-      "no phase transitions since 20:13 fire; both reviews still in-flight (~5h14min in dione-main-opus session)",
-      "no review artifacts on disk yet; reviewer 12h stuck threshold not crossed",
-      "failover-watcher cron a738b0f8 healthy at 22:04 fire (status=ok, 0 errors) — domain boundary intact",
-      "silent fire; logged to memory + state.json"
+      "detected G phase transition: merged at 12:59:49 (since 22:17 fire)",
+      "detected C phase transition: review-pending → review-complete-clean at 12:30 (since 22:17 fire)",
+      "detected merge-blocker on C: rebase-window-stale (branch base de191a3, trunk @ 9f6a657, 28 commits drift incl. Track G merge wave)",
+      "dispatched Nisaba via trinity-bus (async, 900s timeout) for Option-1 rebase — same pattern she used for Track G",
+      "Telegram update to Ingo planned (per silent-unless rule: phase transition occurred)"
     ],
-    "silentReason": "Per silent-unless rules: no phase transition, no dependency violation, no sprint-completion gate, failover-watcher healthy, reviews not yet stuck (5h14min ≪ 12h threshold). Inanna PM lane owns mid-sprint Dione-stalled escalation."
+    "silentReason": null,
+    "nextStep": "On Nisaba bus reply with new SHA: FF-merge to trunk + advance C.phase=merged + dispatch Track B (worker-opus self-author, Phase-2)."
   },
-  "updatedAt": "2026-05-08T20:13:00+02:00"
+  "updatedAt": "2026-05-09T15:51:32+02:00"
 }
