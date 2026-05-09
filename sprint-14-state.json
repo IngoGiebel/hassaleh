@@ -226,7 +226,7 @@
       "phase": "review-pending",
       "dependsOn": [],
       "carryOverFrom": "sprint-13-track-d-review.md \u00a76",
-      "round1Verdict": null,
+      "round1Verdict": "CHANGE-REQ",
       "mergedAt": null,
       "files": [
         "src/hassaleh/runtime/observability.py",
@@ -271,7 +271,12 @@
       ],
       "reviewerDispatchedAt": "2026-05-08T17:01:46+02:00",
       "reviewerSession": "dione-main-opus-2026-05-08-1700",
-      "reviewerIntakeNote": "Picked up by Dione/Opus main-session 2026-05-08T17:00 CEST in response to Nisaba bus prompt 16:51. FIFO order: G first (28.5h queue, leaf - no downstream gate), C second (24.5h queue, gates B/E/F). Cross-LLM property preserved: Codex author x Opus reviewer."
+      "reviewerIntakeNote": "Picked up by Dione/Opus main-session 2026-05-08T17:00 CEST in response to Nisaba bus prompt 16:51. FIFO order: G first (28.5h queue, leaf - no downstream gate), C second (24.5h queue, gates B/E/F). Cross-LLM property preserved: Codex author x Opus reviewer.",
+      "round1ReviewCommit": "2d77942",
+      "round1ReviewFile": "docs/sprint-14-track-g-review-1-dione.md",
+      "round1ReviewBlocker": "branch-hygiene: rebase onto current trunk required (phantom-deletes failover infra from de191a3)",
+      "reviewedAt": "2026-05-09T10:25:15.331244+02:00",
+      "reviewedBy": "dione"
     }
   },
   "orchestrator": {
