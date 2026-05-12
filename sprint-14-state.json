@@ -510,6 +510,56 @@
         "result": "success",
         "attempt": 3,
         "resolved": false
+      },
+      {
+        "timestamp": "2026-05-10T00:32:06.034838+02:00",
+        "issueId": "ae111912",
+        "actionTaken": "ESCALATE_HARD",
+        "result": "success",
+        "attempt": 4,
+        "resolved": false,
+        "escalated": true
+      },
+      {
+        "timestamp": "2026-05-11T23:19:37.073461+02:00",
+        "issueId": "8500bc08",
+        "actionTaken": "A1",
+        "result": "re-trigger dione",
+        "attempt": 1,
+        "resolved": false
+      },
+      {
+        "timestamp": "2026-05-11T23:19:37.166004+02:00",
+        "issueId": "8500bc08",
+        "actionTaken": "A4",
+        "result": "remind dione",
+        "attempt": 2,
+        "resolved": false
+      },
+      {
+        "timestamp": "2026-05-11T23:19:37.210608+02:00",
+        "issueId": "8500bc08",
+        "actionTaken": "A5",
+        "result": "scheduled follow-up",
+        "attempt": 3,
+        "resolved": false
+      },
+      {
+        "timestamp": "2026-05-12T00:28:58.956271+02:00",
+        "issueId": "8500bc08",
+        "actionTaken": "ESCALATE_HARD",
+        "result": "escalated",
+        "attempt": 4,
+        "resolved": false,
+        "escalated": true
+      },
+      {
+        "timestamp": "2026-05-12T07:43:59.051177+02:00",
+        "issueId": "8500bc08",
+        "actionTaken": "ESCALATE_HARD",
+        "result": "escalated",
+        "attempt": 5,
+        "resolved": false
       }
     ],
     "activeFollowUpCrons": []
@@ -538,7 +588,7 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-09T15:51:32+02:00",
+    "at": "2026-05-12T12:19:16+02:00",
     "observedBy": "orchestrator-cron-5d854f3b",
     "firePrompt": "cron 2h fallback dispatcher",
     "observations": {
@@ -546,43 +596,41 @@
         "phase": "merged",
         "mergedAt": "2026-05-09T12:59:49+02:00",
         "mergedAtCommit": "38a4f8abf5a672e5faccc0c05d50e44b30fbeded",
-        "note": "Phase transition merged (since prior fire 22:17). Cross-LLM (Codex\u00d7Opus) preserved; gates \u00a77.1 advanced for Track G's slice."
+        "note": "Stable since 2026-05-09."
       },
       "C": {
-        "phase": "review-complete-clean",
-        "round1Verdict": "CLEAN @ e603f42",
-        "reviewedAt": "2026-05-09T12:30:00+02:00",
-        "reviewer": "dione",
-        "mergedAt": null,
-        "mergeBlocker": "rebase-window-stale: branch base de191a3 is 28 commits behind trunk@9f6a657; FF-merge would phantom-delete 800 lines state.json + 4 review docs + Track G obs v1.0.1 (124 lines).",
-        "actionDispatched": "20260509-155103-dione-to-nisaba-cab737ab (Option-1 rebase req to Nisaba, async 900s)"
+        "phase": "merged",
+        "mergedAt": "2026-05-09T16:28:27+02:00",
+        "mergedAtCommit": "bf364b24a236ede68103abc1aef12cc2f39eeb02",
+        "note": "Stable since 2026-05-09. FF-merge resolved rebase-window-stale via Nisaba Option-1."
       },
       "B": {
         "phase": "pending",
-        "note": "Phase-2 gate: Track C merge required first."
+        "note": "Phase-2 gate met (C merged) BUT Ingo-decline-hold active since 2026-05-10T00:32 (issue ae111912 ESCALATE_HARD declined). Inanna PM logged structural-dup 8500bc08 on 2026-05-11T23:19, escalated again 2026-05-12T07:43 (attempt 5). Orchestrator does NOT auto-dispatch \u2014 user-decline overrides Phase-2 trigger. Awaiting Ingo go-signal."
       },
       "E": {
         "phase": "pending",
-        "note": "Phase-3 gate."
+        "note": "Phase-3 gate (depends on B). Cascade-blocked by B-hold."
       },
       "F": {
         "phase": "pending",
-        "note": "Phase-4 gate."
+        "note": "Phase-4 gate (depends on B,C,D,E). Cascade-blocked by B-hold."
       }
     },
     "failoverWatcherHealth": {
       "verdict": "healthy",
-      "note": "No active capacity-failure dispatch in flight; watcher silent is expected. C+G workers are post-author phase."
+      "note": "Recent silent fires logged: 2026-05-11T23:49, 2026-05-12T00:03, 2026-05-12T00:44-01:09 \u2014 all rc=0, no capacity errors. Domain quiet (no active dispatches in flight)."
     },
     "actionsTaken": [
-      "detected G phase transition: merged at 12:59:49 (since 22:17 fire)",
-      "detected C phase transition: review-pending \u2192 review-complete-clean at 12:30 (since 22:17 fire)",
-      "detected merge-blocker on C: rebase-window-stale (branch base de191a3, trunk @ 9f6a657, 28 commits drift incl. Track G merge wave)",
-      "dispatched Nisaba via trinity-bus (async, 900s timeout) for Option-1 rebase \u2014 same pattern she used for Track G",
-      "Telegram update to Ingo planned (per silent-unless rule: phase transition occurred)"
+      "no new phase transitions since 2026-05-09 (lastOrchestratorFire was stale, brought current)",
+      "verified Track B Ingo-decline-hold via autonomous-actions log (ae111912 + 8500bc08 dup chain)",
+      "no dispatch fired (B is on user-hold, not stuck-for-orchestrator-action)",
+      "no dependency violations detected",
+      "no sprint-completion candidate (3/5 tracks pending)",
+      "failover-watcher silent + healthy (verified via session-start memory buffer)"
     ],
-    "silentReason": null,
-    "nextStep": "On Nisaba bus reply with new SHA: FF-merge to trunk + advance C.phase=merged + dispatch Track B (worker-opus self-author, Phase-2)."
+    "silentReason": "No phase transition since prior real fire (2026-05-09); Track B on Ingo-decline-hold (out of orchestrator scope); failover-watcher healthy; no dependency violations. Per skill silent-unless rule + Sprint-Reviews cadence feedback (intermediate steps logged, not Telegrammed).",
+    "nextStep": "Hold position. On Ingo go-signal for Track B: dispatch worker-opus self-author per Phase-2 plan. Otherwise next 2h fire (~14:19) re-checks state."
   },
-  "updatedAt": "2026-05-09T15:51:32+02:00"
+  "updatedAt": "2026-05-12T12:19:16+02:00"
 }
