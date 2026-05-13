@@ -584,6 +584,16 @@
         "result": "escalated",
         "attempt": 8,
         "resolved": false
+      },
+      {
+        "timestamp": "2026-05-13T12:25:51.461024+02:00",
+        "issueId": "8500bc08",
+        "actionTaken": "ESCALATE_HARD",
+        "result": "escalated",
+        "attempt": 9,
+        "resolved": true,
+        "resolvedBy": "ingo-decline-hold",
+        "resolvedAt": "2026-05-13T12:37:05+02:00"
       }
     ],
     "activeFollowUpCrons": []
@@ -612,7 +622,7 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-13T11:39:00+02:00",
+    "at": "2026-05-13T13:39:00+02:00",
     "observedBy": "orchestrator-cron-5d854f3b",
     "firePrompt": "cron 2h fallback dispatcher",
     "observations": {
@@ -628,7 +638,7 @@
       },
       "B": {
         "phase": "pending",
-        "note": "Phase-2 gate met. Ingo-decline-hold persists (ae111912 declined 2026-05-10T00:32; 8500bc08 chain attempts 5-8 ACKed). User-decline overrides Phase-2 trigger; out of orchestrator scope."
+        "note": "Phase-2 gate met. Ingo-decline-hold persists (ae111912 declined 2026-05-10T00:32; 8500bc08 chain attempts 5-9 ACKed; K-29 self-loop hypothesis if attempts >10). User-decline overrides Phase-2 trigger; out of orchestrator scope (Inanna PM domain)."
       },
       "E": {
         "phase": "pending",
@@ -640,8 +650,8 @@
       }
     },
     "failoverWatcherHealth": {
-      "verdict": "degraded-but-non-actionable",
-      "note": "Cron a738b0f8 lastRunAtMs=2026-05-13T10:52 CEST with lastDurationMs=1914466ms (~32min, anomalous) and lastError=\"cron: job interrupted by gateway restart\". Multiple peer crons also interrupted ~11:24 CEST (gateway restart event). Workspace .remember/now.md latest fire 10:19 clean (failover=0). No tracks currently dispatched-pending, so watcher has no work \u2014 non-actionable per orchestrator escalation gate (\"stuck AND tracks need it\"). Surface to next fire if persists with new track dispatches."
+      "verdict": "healthy",
+      "note": "jobs.json lastRunAtMs=null (likely reset by gateway restart event ~11:24 CEST or cron rewrite), but .remember log shows clean 15-min fires through 12:42 CEST (all exit 0, failover=0). Actual execution healthy; jobs.json telemetry stale. Non-actionable per orchestrator escalation gate (script working, no dispatched-pending tracks need it)."
     },
     "actionsTaken": [
       "no new phase transitions since 2026-05-09 (4d stable)",
@@ -649,11 +659,11 @@
       "no dispatch fired",
       "no dependency violations",
       "no sprint-completion candidate (3/5 tracks pending)",
-      "failover-watcher degraded-but-non-actionable (no dispatched-pending tracks need it)"
+      "failover-watcher healthy (12:42 fire clean despite jobs.json telemetry reset)"
     ],
-    "silentReason": "No phase transition since 2026-05-09; Track B on Ingo-decline-hold; failover-watcher degradation non-actionable per conjunctive escalation gate. Per Sprint-Reviews cadence: intermediate fires logged, not Telegrammed.",
-    "nextStep": "Hold position. On Ingo go-signal for Track B: dispatch worker-opus self-author per Phase-2 plan. Otherwise next 2h fire (~13:39) re-checks state; verify failover-watcher recovery after gateway-restart event.",
-    "previousFire": "2026-05-13T09:39:00+02:00"
+    "silentReason": "No phase transition since 2026-05-09; Track B on Ingo-decline-hold; failover-watcher operationally healthy. Per Sprint-Reviews cadence: intermediate fires logged, not Telegrammed.",
+    "nextStep": "Hold position. On Ingo go-signal for Track B: dispatch worker-opus self-author per Phase-2 plan. Otherwise next 2h fire (~15:39) re-checks state.",
+    "previousFire": "2026-05-13T11:39:00+02:00"
   },
   "updatedAt": "2026-05-13T09:39:00+02:00"
 }
