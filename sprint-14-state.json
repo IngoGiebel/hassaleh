@@ -9,13 +9,13 @@
     "planVersion": "v1.1",
     "planCommitFrozen": "13dce84",
     "inheritedSections": [
-      "\u00a71",
-      "\u00a72",
-      "\u00a73",
-      "\u00a77.1",
-      "\u00a77.2",
-      "\u00a78",
-      "\u00a79"
+      "§1",
+      "§2",
+      "§3",
+      "§7.1",
+      "§7.2",
+      "§8",
+      "§9"
     ]
   },
   "planReviews": {
@@ -28,7 +28,7 @@
       },
       "gemini": {
         "verdict": "CHANGE-REQ",
-        "findings": "1 BLOCKING (\u00a75.G D-A7 source inversion: source says _LOGGER_NAME='hassaleh.runtime' intentionally NOT in SERVICE_ENUM; v0 wrote 'hassaleh-daemon' and demanded enum-match) + 2 ADVISORY (editorial fix-sketches not source-verbatim for #2/#3/#6; Track-G diff-surface inconsistent across \u00a75.x/\u00a76.1/table). All addressed in v1.",
+        "findings": "1 BLOCKING (§5.G D-A7 source inversion: source says _LOGGER_NAME='hassaleh.runtime' intentionally NOT in SERVICE_ENUM; v0 wrote 'hassaleh-daemon' and demanded enum-match) + 2 ADVISORY (editorial fix-sketches not source-verbatim for #2/#3/#6; Track-G diff-surface inconsistent across §5.x/§6.1/table). All addressed in v1.",
         "file": "docs/sprint-14-plan-review-1-gemini.md",
         "commit": "17254b9"
       }
@@ -36,19 +36,19 @@
     "round2": {
       "gemini": {
         "verdict": "CHANGE-REQ",
-        "findings": "Narrow: \u00a75.G column-2 labelled 'verbatim' but contains ellipses and quote-style drift. Required correction: byte-faithful column 2 OR relabel as excerpt/paraphrase. Finding 3 (diff-surface) VERIFIED.",
+        "findings": "Narrow: §5.G column-2 labelled 'verbatim' but contains ellipses and quote-style drift. Required correction: byte-faithful column 2 OR relabel as excerpt/paraphrase. Finding 3 (diff-surface) VERIFIED.",
         "file": "docs/sprint-14-plan-review-2-gemini.md",
         "commit": "e8c6185",
-        "scope": "verify-only on R1 CRs: \u00a75.G restructure + D-A7 correction + Track-G diff-surface consolidation."
+        "scope": "verify-only on R1 CRs: §5.G restructure + D-A7 correction + Track-G diff-surface consolidation."
       }
     },
     "round2b": {
       "nisaba": {
         "verdict": "CLEAN",
-        "findings": "All 5 narrow R2b verification items VERIFIED: (1a) \u00a75.G col-2 header 'excerpt' not 'verbatim'; (1b) explanatory para declares near-quote excerpt + canonical FROZEN source; (1c) D-A7 double-quote style aligned; (2a) no residual 'verbatim' claim in \u00a75.G; (2b) D-A6 double-quote style aligned. Plan is CLEAN-and-FROZEN-eligible.",
+        "findings": "All 5 narrow R2b verification items VERIFIED: (1a) §5.G col-2 header 'excerpt' not 'verbatim'; (1b) explanatory para declares near-quote excerpt + canonical FROZEN source; (1c) D-A7 double-quote style aligned; (2a) no residual 'verbatim' claim in §5.G; (2b) D-A6 double-quote style aligned. Plan is CLEAN-and-FROZEN-eligible.",
         "file": "docs/sprint-14-plan-review-2b-gemini.md",
         "commit": "c91d20c",
-        "scope": "verify-only on R2 CR: \u00a75.G column-2 relabel to 'excerpt' + explanatory-para update + D-A6/D-A7 quote-style alignment with source. Do NOT regrade R1 CLEAN items, R1 finding-3 (already VERIFIED), or \u00a71/\u00a72/\u00a73 inheritance.",
+        "scope": "verify-only on R2 CR: §5.G column-2 relabel to 'excerpt' + explanatory-para update + D-A6/D-A7 quote-style alignment with source. Do NOT regrade R1 CLEAN items, R1 finding-3 (already VERIFIED), or §1/§2/§3 inheritance.",
         "verifiedAt": "2026-05-07T10:00:00+02:00",
         "note": "Reviewer file uses 'gemini' header naming-legacy but reviewer is Nisaba (worker-codex)."
       }
@@ -56,7 +56,7 @@
   },
   "tracks": {
     "B": {
-      "scope": "Six Intent handlers (\u00a73.1-\u00a73.6) with Cypher preconditions and mutations; resolves Sprint-13 advisory A-1 at \u00a73.2 SetVerdict; consumes Track-A's Result.error_message generic-leak fix as a precondition",
+      "scope": "Six Intent handlers (§3.1-§3.6) with Cypher preconditions and mutations; resolves Sprint-13 advisory A-1 at §3.2 SetVerdict; consumes Track-A's Result.error_message generic-leak fix as a precondition",
       "author": "worker-opus",
       "authorFoundation": "Opus",
       "reviewer": "inanna",
@@ -132,7 +132,7 @@
           "viaFailover": true
         }
       ],
-      "lastDispatchPrompt": "SPRINT-14 TRACK C \u2014 AUTHOR (worker-gemini \u00d7 Nisaba review)\n\nYou are Inanna \u2b50 (worker-gemini, Gemini foundation), authoring Track C of Sprint-14 in Hassaleh. Reviewer will be Nisaba (Codex foundation) \u2014 cross-LLM check.\n\n## Repo + branch\n\nRepo: ~/projects/hassaleh\nDefault: trunk (FROZEN at planCommitFrozen=c268bb0)\nAuthor branch: sprint-14/track-c (create from trunk)\nPush to: origin/sprint-14/track-c\n\n## Authoritative spec\n\nRead in this order before coding:\n1. ~/projects/hassaleh/docs/sprint-14-plan.md \u00a75 Track C row (Capability enforcement scope) and \u00a76.1 (worker parity)\n2. Sprint-13 \u00a75 Track-C scope (carry-over baseline)\n3. Plan \u00a73 Interface Specification (six Intent types \u2014 Track C must support all six's capability declarations)\n\n## Deliverables\n\nFiles to write/modify:\n- src/hassaleh/runtime/capabilities.py \u2014 new module with: ApiKey schema field `scopes: list[str]`, `check_scope(api_key, required_scope) -> bool`, capability-test fixtures usable by Track B + F. Ensure exact-match semantics (no prefix wildcards).\n- schema.cypher \u2014 add `CREATE INDEX apikey_scope IF NOT EXISTS FOR (k:ApiKey) ON (k.scopes)` and any uniqueness constraint Sprint-13 \u00a78 / I-CR-4.2 prescribes for capabilities.\n- tests covering check_scope happy-path, missing-scope, empty-scopes-list, and scope-not-in-allowed-set.\n\nOut of scope: actual Intent handlers (Track B), market migration (Track E).\n\n## Process gates\n\n- One bundled commit on sprint-14/track-c branch with subject `sprint-14 Track C: capability enforcement`. Body lists the changes.\n- Push branch when ready.\n- DO NOT merge to trunk yourself \u2014 Nisaba reviews, then Dione merges per gate \u00a77.1.\n- DO NOT modify sprint-14-state.json yourself \u2014 Dione/orchestrator owns that.\n\n## When done\n\nUpdate authorImplementedAt by emitting a Trinity Bus message back to Dione:\ntrinity-bus send --from inanna --to dione -m \"Track C author done: branch sprint-14/track-c at <SHA>\"\n\nIf blocked on something the spec doesn't cover, send a clarification request via Bus to Dione FIRST before committing partial work.\n",
+      "lastDispatchPrompt": "SPRINT-14 TRACK C — AUTHOR (worker-gemini × Nisaba review)\n\nYou are Inanna ⭐ (worker-gemini, Gemini foundation), authoring Track C of Sprint-14 in Hassaleh. Reviewer will be Nisaba (Codex foundation) — cross-LLM check.\n\n## Repo + branch\n\nRepo: ~/projects/hassaleh\nDefault: trunk (FROZEN at planCommitFrozen=c268bb0)\nAuthor branch: sprint-14/track-c (create from trunk)\nPush to: origin/sprint-14/track-c\n\n## Authoritative spec\n\nRead in this order before coding:\n1. ~/projects/hassaleh/docs/sprint-14-plan.md §5 Track C row (Capability enforcement scope) and §6.1 (worker parity)\n2. Sprint-13 §5 Track-C scope (carry-over baseline)\n3. Plan §3 Interface Specification (six Intent types — Track C must support all six's capability declarations)\n\n## Deliverables\n\nFiles to write/modify:\n- src/hassaleh/runtime/capabilities.py — new module with: ApiKey schema field `scopes: list[str]`, `check_scope(api_key, required_scope) -> bool`, capability-test fixtures usable by Track B + F. Ensure exact-match semantics (no prefix wildcards).\n- schema.cypher — add `CREATE INDEX apikey_scope IF NOT EXISTS FOR (k:ApiKey) ON (k.scopes)` and any uniqueness constraint Sprint-13 §8 / I-CR-4.2 prescribes for capabilities.\n- tests covering check_scope happy-path, missing-scope, empty-scopes-list, and scope-not-in-allowed-set.\n\nOut of scope: actual Intent handlers (Track B), market migration (Track E).\n\n## Process gates\n\n- One bundled commit on sprint-14/track-c branch with subject `sprint-14 Track C: capability enforcement`. Body lists the changes.\n- Push branch when ready.\n- DO NOT merge to trunk yourself — Nisaba reviews, then Dione merges per gate §7.1.\n- DO NOT modify sprint-14-state.json yourself — Dione/orchestrator owns that.\n\n## When done\n\nUpdate authorImplementedAt by emitting a Trinity Bus message back to Dione:\ntrinity-bus send --from inanna --to dione -m \"Track C author done: branch sprint-14/track-c at <SHA>\"\n\nIf blocked on something the spec doesn't cover, send a clarification request via Bus to Dione FIRST before committing partial work.\n",
       "phaseHistory": [
         {
           "phase": "implement",
@@ -147,7 +147,7 @@
         {
           "phase": "review-complete-clean",
           "at": "2026-05-09T12:30:00+02:00",
-          "note": "Round-1 verdict CLEAN by Dione/Opus. 41 runtime tests pass on isolated PYTHONPATH (avoids editable-install shadow). Branch base de191a3 (failover infra present, no phantom-delete risk). Cross-LLM Codex\u00d7Opus preserved. Two advisory notes (non-blocking): plan-inconsistency on attempt_unique_per_segment ownership, and merge-hygiene to take trunk's sprint-14-state.json. Ready to merge \u2192 unblocks Track B dispatch."
+          "note": "Round-1 verdict CLEAN by Dione/Opus. 41 runtime tests pass on isolated PYTHONPATH (avoids editable-install shadow). Branch base de191a3 (failover infra present, no phantom-delete risk). Cross-LLM Codex×Opus preserved. Two advisory notes (non-blocking): plan-inconsistency on attempt_unique_per_segment ownership, and merge-hygiene to take trunk's sprint-14-state.json. Ready to merge → unblocks Track B dispatch."
         },
         {
           "phase": "merged",
@@ -170,14 +170,14 @@
       "authorCompletedAt": "2026-05-07T15:05:42+02:00",
       "authorReturnedCommit": "e603f42c618e07c4a5970570292c0b8fd711b42e",
       "authorReturnedBranch": "sprint-14/track-c",
-      "authorReturnedNotice": "trinity-bus from nisaba (worker-codex) \u2192 dione (worker-opus) at 2026-05-07T15:05:42+02:00",
+      "authorReturnedNotice": "trinity-bus from nisaba (worker-codex) → dione (worker-opus) at 2026-05-07T15:05:42+02:00",
       "reviewerReassignment": {
         "originalReviewer": "nisaba",
         "originalReviewerFoundation": "Codex",
         "newReviewer": "dione",
         "newReviewerFoundation": "Opus",
         "at": "2026-05-07T15:08:00+02:00",
-        "reason": "crossLLMViolated=true after failover-watcher reassigned author worker-gemini\u2192worker-codex (Codex). Original reviewer Nisaba is also Codex; self-review would compound the violation. Dione/Opus restores cross-foundation review (Codex \u00d7 Opus). Routes around the Gemini capacity failure that triggered the failover."
+        "reason": "crossLLMViolated=true after failover-watcher reassigned author worker-gemini→worker-codex (Codex). Original reviewer Nisaba is also Codex; self-review would compound the violation. Dione/Opus restores cross-foundation review (Codex × Opus). Routes around the Gemini capacity failure that triggered the failover."
       },
       "reviewerDispatchedAt": "2026-05-08T17:01:46+02:00",
       "reviewerSession": "dione-main-opus-2026-05-08-1700",
@@ -193,7 +193,7 @@
         "verdict": "CLEAN",
         "testsRun": "tests/test_runtime_capabilities.py + test_runtime_core.py + test_runtime_observability.py = 41 passed",
         "advisoryNotes": [
-          "plan-inconsistency-attempt-unique-constraint (S13 \u00a78 vs S14 \u00a75 Track B row)",
+          "plan-inconsistency-attempt-unique-constraint (S13 §8 vs S14 §5 Track B row)",
           "merge-hygiene: take trunk's sprint-14-state.json on merge (branch base 187 lines stale)"
         ],
         "branchBaseOk": true,
@@ -224,7 +224,7 @@
         "contentEquivalence": {
           "method": "git range-diff e603f42^...e603f42 bf364b24^...bf364b24",
           "result": "e603f42 = bf364b2 (patch-equivalent)",
-          "note": "Rebase from old base de191a3 onto trunk db5ee5c4 \u2014 patch unchanged, no fresh substantive review needed"
+          "note": "Rebase from old base de191a3 onto trunk db5ee5c4 — patch unchanged, no fresh substantive review needed"
         },
         "gateRun": {
           "cmd": "PYTHONPATH=$PWD/src python -m pytest -q tests/test_runtime_capabilities.py tests/test_runtime_core.py",
@@ -243,11 +243,11 @@
             "role": "rebased force-pushed tip, FF-merged to trunk"
           }
         ],
-        "cascadeUnblock": "Track B Phase-2 dispatch now unblocked; Track E + F follow per Sprint-14 plan \u00a76"
+        "cascadeUnblock": "Track B Phase-2 dispatch now unblocked; Track E + F follow per Sprint-14 plan §6"
       }
     },
     "E": {
-      "scope": "Market Pipeline migration to Intent dispatch with HASSALEH_RUNTIME_OPERATOR env flag for backwards-compat per Sprint-13 \u00a78",
+      "scope": "Market Pipeline migration to Intent dispatch with HASSALEH_RUNTIME_OPERATOR env flag for backwards-compat per Sprint-13 §8",
       "author": "worker-codex",
       "authorFoundation": "Codex",
       "reviewer": "inanna",
@@ -268,7 +268,7 @@
       ]
     },
     "F": {
-      "scope": "End-to-end + crash-recovery integration tests asserting S1-S4 from Sprint-13 \u00a71",
+      "scope": "End-to-end + crash-recovery integration tests asserting S1-S4 from Sprint-13 §1",
       "author": "dione-main",
       "authorFoundation": "opus",
       "reviewer": "nisaba",
@@ -290,14 +290,14 @@
       ]
     },
     "G": {
-      "scope": "Observability v1.0.1 patch \u2014 closes the seven Track-D Round-1 advisories (D-A1..D-A7) deferred per Dione's 2026-04-26 arbitration",
+      "scope": "Observability v1.0.1 patch — closes the seven Track-D Round-1 advisories (D-A1..D-A7) deferred per Dione's 2026-04-26 arbitration",
       "author": "worker-codex",
       "authorFoundation": "Codex",
       "reviewer": "dione",
       "reviewerFoundation": "Opus",
       "phase": "merged",
       "dependsOn": [],
-      "carryOverFrom": "sprint-13-track-d-review.md \u00a76",
+      "carryOverFrom": "sprint-13-track-d-review.md §6",
       "round1Verdict": "CHANGE-REQ",
       "round2Verdict": "APPROVED",
       "mergedAt": "2026-05-09T12:59:49+02:00",
@@ -332,8 +332,8 @@
       "authorReturnedBranch": "sprint-14/track-g",
       "authorReturnedFiles": 4,
       "authorReturnedLines": "+195/-29",
-      "authorReturnedNotice": "trinity-bus from nisaba (worker-codex) \u2192 dione (worker-opus) at 2026-05-07T11:09:18+02:00",
-      "lastDispatchPrompt": "SPRINT-14 TRACK G \u2014 AUTHOR (worker-codex \u00d7 Dione review)\n\nYou are Nisaba \ud83c\udf3e (worker-codex, Codex foundation), authoring Track G (Observability v1.0.1 patch) of Sprint-14 in Hassaleh. Reviewer will be Dione (Opus foundation) \u2014 cross-LLM check.\n\n## Repo + branch\n\nRepo: ~/projects/hassaleh\nDefault: trunk (FROZEN at planCommitFrozen=c268bb0)\nAuthor branch: sprint-14/track-g (create from trunk)\nPush to: origin/sprint-14/track-g\n\n## Authoritative spec\n\nRead in this order before coding:\n1. ~/projects/hassaleh/docs/sprint-14-plan.md \u00a75.G \u2014 the seven advisories table (D-A1..D-A7) with severity + chosen resolution.\n2. Canonical source: ~/projects/hassaleh/docs/sprint-13-track-d-review.md \u00a76 #1\u2013#7 \u2014 Inanna's Sprint-13 Track-D R1 review, FROZEN. Treat that file as authoritative for source fidelity, NOT the plan's column-2 excerpts.\n\n## Deliverables (one bundled commit)\n\nCode changes per \u00a75.G:\n- D-A1: Eager init at daemon startup, guarded by `is_obs_enabled()`, called from runtime entrypoint BEFORE first dispatch. `_ensure_metrics()` retains `threading.Lock` as defense-in-depth.\n- D-A2: `_ensure_metrics()` returns `(counter, histogram, registry)`; `get_runtime_registry()` calls it and returns the registry. Remove the `assert _registry is not None`.\n- D-A3: NO Track-G code change. Routed to Track E.\n- D-A4: Allow-list of the six \u00a73 Intent types inside `record_metric`; un-registered types emit `intent_type=\"unknown\"` and increment a separate guard counter `hassaleh_intent_unknown_type_total`.\n- D-A5: Add four sub-ms boundaries to `_DURATION_BUCKETS`: 0.0005, 0.001, 0.002, 0.005 (preserve existing 0.01 anchor and all higher buckets).\n- D-A6: (a) module-docstring precondition note in `observability.py` + (b) integration test asserting setup-then-emit canonical sequence.\n- D-A7: One-line cross-reference comment at `_LOGGER_NAME` definition documenting the intentional separation from `SERVICE_ENUM`. NO code-name change.\n\nFiles touched (per plan):\n- src/hassaleh/runtime/observability.py\n- tests/test_runtime_observability.py \u2014 ~3 new tests covering D-A1 thread-safety, D-A4 unknown-type guard, D-A6 setup-then-emit\n- docs/sprint-13-plan.md \u2014 change-log entry for v1.0.1 with this commit's SHA\n\nDO NOT touch src/hassaleh/obs/tracing.py (none of D-A1..D-A7 require it).\n\n## Process gates\n\n- ONE bundled commit on sprint-14/track-g with subject `sprint-14 Track G: observability v1.0.1 patch (D-A1..D-A7)`. Body lists each advisory and the line-numbered fix.\n- Push branch when ready.\n- DO NOT merge to trunk \u2014 Dione reviews, then merges per \u00a77.1.\n- DO NOT modify sprint-14-state.json \u2014 Dione/orchestrator owns that.\n\n## When done\n\ntrinity-bus send --from nisaba --to dione -m \"Track G author done: branch sprint-14/track-g at <SHA>\"\n\nIf blocked, send Bus clarification to Dione before committing partial work.\n",
+      "authorReturnedNotice": "trinity-bus from nisaba (worker-codex) → dione (worker-opus) at 2026-05-07T11:09:18+02:00",
+      "lastDispatchPrompt": "SPRINT-14 TRACK G — AUTHOR (worker-codex × Dione review)\n\nYou are Nisaba 🌾 (worker-codex, Codex foundation), authoring Track G (Observability v1.0.1 patch) of Sprint-14 in Hassaleh. Reviewer will be Dione (Opus foundation) — cross-LLM check.\n\n## Repo + branch\n\nRepo: ~/projects/hassaleh\nDefault: trunk (FROZEN at planCommitFrozen=c268bb0)\nAuthor branch: sprint-14/track-g (create from trunk)\nPush to: origin/sprint-14/track-g\n\n## Authoritative spec\n\nRead in this order before coding:\n1. ~/projects/hassaleh/docs/sprint-14-plan.md §5.G — the seven advisories table (D-A1..D-A7) with severity + chosen resolution.\n2. Canonical source: ~/projects/hassaleh/docs/sprint-13-track-d-review.md §6 #1–#7 — Inanna's Sprint-13 Track-D R1 review, FROZEN. Treat that file as authoritative for source fidelity, NOT the plan's column-2 excerpts.\n\n## Deliverables (one bundled commit)\n\nCode changes per §5.G:\n- D-A1: Eager init at daemon startup, guarded by `is_obs_enabled()`, called from runtime entrypoint BEFORE first dispatch. `_ensure_metrics()` retains `threading.Lock` as defense-in-depth.\n- D-A2: `_ensure_metrics()` returns `(counter, histogram, registry)`; `get_runtime_registry()` calls it and returns the registry. Remove the `assert _registry is not None`.\n- D-A3: NO Track-G code change. Routed to Track E.\n- D-A4: Allow-list of the six §3 Intent types inside `record_metric`; un-registered types emit `intent_type=\"unknown\"` and increment a separate guard counter `hassaleh_intent_unknown_type_total`.\n- D-A5: Add four sub-ms boundaries to `_DURATION_BUCKETS`: 0.0005, 0.001, 0.002, 0.005 (preserve existing 0.01 anchor and all higher buckets).\n- D-A6: (a) module-docstring precondition note in `observability.py` + (b) integration test asserting setup-then-emit canonical sequence.\n- D-A7: One-line cross-reference comment at `_LOGGER_NAME` definition documenting the intentional separation from `SERVICE_ENUM`. NO code-name change.\n\nFiles touched (per plan):\n- src/hassaleh/runtime/observability.py\n- tests/test_runtime_observability.py — ~3 new tests covering D-A1 thread-safety, D-A4 unknown-type guard, D-A6 setup-then-emit\n- docs/sprint-13-plan.md — change-log entry for v1.0.1 with this commit's SHA\n\nDO NOT touch src/hassaleh/obs/tracing.py (none of D-A1..D-A7 require it).\n\n## Process gates\n\n- ONE bundled commit on sprint-14/track-g with subject `sprint-14 Track G: observability v1.0.1 patch (D-A1..D-A7)`. Body lists each advisory and the line-numbered fix.\n- Push branch when ready.\n- DO NOT merge to trunk — Dione reviews, then merges per §7.1.\n- DO NOT modify sprint-14-state.json — Dione/orchestrator owns that.\n\n## When done\n\ntrinity-bus send --from nisaba --to dione -m \"Track G author done: branch sprint-14/track-g at <SHA>\"\n\nIf blocked, send Bus clarification to Dione before committing partial work.\n",
       "dispatchHistory": [
         {
           "attempt": 1,
@@ -359,10 +359,10 @@
         "by": "dione-A2",
         "to": "implement",
         "at": "2026-05-09T10:27:14.532713+02:00",
-        "reason": "round1Verdict=CHANGE-REQ acked; Inanna (PM-role) declined A2 in bus reply, falling back to Dione-A2 per SKILL \u00a71d (A2 = All EXCEPT B, E)."
+        "reason": "round1Verdict=CHANGE-REQ acked; Inanna (PM-role) declined A2 in bus reply, falling back to Dione-A2 per SKILL §1d (A2 = All EXCEPT B, E)."
       },
       "round2AuthorReturnedCommit": "abba44d658f65e4c6a7fb2e7b5e439699e70bf1a",
-      "round2AuthorReturnedNotice": "trinity-bus from nisaba (worker-codex) \u2192 dione (worker-opus) at 2026-05-09T12:36:56+02:00; rebased onto trunk@dfa436b, force-pushed.",
+      "round2AuthorReturnedNotice": "trinity-bus from nisaba (worker-codex) → dione (worker-opus) at 2026-05-09T12:36:56+02:00; rebased onto trunk@dfa436b, force-pushed.",
       "round2ReviewedAt": "2026-05-09T12:51:40+02:00",
       "round2ReviewFile": "docs/sprint-14-track-g-review-2-dione.md",
       "round2ReviewCommit": "f815adb",
@@ -375,7 +375,7 @@
         "finalAuthorTip": "38a4f8abf5a672e5faccc0c05d50e44b30fbeded",
         "rebasedOnto": "d099d2e478ab1a83ccee2396699b2a3ce4dd2bbb",
         "authorForcePushedAt": "2026-05-09T12:54:49+02:00",
-        "authorForcePushNotice": "trinity-bus from nisaba (worker-codex) \u2192 dione (worker-opus); rebased with --force-with-lease per Option-1 preference",
+        "authorForcePushNotice": "trinity-bus from nisaba (worker-codex) → dione (worker-opus); rebased with --force-with-lease per Option-1 preference",
         "contentEquivalence": "byte-identical Track-G payload to abba44d (round-2 reviewed SHA): same 4 files, same +195/-29, same 22 obs tests pass; only parent-pointer differs",
         "preMergeGate": "PYTHONPATH=worktree/src pytest tests/test_runtime_core.py tests/test_runtime_observability.py = 38 passed (22 obs + 16 core, expanded vs round-2's 22-only to assert D-A1 eager-init core.py wire-up doesn't regress runtime/core)",
         "postMergeGate": "PYTHONPATH=/home/uranus/projects/hassaleh/src pytest tests/test_runtime_core.py tests/test_runtime_observability.py = 38 passed in 2.91s on trunk",
@@ -395,7 +395,7 @@
         "phantomDeleteRisk": false,
         "rebaseRaceObserved": "trunk advanced 6c20d30 + 1ad7610 (Track-C round-1 review + state.json) AFTER Nisaba's 12:39 force-push; file-domain-disjoint with track-g; merge requires either re-rebase to trunk@1ad7610 OR 3-way merge-commit. Decision deferred to merge step.",
         "advisoryNotes": [
-          "process-fix: future round-2 reviewer holds trunk commits during rebase-window-pending state, OR author signals rebase-window-closed before reviewer resumes \u2014 candidate for feedback_corrections_on_checked_in_state.md sub-rule"
+          "process-fix: future round-2 reviewer holds trunk commits during rebase-window-pending state, OR author signals rebase-window-closed before reviewer resumes — candidate for feedback_corrections_on_checked_in_state.md sub-rule"
         ]
       }
     }
@@ -435,7 +435,7 @@
       "followUpCronTtlHours": 6,
       "maxActiveFollowUpCrons": 5
     },
-    "reportingFlow": "Inanna PM-cron \u2192 bus to Dione (aggregator) \u2192 Telegram to Ingo only on actionable issues or sprint-grenze (G1/G2/G3/G4)",
+    "reportingFlow": "Inanna PM-cron → bus to Dione (aggregator) → Telegram to Ingo only on actionable issues or sprint-grenze (G1/G2/G3/G4)",
     "autonomousActions": [
       {
         "timestamp": "2026-05-08T10:23:01.085405+02:00",
@@ -601,9 +601,9 @@
   "advisories": [
     {
       "id": "S14-OQ-1",
-      "fromReview": "sprint-14-plan v0 \u00a76.1",
+      "fromReview": "sprint-14-plan v0 §6.1",
       "scope": "Open question for plan reviewers: should Track G be a bounded re-trial of worker-codex/worker-gemini under tighter Inanna scrutiny, or hold the only-opus stance? v0 default: hold.",
-      "resolution": "REVERSED 2026-05-07 by Ingo: worker parity restored across all 5 tracks; only-opus stance dropped. Cross-LLM verification enforced (author worker foundation \u2260 reviewer persona foundation). Track-G specifically: worker-codex authors with Dione (opus) review \u2014 bounded test of whether codex+opus-review can close the 7 advisories that codex/gemini missed in Sprint-13.",
+      "resolution": "REVERSED 2026-05-07 by Ingo: worker parity restored across all 5 tracks; only-opus stance dropped. Cross-LLM verification enforced (author worker foundation ≠ reviewer persona foundation). Track-G specifically: worker-codex authors with Dione (opus) review — bounded test of whether codex+opus-review can close the 7 advisories that codex/gemini missed in Sprint-13.",
       "resolvedAt": "2026-05-07T09:47:00+02:00",
       "resolvedBy": "ingo"
     }
@@ -622,16 +622,16 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-14T16:22:07+02:00",
+    "at": "2026-05-14T18:22:59+02:00",
     "cronId": "5d854f3b-8dea-4e5c-a680-9ba5eee1c64b",
     "verdict": "silent-no-action",
     "observations": [
       "no phase transitions since 2026-05-09 (C+G merged 5d stable)",
-      "Track B Phase-2 gate met but Ingo-decline-hold persists (attempt-9 resolved 2026-05-13T12:37); main-session author-lift, not bus-dispatchable",
+      "Track B Phase-2 gate met but Ingo-decline-hold persists (attempt-9 resolved 2026-05-13T12:37) — main-session author-lift, not bus-dispatchable",
       "E+F cascade-blocked on B",
-      "failover-watcher healthy (last fire 2026-05-14T16:07:54+02:00 ~14min ago, well under 30min threshold; no impl-phase tracks to watch)",
-      "prevFire 2026-05-14T14:17:15+02:00"
+      "failover-watcher healthy (last run 2026-05-14T18:04 CEST ~15min ago, under 30min threshold; no impl-phase tracks to watch)",
+      "prevFire 2026-05-14T16:22:07+02:00"
     ]
   },
-  "updatedAt": "2026-05-14T16:22:07+02:00"
+  "updatedAt": "2026-05-14T18:22:59+02:00"
 }
