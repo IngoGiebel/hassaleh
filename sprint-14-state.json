@@ -622,48 +622,16 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-13T13:39:00+02:00",
-    "observedBy": "orchestrator-cron-5d854f3b",
-    "firePrompt": "cron 2h fallback dispatcher",
-    "observations": {
-      "G": {
-        "phase": "merged",
-        "mergedAt": "2026-05-09T12:59:49+02:00",
-        "note": "Stable since 2026-05-09 (4d)."
-      },
-      "C": {
-        "phase": "merged",
-        "mergedAt": "2026-05-09T16:28:27+02:00",
-        "note": "Stable since 2026-05-09 (4d)."
-      },
-      "B": {
-        "phase": "pending",
-        "note": "Phase-2 gate met. Ingo-decline-hold persists (ae111912 declined 2026-05-10T00:32; 8500bc08 chain attempts 5-9 ACKed; K-29 self-loop hypothesis if attempts >10). User-decline overrides Phase-2 trigger; out of orchestrator scope (Inanna PM domain)."
-      },
-      "E": {
-        "phase": "pending",
-        "note": "Phase-3 gate (depends on B). Cascade-blocked."
-      },
-      "F": {
-        "phase": "pending",
-        "note": "Phase-4 gate (depends on B,C,D,E). Cascade-blocked."
-      }
-    },
-    "failoverWatcherHealth": {
-      "verdict": "healthy",
-      "note": "jobs.json lastRunAtMs=null (likely reset by gateway restart event ~11:24 CEST or cron rewrite), but .remember log shows clean 15-min fires through 12:42 CEST (all exit 0, failover=0). Actual execution healthy; jobs.json telemetry stale. Non-actionable per orchestrator escalation gate (script working, no dispatched-pending tracks need it)."
-    },
-    "actionsTaken": [
-      "no new phase transitions since 2026-05-09 (4d stable)",
-      "Track B remains on Ingo-decline-hold (out of orchestrator scope)",
-      "no dispatch fired",
-      "no dependency violations",
-      "no sprint-completion candidate (3/5 tracks pending)",
-      "failover-watcher healthy (12:42 fire clean despite jobs.json telemetry reset)"
-    ],
-    "silentReason": "No phase transition since 2026-05-09; Track B on Ingo-decline-hold; failover-watcher operationally healthy. Per Sprint-Reviews cadence: intermediate fires logged, not Telegrammed.",
-    "nextStep": "Hold position. On Ingo go-signal for Track B: dispatch worker-opus self-author per Phase-2 plan. Otherwise next 2h fire (~15:39) re-checks state.",
-    "previousFire": "2026-05-13T11:39:00+02:00"
+    "at": "2026-05-14T16:22:07+02:00",
+    "cronId": "5d854f3b-8dea-4e5c-a680-9ba5eee1c64b",
+    "verdict": "silent-no-action",
+    "observations": [
+      "no phase transitions since 2026-05-09 (C+G merged 5d stable)",
+      "Track B Phase-2 gate met but Ingo-decline-hold persists (attempt-9 resolved 2026-05-13T12:37); main-session author-lift, not bus-dispatchable",
+      "E+F cascade-blocked on B",
+      "failover-watcher healthy (last fire 2026-05-14T16:07:54+02:00 ~14min ago, well under 30min threshold; no impl-phase tracks to watch)",
+      "prevFire 2026-05-14T14:17:15+02:00"
+    ]
   },
-  "updatedAt": "2026-05-13T09:39:00+02:00"
+  "updatedAt": "2026-05-14T16:22:07+02:00"
 }
