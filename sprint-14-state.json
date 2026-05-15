@@ -622,17 +622,17 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-15T12:34:00+02:00",
+    "at": "2026-05-15T18:41:00+02:00",
     "cronId": "5d854f3b-8dea-4e5c-a680-9ba5eee1c64b",
     "verdict": "silent-no-action",
     "observations": [
-      "no phase transitions since 2026-05-09 (C+G merged ~6d20h stable)",
+      "no phase transitions since 2026-05-09 (C+G merged ~6d, stable)",
       "Track B Phase-2 gate met but Ingo-decline-hold persists (attempt-9 closed 2026-05-13T12:37) — main-session author-lift, not bus-dispatchable",
       "E+F cascade-blocked on B",
-      "failover-watcher cron a738b0f8 healthy: last fire 6m ago, status ok, next in ~9m",
-      "no tracks in implement phase (failover-watcher trivially silent)",
-      "prevFire 2026-05-15T10:35:00+02:00 (verdict silent-no-action)"
+      "failover-watcher cron a738b0f8 healthy: last fire 9m ago, status ok, next due in ~6m",
+      "no tracks in implement phase (failover-watcher trivially silent per memory 04:02)",
+      "prevFire 2026-05-15T16:41:00+02:00 (verdict silent-no-action, uncommitted)"
     ]
   },
-  "updatedAt": "2026-05-15T12:35:00+02:00"
+  "updatedAt": "2026-05-15T18:41:00+02:00"
 }
