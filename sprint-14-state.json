@@ -622,17 +622,16 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-17T01:00:00+02:00",
+    "at": "2026-05-17T19:13:00+02:00",
     "cronId": "5d854f3b-8dea-4e5c-a680-9ba5eee1c64b",
     "verdict": "silent-no-action",
     "observations": [
-      "no phase transitions since 2026-05-09 (C+G merged ~8d stable)",
-      "Track B Phase-2 gate met but Ingo-decline-hold persists (attempt-9 closed 2026-05-13T12:37, ~4d ago); main-session author-lift not bus-dispatchable; do not re-attempt auto-dispatch",
-      "E+F cascade-blocked on B",
-      "failover-watcher healthy: per now.md cron fires 00:13 + 00:53 both clean (failover=0 exhausted=0 non_cap=0)",
-      "prev orchestrator fire 2026-05-16T22:52:00+02:00 (verdict silent-no-action)",
-      "1st fire today: 01:00 (first post-midnight tick)"
+      "12th consecutive silent-no-action fire today (every-2h cadence; prior fire 17:13 written but not committed — subsumed by this fire)",
+      "Track-B Ingo-decline-hold persists (attempt-9 closed 2026-05-13T12:37, 4d ago); main-session author-lift remains not bus-dispatchable, suppression honored",
+      "No new hassaleh commits since 11:00 (10h quiet); Inanna PM-cron last autonomous-action 2026-05-13, no fresh stuck-state triggers expected",
+      "Failover-watcher: no implement-phase tracks present (B held, E/F cascade-blocked, C/G merged 8d) → silent-skip remains correct per §Domain boundary single-writer policy",
+      "Phase still phase-1; no transitions to log; no dependency violations; no sprint-completion criteria approached"
     ]
   },
-  "updatedAt": "2026-05-17T01:00:00+02:00"
+  "updatedAt": "2026-05-17T19:13:00+02:00"
 }
