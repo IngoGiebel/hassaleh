@@ -622,16 +622,16 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-17T23:13:00+02:00",
+    "at": "2026-05-18T17:36:00+02:00",
     "cronId": "5d854f3b-8dea-4e5c-a680-9ba5eee1c64b",
     "verdict": "silent-no-action",
     "observations": [
-      "14th consecutive silent-no-action fire today (every-2h cadence; prior fire 21:13 committed 7dbf3ca)",
-      "Track-B Ingo-decline-hold persists (attempt-9 closed 2026-05-13T12:37, 4d 11h ago); main-session author-lift remains not bus-dispatchable, suppression honored",
-      "No new hassaleh commits since 11:00 (12h quiet on non-orch paths); no fresh stuck-state triggers",
-      "Failover-watcher: no implement-phase tracks present (B held, E/F cascade-blocked, C/G merged 8d) — silent-skip remains correct per §Domain boundary single-writer policy",
+      "First commit of 2026-05-18 cycle; 8 uncommitted silent-fires of plain-string form since 4023d4f (23:13 prior day); restoring rich-format heartbeat",
+      "Track-B Ingo-decline-hold persists (attempt-9 closed 2026-05-13T12:37, 5d 5h ago); main-session author-lift remains not bus-dispatchable, suppression honored",
+      "No new hassaleh commits on non-orch paths since 11:00 yesterday (30h+ quiet); no fresh stuck-state triggers",
+      "Failover-watcher (a738b0f8) healthy: last run 4m ago, next in 11m, no implement-phase tracks (B held, E/F cascade-blocked, C/G merged 9d) — silent-skip correct per §Domain boundary single-writer policy",
       "Phase still phase-1; no transitions to log; no dependency violations; no sprint-completion criteria approached"
     ]
   },
-  "updatedAt": "2026-05-17T23:13:00+02:00"
+  "updatedAt": "2026-05-18T17:36:00+02:00"
 }
