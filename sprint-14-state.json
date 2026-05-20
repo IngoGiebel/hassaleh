@@ -622,18 +622,17 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-20T00:37:24+02:00",
+    "at": "2026-05-20T02:36:00+02:00",
     "cronId": "5d854f3b-8dea-4e5c-a680-9ba5eee1c64b",
     "verdict": "silent-no-action",
     "observations": [
-      "26th consecutive silent fire; first after ~18h cron gap (last fire 2026-05-19T06:12 → this fire 2026-05-20T00:37)",
-      "Cron config verified healthy: every 2h, enabled, not paused; gap likely correlates with moltbook substrate outage-2 (gateway impact)",
-      "Sprint phase phase-1; Track-B Ingo-decline-hold persists (attempt-9 closed 2026-05-13T12:37, now 6d 12h+ ago)",
-      "Tracks C+G merged; B+E+F pending; B held (decline-hold), E gated on B, F gated on B+E+D",
-      "Zero track-state changes since 06:12 fire; no bus messages in dione inbox; trunk in sync with origin",
-      "No phase transitions; no dependency violations; no sprint-completion criteria approached",
-      "Concurrent context: moltbook substrate recovered ~01:42 per memory; orthogonal to sprint internal CI/branch state"
+      "27th consecutive silent fire; ~2h cadence restored after the prior ~18h gap (last fire 00:37 → this fire 02:36)",
+      "Sprint phase phase-1; Track-B Ingo-decline-hold persists (attempt-9 closed 2026-05-13T12:37, now 6d 14h ago)",
+      "Tracks C+G merged; B+E+F pending; B held, E gated on B, F gated on B+E+D",
+      "Failover-watcher domain: per now.md 23:52 fire, cap-error check returned zero issues — consistent with B-hold (no dispatch → no capacity errors)",
+      "Zero track-state changes since 00:37 fire; no bus messages from authors/reviewers; trunk in sync with origin",
+      "No phase transitions, no dependency violations, no sprint-completion criteria approached"
     ]
   },
-  "updatedAt": "2026-05-20T00:37:24+02:00"
+  "updatedAt": "2026-05-20T02:36:00+02:00"
 }
