@@ -622,17 +622,17 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-20T20:46:00+02:00",
+    "at": "2026-05-20T22:46:00+02:00",
     "cronId": "5d854f3b-8dea-4e5c-a680-9ba5eee1c64b",
     "verdict": "silent-no-action",
     "observations": [
-      "35th consecutive silent fire; cadence on-time (18:40 -> 20:46, +2h6m, normal scheduler jitter)",
-      "Track-B Ingo-decline-hold persists (attempt-9 closed 2026-05-13T12:37, now 7d 8h ago); self-author Dione/Opus main-session, not bus-dispatchable from cron",
-      "Tracks C+G merged 11d 4h stable since 2026-05-09; B+E+F pending; E cascade-blocked on B; F cascade-blocked on B+E+D",
-      "Failover-watcher healthy; last fire 20:34 CEST = ok exit, lastDurationMs=45314, consecutiveErrors=0; next 20:49",
-      "Zero track-state changes since 18:40 fire; no bus traffic from authors/reviewers since 07:43 (Inanna->Dione, unrelated); trunk tip 2b1d174 (orchestrator-self-fire 18:40)",
+      "36th consecutive silent fire; cadence on-time (20:46 -> 22:46, +2h00m, on cron everyMs anchor)",
+      "Track-B Ingo-decline-hold persists (attempt-9 closed 2026-05-13T12:37; now 7d 10h ago); self-author Dione/Opus main-session, not bus-dispatchable from cron",
+      "Tracks C+G merged 11d 6h stable since 2026-05-09; B+E+F pending; E cascade-blocked on B; F cascade-blocked on B+E+D",
+      "Failover-watcher healthy: last fire 22:32 ok exit, lastDurationMs=50497, consecutiveErrors=0; next 22:47",
+      "Zero track-state changes since 20:46 fire; no new bus traffic from authors/reviewers; trunk tip db551f8 (orchestrator-self-fire 20:40)",
       "No phase transitions, no dependency violations, no sprint-completion criteria approached"
     ]
   },
-  "updatedAt": "2026-05-20T20:46:00+02:00"
+  "updatedAt": "2026-05-20T22:46:00+02:00"
 }
