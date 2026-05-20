@@ -622,17 +622,17 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-20T12:40:00+02:00",
+    "at": "2026-05-20T14:40:00+02:00",
     "cronId": "5d854f3b-8dea-4e5c-a680-9ba5eee1c64b",
     "verdict": "silent-no-action",
     "observations": [
-      "31st consecutive silent fire; cadence on time (10:40 → 12:40, +2h0m)",
-      "Sprint phase phase-1; Track-B Ingo-decline-hold persists (attempt-9 closed 2026-05-13T12:37, now 7d 0h ago); Track-B is self-author by Dione/Opus main-session — not bus-dispatchable from cron",
+      "32nd consecutive silent fire; cadence on time (12:40 → 14:40, +2h0m)",
+      "Sprint phase phase-1; Track-B Ingo-decline-hold persists (attempt-9 closed 2026-05-13T12:37, now 7d 2h ago); Track-B is self-author by Dione/Opus main-session — not bus-dispatchable from cron",
       "Tracks C+G merged (11d 23h stable since 2026-05-09); B+E+F pending; E cascade-blocked on B; F cascade-blocked on B+E+D",
-      "Failover-watcher healthy: last fire 12:39:44 CEST (~1min ago, status=ok, durationMs=38182), next 12:54:44 CEST, 0 consecutiveErrors",
-      "Zero track-state changes since 10:40 fire; no bus messages from authors/reviewers; no new commits to hassaleh trunk except orchestrator self-fire 2fbeb1e",
+      "Failover-watcher healthy: last fire 2026-05-20T14:32:36 CEST (status=ok, durationMs=37743), next 14:47:36 CEST, 0 consecutiveErrors",
+      "Zero track-state changes since 12:40 fire; no bus messages from authors/reviewers; trunk tip 603ad19 (orchestrator-self-fire 12:40)",
       "No phase transitions, no dependency violations, no sprint-completion criteria approached"
     ]
   },
-  "updatedAt": "2026-05-20T12:40:00+02:00"
+  "updatedAt": "2026-05-20T14:40:00+02:00"
 }
