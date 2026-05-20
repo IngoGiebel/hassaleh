@@ -622,17 +622,17 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-20T02:36:00+02:00",
+    "at": "2026-05-20T04:40:00+02:00",
     "cronId": "5d854f3b-8dea-4e5c-a680-9ba5eee1c64b",
     "verdict": "silent-no-action",
     "observations": [
-      "27th consecutive silent fire; ~2h cadence restored after the prior ~18h gap (last fire 00:37 → this fire 02:36)",
-      "Sprint phase phase-1; Track-B Ingo-decline-hold persists (attempt-9 closed 2026-05-13T12:37, now 6d 14h ago)",
+      "28th consecutive silent fire; ~2h cadence (last fire 02:36 → this fire 04:40)",
+      "Sprint phase phase-1; Track-B Ingo-decline-hold persists (attempt-9 closed 2026-05-13T12:37, now 6d 16h ago)",
       "Tracks C+G merged; B+E+F pending; B held, E gated on B, F gated on B+E+D",
-      "Failover-watcher domain: per now.md 23:52 fire, cap-error check returned zero issues — consistent with B-hold (no dispatch → no capacity errors)",
-      "Zero track-state changes since 00:37 fire; no bus messages from authors/reviewers; trunk in sync with origin",
+      "Failover-watcher last finish 04:09 (~31min ago); cron list shows 'running' state; NO alert per orchestrator spec — no tracks need failover-watcher (B held by Ingo, E/F dep-gated, no capacity-error condition)",
+      "Zero track-state changes since 02:36 fire; no bus messages from authors/reviewers; trunk in sync with origin",
       "No phase transitions, no dependency violations, no sprint-completion criteria approached"
     ]
   },
-  "updatedAt": "2026-05-20T02:36:00+02:00"
+  "updatedAt": "2026-05-20T04:40:00+02:00"
 }
