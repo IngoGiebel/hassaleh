@@ -622,16 +622,17 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-21T06:46:00+02:00",
+    "at": "2026-05-21T11:18:25+02:00",
     "cronId": "5d854f3b-8dea-4e5c-a680-9ba5eee1c64b",
     "verdict": "silent-no-action",
     "observations": [
-      "40th consecutive silent fire; cadence on-time (04:46 -> 06:46, +2h00m anchor; observed at 07:02 = +16min cron drift, within tolerance)",
-      "Track-B Ingo-decline-hold persists (attempt-9 closed 2026-05-13T12:37; now 7d 18h 25m ago); self-author Dione/Opus main-session, not bus-dispatchable from cron",
-      "Tracks C+G merged 11d 14h stable since 2026-05-09; B+E+F pending; E cascade-blocked on B; F cascade-blocked on B+E+D",
-      "Failover-watcher healthy (last completed run 06:41:50 CEST, status=ok, durationMs=40020; cycle 06:56:50 currently running started 07:01:34; consecutiveErrors=0; well within 30min health window)",
-      "Zero track-state changes since 04:46 fire; no new bus traffic from authors/reviewers; trunk tip 89db284 (orchestrator-self-fire 04:46)",
-      "No phase transitions, no dependency violations, no sprint-completion criteria approached"
+      "42nd consecutive silent fire (count includes 07:01 and 09:01 fires that NO_REPLYd without committing audit records; restored audit-trail at 11:18)",
+      "Cadence drifted: actual fire 11:18 against 11:01 anchor (+17min); within tolerance, no schedule corruption",
+      "Track-B Ingo-decline-hold persists (attempt-9 closed 2026-05-13T12:37 = 7d 22h 41m ago); self-author Dione/Opus main-session work, not bus-dispatchable from cron",
+      "Tracks C+G merged 11d 19h stable since 2026-05-09; B+E+F pending; E cascade-blocked on B; F cascade-blocked on B+E+D",
+      "Failover-watcher healthy: last completed run 10:56:27 CEST (status=ok, durationMs=17464, consecutiveErrors=0); 11:11-anchored fire running since 11:18:25 (concurrent overlap normal)",
+      "Zero track-state changes since 06:46 commit (e54939a); no new bus traffic from authors/reviewers; trunk tip e54939a unchanged through three uncommitted fires",
+      "No phase transitions, no dependency violations, no sprint-completion criteria approached → NO_REPLY to Ingo"
     ]
   },
   "updatedAt": "2026-05-21T02:46:00+02:00"
