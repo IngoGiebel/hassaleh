@@ -622,16 +622,16 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-21T17:34:00+02:00",
+    "at": "2026-05-21T19:35:00+02:00",
     "cronId": "5d854f3b-8dea-4e5c-a680-9ba5eee1c64b",
     "verdict": "silent-no-action",
-    "fireNumber": 45,
+    "fireNumber": 46,
     "observations": [
-      "45th consecutive silent fire; cadence on-time (15:36 -> 17:34 = +1h58m)",
-      "Track-B Ingo-decline-hold 8d 5h (attempt-9 closed 2026-05-13T12:37); self-author Dione/Opus main-session work, not cron-bus-dispatchable",
-      "Tracks C+G merged stable since 2026-05-09 (12d); B+E+F pending; E cascade-blocked on B+A; F cascade-blocked on B+D+E",
-      "Failover-watcher healthy: cron a738b0f8 every-15m status=ok, last fire ~17:31 (3m ago per openclaw cron list), next in 12m, well inside 30min stuck-watcher window",
-      "Zero track-state changes since 2026-05-09 merges; trunk tip 6597db4 unchanged from prior 15:36 fire",
+      "46th consecutive silent fire; cadence on-time (17:34 -> 19:35 = +2h01m)",
+      "Track-B Ingo-decline-hold 8d 7h (attempt-9 closed 2026-05-13T12:37); self-author Dione/Opus main-session work, not cron-bus-dispatchable",
+      "Tracks C+G merged stable since 2026-05-09 (12d 3h); B+E+F pending; E cascade-blocked on B+A; F cascade-blocked on B+D+E",
+      "Failover-watcher healthy: cron a738b0f8 every-15m status=ok, last fire <1m ago, next in ~14m, well inside 30min stuck-watcher window",
+      "Zero track-state changes since 2026-05-09 merges; trunk tip 5999efe unchanged from prior 17:34 silent-fire commit",
       "No phase transitions, no dependency violations, no sprint-completion criteria approached -> NO_REPLY to Ingo"
     ]
   },
