@@ -622,17 +622,16 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-21T11:18:25+02:00",
+    "at": "2026-05-21T13:20:00+02:00",
     "cronId": "5d854f3b-8dea-4e5c-a680-9ba5eee1c64b",
     "verdict": "silent-no-action",
     "observations": [
-      "42nd consecutive silent fire (count includes 07:01 and 09:01 fires that NO_REPLYd without committing audit records; restored audit-trail at 11:18)",
-      "Cadence drifted: actual fire 11:18 against 11:01 anchor (+17min); within tolerance, no schedule corruption",
-      "Track-B Ingo-decline-hold persists (attempt-9 closed 2026-05-13T12:37 = 7d 22h 41m ago); self-author Dione/Opus main-session work, not bus-dispatchable from cron",
-      "Tracks C+G merged 11d 19h stable since 2026-05-09; B+E+F pending; E cascade-blocked on B; F cascade-blocked on B+E+D",
-      "Failover-watcher healthy: last completed run 10:56:27 CEST (status=ok, durationMs=17464, consecutiveErrors=0); 11:11-anchored fire running since 11:18:25 (concurrent overlap normal)",
-      "Zero track-state changes since 06:46 commit (e54939a); no new bus traffic from authors/reviewers; trunk tip e54939a unchanged through three uncommitted fires",
-      "No phase transitions, no dependency violations, no sprint-completion criteria approached → NO_REPLY to Ingo"
+      "43rd consecutive silent fire; cadence on-time (+2h02m from 11:18 anchor)",
+      "Track-B Ingo-decline-hold persists (attempt-9 closed 2026-05-13T12:37 = 8d 0h 43m ago); self-author Dione/Opus main-session work, not bus-dispatchable from cron",
+      "Tracks C+G merged 11d 21h stable since 2026-05-09; B+E+F pending; E cascade-blocked on B; F cascade-blocked on B+D+E",
+      "Failover-watcher healthy: latest memory-confirmed fire at 10:10 (exit 0, failover=0/exhausted=0/non_cap=0); 13:11-anchored slot within 30min window",
+      "Zero track-state changes since 11:18 commit (240f84f); no bus traffic from authors/reviewers; trunk tip unchanged",
+      "No phase transitions, no dependency violations, no sprint-completion criteria approached -> NO_REPLY to Ingo"
     ]
   },
   "updatedAt": "2026-05-21T02:46:00+02:00"
