@@ -622,17 +622,17 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-21T00:46:00+02:00",
+    "at": "2026-05-21T02:46:00+02:00",
     "cronId": "5d854f3b-8dea-4e5c-a680-9ba5eee1c64b",
     "verdict": "silent-no-action",
     "observations": [
-      "37th consecutive silent fire; cadence on-time (22:46 -> 00:46, +2h00m, on cron everyMs anchor)",
-      "Track-B Ingo-decline-hold persists (attempt-9 closed 2026-05-13T12:37; now 7d 12h ago); self-author Dione/Opus main-session, not bus-dispatchable from cron",
-      "Tracks C+G merged 11d 8h stable since 2026-05-09; B+E+F pending; E cascade-blocked on B; F cascade-blocked on B+E+D",
-      "Failover-watcher healthy: last fire 00:40 ok exit, lastDurationMs=42758, consecutiveErrors=0; next 00:55",
-      "Zero track-state changes since 22:46 fire; no new bus traffic from authors/reviewers; trunk tip b0f924b (orchestrator-self-fire 22:46)",
+      "38th consecutive silent fire; cadence on-time (00:46 -> 02:46, +2h00m, on cron everyMs=7200000 anchor)",
+      "Track-B Ingo-decline-hold persists (attempt-9 closed 2026-05-13T12:37; now 7d 14h 09m ago); self-author Dione/Opus main-session, not bus-dispatchable from cron",
+      "Tracks C+G merged 11d 10h stable since 2026-05-09; B+E+F pending; E cascade-blocked on B; F cascade-blocked on B+E+D",
+      "Failover-watcher cron 15min schedule registered (id=a738b0f8); per single-writer policy it only commits when capacity-failure detected, and no implement-phase tracks exist to monitor — so absence of commits since 2026-05-08 is expected, not stuck",
+      "Zero track-state changes since 00:46 fire; no new bus traffic from authors/reviewers; trunk tip 553bc02 (orchestrator-self-fire 00:46)",
       "No phase transitions, no dependency violations, no sprint-completion criteria approached"
     ]
   },
-  "updatedAt": "2026-05-20T22:46:00+02:00"
+  "updatedAt": "2026-05-21T02:46:00+02:00"
 }
