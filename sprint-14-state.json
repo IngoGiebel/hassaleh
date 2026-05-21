@@ -622,17 +622,17 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-21T23:34:00+02:00",
+    "at": "2026-05-22T01:51:00+02:00",
     "cronId": "5d854f3b-8dea-4e5c-a680-9ba5eee1c64b",
     "verdict": "silent-no-action",
-    "fireNumber": 48,
+    "fireNumber": 49,
     "observations": [
-      "48th consecutive silent fire; cadence on-time (21:34 -> 23:34 = +2h00m nominal, actual dispatch 23:55 = +21m drift, within 2h tolerance)",
-      "Track-B Ingo-decline-hold 8d 11h (attempt-9 closed 2026-05-13T12:37); self-author Dione/Opus main-session work, not cron-bus-dispatchable",
-      "Tracks C+G merged stable since 2026-05-09 (12d 7h+); B+E+F pending; E cascade-blocked on B+A; F cascade-blocked on B+D+E",
-      "Failover-watcher healthy: cron a738b0f8 every-15m, last memory-confirmed fire 23:24 (~30m ago), system activity 23:43 moltbook-monitor confirms cron-engine alive, well inside 30min stuck-watcher window",
-      "Zero track-state changes since 2026-05-09 merges; trunk tip 46c6351 unchanged from prior 21:34 silent-fire commit",
-      "No phase transitions, no dependency violations, no sprint-completion criteria approached -> NO_REPLY to Ingo"
+      "49th consecutive silent fire; cadence on-time (23:34 -> 01:34 nominal = +2h00m, actual dispatch 01:51 = +17m drift, within 2h tolerance)",
+      "Track-B Ingo-decline-hold 8d 13h (attempt-9 closed 2026-05-13T12:37); self-author Dione/Opus main-session work, not cron-bus-dispatchable per [[user_study_program]] and prior decline rationale",
+      "Tracks C+G merged stable since 2026-05-09 (12d 9h+); B+E+F pending; E cascade-blocked on B+A; F cascade-blocked on B+D+E",
+      "Failover-watcher healthy: cron a738b0f8 every-15m, prior fire confirmed silent at ~23:57 CEST per fire-48 memory tail; well inside 30min stuck-watcher window",
+      "Zero track-state changes since 2026-05-09 merges; trunk tip f20336f from prior 23:34 silent-fire commit, no bus traffic from authors/reviewers",
+      "No phase transitions, no dependency violations, no sprint-completion criteria approached -> NO_REPLY to Ingo per cron contract"
     ]
   },
   "updatedAt": "2026-05-21T23:34:00+02:00"
