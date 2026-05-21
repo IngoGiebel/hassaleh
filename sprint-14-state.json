@@ -622,18 +622,18 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-21T21:34:00+02:00",
+    "at": "2026-05-21T23:34:00+02:00",
     "cronId": "5d854f3b-8dea-4e5c-a680-9ba5eee1c64b",
     "verdict": "silent-no-action",
-    "fireNumber": 47,
+    "fireNumber": 48,
     "observations": [
-      "47th consecutive silent fire; cadence on-time (19:35 -> 21:34 = +1h59m, anchored 21:34:03)",
-      "Track-B Ingo-decline-hold 8d 9h (attempt-9 closed 2026-05-13T12:37); self-author Dione/Opus main-session work, not cron-bus-dispatchable",
-      "Tracks C+G merged stable since 2026-05-09 (12d 5h+); B+E+F pending; E cascade-blocked on B+A; F cascade-blocked on B+D+E",
-      "Failover-watcher healthy: cron a738b0f8 every-15m, last fire 21:29 (10m ago), next 21:44 (5min), well inside 30min stuck-watcher window",
-      "Zero track-state changes since 2026-05-09 merges; trunk tip bfda73a unchanged from prior 19:35 silent-fire commit",
+      "48th consecutive silent fire; cadence on-time (21:34 -> 23:34 = +2h00m nominal, actual dispatch 23:55 = +21m drift, within 2h tolerance)",
+      "Track-B Ingo-decline-hold 8d 11h (attempt-9 closed 2026-05-13T12:37); self-author Dione/Opus main-session work, not cron-bus-dispatchable",
+      "Tracks C+G merged stable since 2026-05-09 (12d 7h+); B+E+F pending; E cascade-blocked on B+A; F cascade-blocked on B+D+E",
+      "Failover-watcher healthy: cron a738b0f8 every-15m, last memory-confirmed fire 23:24 (~30m ago), system activity 23:43 moltbook-monitor confirms cron-engine alive, well inside 30min stuck-watcher window",
+      "Zero track-state changes since 2026-05-09 merges; trunk tip 46c6351 unchanged from prior 21:34 silent-fire commit",
       "No phase transitions, no dependency violations, no sprint-completion criteria approached -> NO_REPLY to Ingo"
     ]
   },
-  "updatedAt": "2026-05-21T21:34:00+02:00"
+  "updatedAt": "2026-05-21T23:34:00+02:00"
 }
