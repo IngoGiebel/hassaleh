@@ -622,18 +622,18 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-22T22:14:42+02:00",
+    "at": "2026-05-23T00:15:27+02:00",
     "cronId": "5d854f3b-8dea-4e5c-a680-9ba5eee1c64b",
     "verdict": "silent-no-action",
-    "fireNumber": 58,
+    "fireNumber": 59,
     "observations": [
-      "58th consecutive silent fire; cadence on-nominal (fire-57 at 2026-05-22T20:11:57+02:00 \u2192 fire-58 at 2026-05-22T22:14:42+02:00, +2h~)",
-      "Track-B Ingo-decline-hold 9d 9h 37m (attempt-9 closed 2026-05-13T12:37 CEST); Dione/Opus self-author, main-session-only, not cron-bus-dispatchable",
-      "Tracks C+G merged stable 13d 9h since 2026-05-09; B+D+E+F pending; E cascade-blocked on A+B+C; F cascade-blocked on A+B+D+E",
-      "Failover-watcher healthy (last fire 2026-05-22T22:06 CEST = 8m ago, well within 30min stuck-watcher window per single-writer policy)",
-      "Zero bus traffic from Sprint-14 authors/reviewers since fire-57 (most-recent bus jobs gww3-china-taiwan unrelated)",
-      "No phase transitions, no dependency violations, no sprint-completion criteria approached \u2192 NO_REPLY to Ingo per cron contract"
+      "59th consecutive silent fire; cadence on-nominal (fire-58 at 2026-05-22T22:14:42+02:00 -> fire-59 at 2026-05-23T00:15:27+02:00, ~+2h)",
+      "Track-B Ingo-decline-hold 9d 11h 38m (attempt-9 closed 2026-05-13T12:37 CEST); Dione/Opus self-author, main-session-only, not cron-bus-dispatchable",
+      "Tracks C+G merged stable 13d 7h since 2026-05-09; B+E+F pending (D not in state schema); E cascade-blocked on A+B+C; F cascade-blocked on A+B+D+E",
+      "Failover-watcher healthy (last fire 2026-05-23T00:00:17+02:00 = ~13m ago, well within 30min stuck-watcher window per single-writer policy)",
+      "1x Inanna sprint14-pm-ok bus ping at 2026-05-22T23:20+02:00 (routine PM cron, sender replied NO_REPLY); 1x unrelated gww3 dispatch at 21:07+02:00; no S14 author/reviewer traffic",
+      "No phase transitions, no dependency violations, no sprint-completion criteria approached -> NO_REPLY to Ingo per cron contract"
     ]
   },
-  "updatedAt": "2026-05-22T22:14:42+02:00"
+  "updatedAt": "2026-05-23T00:15:27+02:00"
 }
