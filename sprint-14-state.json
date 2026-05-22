@@ -622,17 +622,18 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-22T01:51:00+02:00",
+    "at": "2026-05-22T03:55:00+02:00",
     "cronId": "5d854f3b-8dea-4e5c-a680-9ba5eee1c64b",
     "verdict": "silent-no-action",
-    "fireNumber": 49,
+    "fireNumber": 50,
     "observations": [
-      "49th consecutive silent fire; cadence on-time (23:34 -> 01:34 nominal = +2h00m, actual dispatch 01:51 = +17m drift, within 2h tolerance)",
-      "Track-B Ingo-decline-hold 8d 13h (attempt-9 closed 2026-05-13T12:37); self-author Dione/Opus main-session work, not cron-bus-dispatchable per [[user_study_program]] and prior decline rationale",
-      "Tracks C+G merged stable since 2026-05-09 (12d 9h+); B+E+F pending; E cascade-blocked on B+A; F cascade-blocked on B+D+E",
-      "Failover-watcher healthy: cron a738b0f8 every-15m, prior fire confirmed silent at ~23:57 CEST per fire-48 memory tail; well inside 30min stuck-watcher window",
-      "Zero track-state changes since 2026-05-09 merges; trunk tip f20336f from prior 23:34 silent-fire commit, no bus traffic from authors/reviewers",
-      "No phase transitions, no dependency violations, no sprint-completion criteria approached -> NO_REPLY to Ingo per cron contract"
+      "50th consecutive silent fire; cadence on-time (01:51 -> 03:34 nominal = +1h43m to next anchor, actual dispatch 03:55 = +21m drift, within 2h tolerance)",
+      "Track-B Ingo-decline-hold 8d 15h+ (attempt-9 closed 2026-05-13T12:37); self-author Dione/Opus main-session-only, not cron-bus-dispatchable",
+      "Tracks C+G merged stable since 2026-05-09 (12d 11h+); B+E+F pending; E cascade-blocked on B+A; F cascade-blocked on B+D+E",
+      "Failover-watcher healthy: cron a738b0f8 fired silent at 01:25 + 01:55 (15-min cadence), well inside 30min stuck-watcher window per single-writer policy boundary",
+      "Zero track-state changes since 2026-05-09 merges; trunk tip a5ad081 from prior 01:51 fire-49 commit, no bus traffic from authors/reviewers",
+      "No phase transitions, no dependency violations, no sprint-completion criteria approached -> NO_REPLY to Ingo per cron contract",
+      "Milestone: fire-50 = 100+ hours of stable silent-fire cadence (49x2h + dispatch drift), confirming orchestrator/FW domain-boundary discipline during prolonged B-hold"
     ]
   },
   "updatedAt": "2026-05-21T23:34:00+02:00"
