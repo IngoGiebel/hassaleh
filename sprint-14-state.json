@@ -622,19 +622,18 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-22T18:14:00+02:00",
+    "at": "2026-05-22T20:11:57+02:00",
     "cronId": "5d854f3b-8dea-4e5c-a680-9ba5eee1c64b",
     "verdict": "silent-no-action",
-    "fireNumber": 56,
+    "fireNumber": 57,
     "observations": [
-      "56th consecutive silent fire; cadence +2h03m vs 2h nominal (fire-55 at 16:10:19 → fire-56 at 18:14:00)",
-      "Track-B Ingo-decline-hold 9d 5h 37m (attempt-9 closed 2026-05-13T12:37 CEST); Dione/Opus self-author, main-session-only, not cron-bus-dispatchable",
-      "Tracks C+G merged stable 13d 1h; B+D+E+F pending; E cascade-blocked on A+B+C; F cascade-blocked on A+B+D+E",
-      "Failover-watcher healthy (last fire 18:00 CEST, 13.6m ago, well within 30min stuck-watcher window per single-writer policy)",
-      "Bus traffic since fire-55: 1× Inanna PM-OK ack at 17:40:09 CEST (routine sprint14-pm cron, all tracks healthy, no author/reviewer state change)",
-      "Zero track-state changes since 2026-05-09 merges (13d 5h); trunk tip 72e6e5f = fire-55 commit, no author/reviewer bus traffic warranting state changes",
+      "57th consecutive silent fire; cadence +1h57m vs 2h nominal (fire-56 at 2026-05-22T18:14 CEST → fire-57 at 20:11:57 CEST)",
+      "Track-B Ingo-decline-hold 9d 7h 34m (attempt-9 closed 2026-05-13T12:37 CEST); Dione/Opus self-author, main-session-only, not cron-bus-dispatchable",
+      "Tracks C+G merged stable 13d 3h since 2026-05-09; B+D+E+F pending; E cascade-blocked on A+B+C; F cascade-blocked on A+B+D+E",
+      "Failover-watcher healthy (last fire 19:57 CEST = 14m ago, well within 30min stuck-watcher window per single-writer policy)",
+      "Zero bus traffic from Sprint-14 authors/reviewers since fire-56 (most-recent unrelated bus jobs 2026-05-19 silicon-strait/AMTI, 3d old)",
       "No phase transitions, no dependency violations, no sprint-completion criteria approached → NO_REPLY to Ingo per cron contract"
     ]
   },
-  "updatedAt": "2026-05-22T12:08:38+02:00"
+  "updatedAt": "2026-05-22T20:11:57+02:00"
 }
