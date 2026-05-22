@@ -622,17 +622,17 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-22T12:08:38+02:00",
+    "at": "2026-05-22T14:12:11+02:00",
     "cronId": "5d854f3b-8dea-4e5c-a680-9ba5eee1c64b",
     "verdict": "silent-no-action",
-    "fireNumber": 53,
+    "fireNumber": 54,
     "observations": [
-      "53rd consecutive silent fire; cadence on-time (10:05:30 prior dispatch -> 12:08:38 actual = +2h03m08s drift, within 2h tolerance)",
-      "Track-B Ingo-decline-hold 8d 23h 31m (attempt-9 closed 2026-05-13T12:37); self-author Dione/Opus main-session-only, not cron-bus-dispatchable",
-      "Tracks C+G merged stable since 2026-05-09 (13d 2h+); B+E+F pending; E cascade-blocked on B+A; F cascade-blocked on B+D+E",
-      "Failover-watcher healthy (a738b0f8 every-15m, last fire 8min ago / next in 7min, well inside 30min stuck-watcher window per single-writer policy boundary)",
-      "Zero track-state changes since 2026-05-09 merges; trunk tip eaa156f unchanged from prior 10:05 fire-52 commit, no bus traffic from authors/reviewers since 2026-05-21T23:19",
-      "No phase transitions, no dependency violations, no sprint-completion criteria approached -> NO_REPLY to Ingo per cron contract"
+      "54th consecutive silent fire; cadence +2h03m vs 2h nominal (fire-53 at 12:08:38 → fire-54 now)",
+      "Track-B Ingo-decline-hold 9d 1h 35m (attempt-9 closed 2026-05-13T12:37 CEST); self-author Dione/Opus main-session-only, not cron-bus-dispatchable",
+      "Tracks C+G merged stable 12d 21h; B+E+F pending; E cascade-blocked on B+A; F cascade-blocked on B+D+E",
+      "Failover-watcher healthy per fire-53 observation (every-15m a738b0f8, FW fires don't commit to trunk; lastObserved 12:00 CEST, expected ~14:00, within 30min stuck-watcher window per single-writer policy)",
+      "Zero track-state changes since 2026-05-09 merges; trunk tip 4dc8d99 unchanged from fire-53; no bus traffic from authors/reviewers since 2026-05-21T23:19",
+      "No phase transitions, no dependency violations, no sprint-completion criteria approached → NO_REPLY to Ingo per cron contract"
     ]
   },
   "updatedAt": "2026-05-22T12:08:38+02:00"
