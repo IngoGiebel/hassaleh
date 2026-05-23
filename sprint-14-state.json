@@ -622,20 +622,20 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-23T12:18:00+02:00",
+    "at": "2026-05-23T14:18:00+02:00",
     "cronId": "5d854f3b-8dea-4e5c-a680-9ba5eee1c64b",
     "verdict": "silent-no-action",
-    "fireNumber": 64,
+    "fireNumber": 65,
     "observations": [
-      "64th consecutive silent fire",
-      "Track B: pending \u2192 Ingo-hold continues (10d 0h since 2026-05-13 ae111912/8500bc08 declines)",
-      "Track C: merged 2026-05-09 (14d 0h stable)",
-      "Track G: merged 2026-05-09 (14d 0h stable)",
+      "65th consecutive silent fire",
+      "Track B: pending -> Ingo-hold continues (10d 2h since 2026-05-13 ae111912/8500bc08 declines)",
+      "Track C: merged 2026-05-09 (14d 2h stable)",
+      "Track G: merged 2026-05-09 (14d 2h stable)",
       "Tracks E, F: cascade-blocked on B (no action possible per dependency chain)",
-      "failover-watcher: healthy (last Inanna PM signal 07:42; jobs.json schedule 15min still active)",
-      "Trinity bus: zero S14 traffic since 2026-05-22 23:20 PM-OK",
+      "failover-watcher: scheduled (jobs.json 15-min cron active; last Inanna PM signal 07:42 confirmed no stuck)",
+      "Trinity bus: zero S14 traffic since fire-64 (12:18). gww3-china-taiwan bus traffic at 11:15 + 14:00 is non-S14.",
       "No phase transitions, no dependency violations, no completion candidates"
     ]
   },
-  "updatedAt": "2026-05-23T12:18:00+02:00"
+  "updatedAt": "2026-05-23T14:18:30+02:00"
 }
