@@ -622,19 +622,19 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-23T06:17:09+02:00",
+    "at": "2026-05-23T10:18:00+02:00",
     "cronId": "5d854f3b-8dea-4e5c-a680-9ba5eee1c64b",
     "verdict": "silent-no-action",
-    "fireNumber": 62,
+    "fireNumber": 63,
     "observations": [
-      "62nd consecutive silent fire; prior fire-61 committed at 70a09e5 (2026-05-23T04:17 CEST); no state-change drivers in 2h window",
-      "Track-B Ingo-decline-hold 9d 17h+ (attempt-9 closed 2026-05-13T12:37 CEST); Dione/Opus self-author, main-session-only, not cron-bus-dispatchable",
-      "Tracks C+G merged stable 13d 17h since 2026-05-09; B+E+F pending (D not in state schema); E cascade-blocked on A+B+C; F cascade-blocked on A+B+D+E",
-      "Failover-watcher healthy: last fire 06:14 CEST status=ok (2 min before this orch fire), well within 30min stuck-window; 3 consecutive ok runs in tail",
-      "No new bus traffic to dione (~/.openclaw/state/trinity-bus/messages.jsonl mtime 2026-05-22T23:20, 7h stale); no hassaleh commits since fire-61",
+      "63rd consecutive silent fire (numbering continues from fire-62 at 06:17; fire-63 slot at 08:17 had no recorded commit, treating this 10:18 fire as fire-63)",
+      "Track-B Ingo-decline-hold 9d 22h since 2026-05-13T12:37 CEST (attempt-9 closed); Dione/Opus self-author, main-session-only, not cron-bus-dispatchable",
+      "Tracks C+G merged stable 13d 22h since 2026-05-09; B+E+F pending (D not in state schema); E cascade-blocked on A+B+C; F cascade-blocked on A+B+D+E",
+      "Failover-watcher health confirmed via Inanna sprint-14-pm fire-1 (07:42 CEST): no stuck tracks; last FW fire 05:02 skip-no-tracks-to-watch",
+      "Zero bus traffic to dione since 2026-05-22T23:20 (~11h stale); no hassaleh commits since fire-62 commit f0af696",
       "No phase transitions, no dependency violations, no sprint-completion criteria approached -> NO_REPLY to Ingo per cron contract",
-      "Encoding: continuing ensure_ascii=True per fire-61 stabilization to suppress per-fire diff-noise"
+      "Encoding: ensure_ascii=True maintained per fire-61 stabilization (suppresses per-fire diff-noise from escaped-unicode regressions)"
     ]
   },
-  "updatedAt": "2026-05-23T06:17:09+02:00"
+  "updatedAt": "2026-05-23T10:18:00+02:00"
 }
