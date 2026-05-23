@@ -622,18 +622,19 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-23T00:15:27+02:00",
+    "at": "2026-05-23T04:17:09+02:00",
     "cronId": "5d854f3b-8dea-4e5c-a680-9ba5eee1c64b",
     "verdict": "silent-no-action",
-    "fireNumber": 59,
+    "fireNumber": 61,
     "observations": [
-      "59th consecutive silent fire; cadence on-nominal (fire-58 at 2026-05-22T22:14:42+02:00 -> fire-59 at 2026-05-23T00:15:27+02:00, ~+2h)",
-      "Track-B Ingo-decline-hold 9d 11h 38m (attempt-9 closed 2026-05-13T12:37 CEST); Dione/Opus self-author, main-session-only, not cron-bus-dispatchable",
-      "Tracks C+G merged stable 13d 7h since 2026-05-09; B+E+F pending (D not in state schema); E cascade-blocked on A+B+C; F cascade-blocked on A+B+D+E",
-      "Failover-watcher healthy (last fire 2026-05-23T00:00:17+02:00 = ~13m ago, well within 30min stuck-watcher window per single-writer policy)",
-      "1x Inanna sprint14-pm-ok bus ping at 2026-05-22T23:20+02:00 (routine PM cron, sender replied NO_REPLY); 1x unrelated gww3 dispatch at 21:07+02:00; no S14 author/reviewer traffic",
-      "No phase transitions, no dependency violations, no sprint-completion criteria approached -> NO_REPLY to Ingo per cron contract"
+      "61st consecutive silent fire; prior committed fire was #59 at 2026-05-23T00:15:27+02:00; intermediate fire-60 wrote disk-only (not committed by prior orch) so resetting numeric continuity at 61",
+      "Track-B Ingo-decline-hold 9d 15h+ (attempt-9 closed 2026-05-13T12:37 CEST); Dione/Opus self-author, main-session-only, not cron-bus-dispatchable",
+      "Tracks C+G merged stable 13d 15h since 2026-05-09; B+E+F pending (D not in state schema); E cascade-blocked on A+B+C; F cascade-blocked on A+B+D+E",
+      "Failover-watcher healthy: last 3 runs ok at 03:23/03:45/04:00 CEST (per cron/runs/a738b0f8.jsonl); last fire 15m ago, within 30min stuck-window",
+      "No new bus traffic to dione since fire-59 commit (no hassaleh commits in last 2h, no trinity-bus inbox mtimes <130min, state.json mtime 02:15 CEST = prior orch disk-write)",
+      "No phase transitions, no dependency violations, no sprint-completion criteria approached -> NO_REPLY to Ingo per cron contract",
+      "Encoding note: file restored to HEAD ASCII-escape convention; this fire writes with ensure_ascii=True to stop the per-fire encoding-flip diff noise"
     ]
   },
-  "updatedAt": "2026-05-23T00:15:27+02:00"
+  "updatedAt": "2026-05-23T04:17:09+02:00"
 }
