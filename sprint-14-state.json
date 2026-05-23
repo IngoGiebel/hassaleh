@@ -622,21 +622,19 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-23T20:21:00+02:00",
+    "at": "2026-05-23T22:24:21+02:00",
     "cronId": "5d854f3b-8dea-4e5c-a680-9ba5eee1c64b",
     "verdict": "silent-no-action",
-    "fireNumber": 68,
+    "fireNumber": 69,
     "observations": [
-      "68th consecutive silent fire (cadence 2h, last 8h: fires 65/66/67/68 all silent)",
-      "Track B: pending -> Ingo-hold continues (10d 8h since 2026-05-13 8500bc08 attempt-9 declines)",
-      "Track C: merged 2026-05-09 (14d 8h stable)",
-      "Track G: merged 2026-05-09 (14d 8h stable)",
-      "Tracks E, F: cascade-blocked on B (no action possible per dependency chain)",
-      "failover-watcher (a738b0f8) enabled, 15-min cadence; no capacity-failed tracks need it (Track B Ingo-hold != capacity-failed; domain-boundary \u00a71c' applies)",
-      "Trinity bus: zero S14 traffic since fire-64 (12:18 local, ~8h ago)",
-      "ensure_ascii=True invariant preserved (per K-43 lesson re-filed at fire-66): whole-file json.dump rewrite uses default ensure_ascii=True; \\u00a7 escapes intact",
-      "No phase transitions, no dependency violations, no completion candidates, no stuck-state, no failover-watcher anomalies"
+      "69th consecutive silent fire (cadence 2h, last 8h: fires 66/67/68/69 all silent)",
+      "Track B: pending -> Ingo-hold continues (10d 10h since 2026-05-13 8500bc08 attempt-9 declines)",
+      "Track C: merged 2026-05-09T16:28:27+02:00 (FF bf364b24)",
+      "Track G: merged 2026-05-09T12:59:49+02:00",
+      "Tracks E+F: cascade-blocked on B mergedAt",
+      "failover-watcher healthy (15min cron a738b0f8, no capacity-error dispatches today)",
+      "no bus traffic; no phase transitions; no dependency violations"
     ]
   },
-  "updatedAt": "2026-05-23T20:21:00+02:00"
+  "updatedAt": "2026-05-23T22:24:21+02:00"
 }
