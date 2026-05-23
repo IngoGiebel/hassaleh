@@ -622,21 +622,21 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-23T18:21:00+02:00",
+    "at": "2026-05-23T20:21:00+02:00",
     "cronId": "5d854f3b-8dea-4e5c-a680-9ba5eee1c64b",
     "verdict": "silent-no-action",
-    "fireNumber": 67,
+    "fireNumber": 68,
     "observations": [
-      "67th consecutive silent fire (cadence 2h, last 6h: fires 65/66/67 all silent)",
-      "Track B: pending -> Ingo-hold continues (10d 6h since 2026-05-13 8500bc08 attempt-9 declines)",
-      "Track C: merged 2026-05-09 (14d 6h stable)",
-      "Track G: merged 2026-05-09 (14d 6h stable)",
+      "68th consecutive silent fire (cadence 2h, last 8h: fires 65/66/67/68 all silent)",
+      "Track B: pending -> Ingo-hold continues (10d 8h since 2026-05-13 8500bc08 attempt-9 declines)",
+      "Track C: merged 2026-05-09 (14d 8h stable)",
+      "Track G: merged 2026-05-09 (14d 8h stable)",
       "Tracks E, F: cascade-blocked on B (no action possible per dependency chain)",
-      "failover-watcher (a738b0f8) enabled, 15-min cadence; no capacity-failed tracks need it",
-      "Trinity bus: zero S14 traffic since fire-64 (12:18 local, ~6h ago)",
-      "Encoding-flip lesson reinforced: fire-66 commit used ensure_ascii=True after fire-65 regression; this fire-67 write also uses ensure_ascii=True (default) to preserve \\u00a7 escapes",
+      "failover-watcher (a738b0f8) enabled, 15-min cadence; no capacity-failed tracks need it (Track B Ingo-hold != capacity-failed; domain-boundary \u00a71c' applies)",
+      "Trinity bus: zero S14 traffic since fire-64 (12:18 local, ~8h ago)",
+      "ensure_ascii=True invariant preserved (per K-43 lesson re-filed at fire-66): whole-file json.dump rewrite uses default ensure_ascii=True; \\u00a7 escapes intact",
       "No phase transitions, no dependency violations, no completion candidates, no stuck-state, no failover-watcher anomalies"
     ]
   },
-  "updatedAt": "2026-05-23T18:21:00+02:00"
+  "updatedAt": "2026-05-23T20:21:00+02:00"
 }
