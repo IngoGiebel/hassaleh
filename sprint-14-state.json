@@ -622,19 +622,19 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-23T22:24:21+02:00",
+    "at": "2026-05-24T02:23:11+02:00",
     "cronId": "5d854f3b-8dea-4e5c-a680-9ba5eee1c64b",
     "verdict": "silent-no-action",
-    "fireNumber": 69,
+    "fireNumber": 71,
     "observations": [
-      "69th consecutive silent fire (cadence 2h, last 8h: fires 66/67/68/69 all silent)",
-      "Track B: pending -> Ingo-hold continues (10d 10h since 2026-05-13 8500bc08 attempt-9 declines)",
-      "Track C: merged 2026-05-09T16:28:27+02:00 (FF bf364b24)",
-      "Track G: merged 2026-05-09T12:59:49+02:00",
-      "Tracks E+F: cascade-blocked on B mergedAt",
-      "failover-watcher healthy (15min cron a738b0f8, no capacity-error dispatches today)",
-      "no bus traffic; no phase transitions; no dependency violations"
+      "71st consecutive silent fire (cadence 2h; fire-70 @ 00:22 was memory-only, day-roll continuity from fire-69)",
+      "Track B: pending \u2192 Ingo-hold continues (10d 14h since 2026-05-13T12:37 8500bc08 attempt-9 declines)",
+      "Track C: merged 2026-05-09T16:28:27+02:00 (FF bf364b24) \u2014 14d 10h stable",
+      "Track G: merged 2026-05-09T12:59:49+02:00 \u2014 14d 13h stable",
+      "Tracks E+F: cascade-blocked on B mergedAt (per \u00a76 phase-3+4 gates)",
+      "failover-watcher (a738b0f8) 15-min cron healthy, no capacity-failed tracks \u2192 \u00a71c' silence benign",
+      "no bus traffic since fire-69; no phase transitions; no dependency violations; no sprint-completion candidates (G1 blocked by B)"
     ]
   },
-  "updatedAt": "2026-05-23T22:24:21+02:00"
+  "updatedAt": "2026-05-24T02:23:11+02:00"
 }
