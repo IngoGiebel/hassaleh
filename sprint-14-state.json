@@ -622,21 +622,21 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-24T14:26:00+02:00",
+    "at": "2026-05-24T16:26:00+02:00",
     "cronId": "5d854f3b-8dea-4e5c-a680-9ba5eee1c64b",
     "verdict": "silent-no-action",
-    "fireNumber": 77,
+    "fireNumber": 78,
     "observations": [
-      "77th consecutive silent fire (2h cadence; fire-76 @ 12:23 silent, regular 2h gap; no bus traffic since fire-69 @ 22:24 ~16h cumulative)",
-      "Track B: pending -> Ingo-hold continues (11d 2h since 2026-05-13T12:37 8500bc08 attempt-9 declines)",
-      "Track C: merged 2026-05-09T16:28:27+02:00 (FF bf364b24) -- 14d 22h stable",
-      "Track G: merged 2026-05-09T12:59:49+02:00 -- 15d 1h stable",
+      "78th consecutive silent fire (2h cadence; fire-77 @ 14:26 silent, regular 2h gap; no bus traffic since fire-69 @ 22:24 ~18h cumulative)",
+      "Track B: pending -> Ingo-hold continues (11d 3h since 2026-05-13T12:37 8500bc08 attempt-9 declines)",
+      "Track C: merged 2026-05-09T16:28:27+02:00 (FF bf364b24) -- 14d 23h stable",
+      "Track G: merged 2026-05-09T12:59:49+02:00 -- 15d 3h stable",
       "Tracks E+F: cascade-blocked on B mergedAt (per s6 phase-3+4 gates)",
-      "failover-watcher (a738b0f8) healthy: last fire 11min ago, next in 4min, status=ok; no capacity-failed tracks needing dispatch",
+      "failover-watcher (a738b0f8) healthy: last fire 7min ago @ 16:18:43, next ~16:33, status=ok; no capacity-failed tracks needing dispatch",
       "sprint-14-pm fire-2 @ 12:23 PM-OK matches disk truth + Inanna bus PM-OK @ 12:24 (last cross-confirmation; no divergence since)",
       "no bus traffic since fire-69; no phase transitions; no dependency violations; no sprint-completion candidates (G1 blocked by B mergedAt=null)",
-      "K-43 ensure_ascii=True invariant preserved 10 fires consecutive (67/68/69/71/72/73/74/75/76/77; fire-70 memory-only day-roll)"
+      "K-43 ensure_ascii=True invariant preserved 11 fires consecutive (67/68/69/71/72/73/74/75/76/77/78; fire-70 memory-only day-roll)"
     ]
   },
-  "updatedAt": "2026-05-24T14:26:00+02:00"
+  "updatedAt": "2026-05-24T16:26:00+02:00"
 }
