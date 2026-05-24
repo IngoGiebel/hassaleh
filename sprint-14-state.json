@@ -622,20 +622,20 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-24T06:23:29+02:00",
+    "at": "2026-05-24T08:23:00+02:00",
     "cronId": "5d854f3b-8dea-4e5c-a680-9ba5eee1c64b",
     "verdict": "silent-no-action",
-    "fireNumber": 73,
+    "fireNumber": 74,
     "observations": [
-      "73rd consecutive silent fire (2h cadence; fire-72 @ 04:23 silent, ~2h gap, no bus traffic since fire-69 @ 22:24 ~8h cumulative)",
-      "Track B: pending \u2192 Ingo-hold continues (10d 18h since 2026-05-13T12:37 8500bc08 attempt-9 declines)",
-      "Track C: merged 2026-05-09T16:28:27+02:00 (FF bf364b24) \u2014 14d 14h stable",
-      "Track G: merged 2026-05-09T12:59:49+02:00 \u2014 14d 17h stable",
-      "Tracks E+F: cascade-blocked on B mergedAt (per \u00a76 phase-3+4 gates)",
-      "failover-watcher (a738b0f8) 15-min cron \u2014 last observed fires 03:06 + 04:09 local 'WATCHER skip: no tracks in implement phase needing watch' exit 0; \u00a71c' silence benign (no capacity-failed tracks)",
-      "no bus traffic since fire-69; no phase transitions; no dependency violations; no sprint-completion candidates (G1 blocked by B mergedAt=null)",
-      "K-43 ensure_ascii=True invariant preserved 6 fires consecutive (67/68/69/71/72/73; fire-70 memory-only day-roll)"
+      "74th consecutive silent fire (2h cadence; fire-73 @ 06:23 silent, ~2h gap, no bus traffic since fire-69 @ 22:24 ~10h cumulative; inbound Inanna AM PM-OK @ 07:43:55 sprint14-pm-ok topic acknowledged via loop-rule, no relay)",
+      "Track B: pending -> Ingo-hold continues (10d 20h since 2026-05-13T12:37 8500bc08 attempt-9 declines)",
+      "Track C: merged 2026-05-09T16:28:27+02:00 (FF bf364b24) -- 14d 16h stable",
+      "Track G: merged 2026-05-09T12:59:49+02:00 -- 14d 19h stable",
+      "Tracks E+F: cascade-blocked on B mergedAt (per s6 phase-3+4 gates)",
+      "failover-watcher (a738b0f8) 15-min cron -- last fire 5min ago (~08:18 local) cron-list ok, next in 10min; overnight band fires 00:31/03:06/04:09/04:32/08:04 all 'WATCHER skip: no tracks in implement phase needing watch' exit 0; s1c-prime silence benign (no capacity-failed tracks)",
+      "no bus traffic since fire-69; no phase transitions; no dependency violations; no sprint-completion candidates (G1 blocked by B mergedAt=null); sprint-14-pm fire-1 @ 07:42 PM-OK matches disk truth",
+      "K-43 ensure_ascii=True invariant preserved 7 fires consecutive (67/68/69/71/72/73/74; fire-70 memory-only day-roll)"
     ]
   },
-  "updatedAt": "2026-05-24T06:23:29+02:00"
+  "updatedAt": "2026-05-24T08:23:00+02:00"
 }
