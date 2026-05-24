@@ -622,21 +622,21 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-24T10:23:00+02:00",
+    "at": "2026-05-24T12:23:00+02:00",
     "cronId": "5d854f3b-8dea-4e5c-a680-9ba5eee1c64b",
     "verdict": "silent-no-action",
-    "fireNumber": 75,
+    "fireNumber": 76,
     "observations": [
-      "75th consecutive silent fire (2h cadence; fire-74 @ 08:23 silent, regular gap; no bus traffic since fire-69 @ 22:24 ~12h cumulative)",
-      "Track B: pending -> Ingo-hold continues (10d 22h since 2026-05-13T12:37 8500bc08 attempt-9 declines)",
-      "Track C: merged 2026-05-09T16:28:27+02:00 (FF bf364b24) -- 14d 18h stable",
-      "Track G: merged 2026-05-09T12:59:49+02:00 -- 14d 21h stable",
+      "76th consecutive silent fire (2h cadence; fire-75 @ 10:23 silent, regular gap; no bus traffic since fire-69 @ 22:24 ~14h cumulative)",
+      "Track B: pending -> Ingo-hold continues (11d 0h since 2026-05-13T12:37 8500bc08 attempt-9 declines)",
+      "Track C: merged 2026-05-09T16:28:27+02:00 (FF bf364b24) -- 14d 20h stable",
+      "Track G: merged 2026-05-09T12:59:49+02:00 -- 14d 23h stable",
       "Tracks E+F: cascade-blocked on B mergedAt (per s6 phase-3+4 gates)",
-      "failover-watcher (a738b0f8) healthy: last fire <1m ago, next in ~14min; no capacity-failed tracks needing dispatch",
-      "sprint-14-pm AM fire @ 07:42 PM-OK matches disk truth; no actionable issues raised",
+      "failover-watcher (a738b0f8) healthy: last fire 5min ago, next in 10min, status=ok; no capacity-failed tracks needing dispatch",
+      "sprint-14-pm fire-2 @ 12:23 PM-OK matches disk truth + Inanna bus PM-OK @ 12:24 (independent cross-confirmation, no divergence)",
       "no bus traffic since fire-69; no phase transitions; no dependency violations; no sprint-completion candidates (G1 blocked by B mergedAt=null)",
-      "K-43 ensure_ascii=True invariant preserved 8 fires consecutive (67/68/69/71/72/73/74/75; fire-70 memory-only day-roll)"
+      "K-43 ensure_ascii=True invariant preserved 9 fires consecutive (67/68/69/71/72/73/74/75/76; fire-70 memory-only day-roll)"
     ]
   },
-  "updatedAt": "2026-05-24T10:23:00+02:00"
+  "updatedAt": "2026-05-24T12:23:00+02:00"
 }
