@@ -622,21 +622,20 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-24T18:32:00+02:00",
+    "at": "2026-05-24T20:31:45+02:00",
     "cronId": "5d854f3b-8dea-4e5c-a680-9ba5eee1c64b",
     "verdict": "silent-no-action",
-    "fireNumber": 79,
+    "fireNumber": 80,
     "observations": [
-      "79th consecutive silent fire (2h cadence; fire-78 @ 16:26 silent, regular 2h gap; no bus traffic since fire-69 @ 22:24 prev-day ~20.1h cumulative)",
-      "Track B: pending -> Ingo-hold continues (11d 5h since 2026-05-13T12:37 8500bc08 attempt-9 declines)",
-      "Track C: merged 2026-05-09T16:28:27+02:00 (FF bf364b24) -- 15d 2h stable",
-      "Track G: merged 2026-05-09T12:59:49+02:00 -- 15d 5h stable",
+      "80th consecutive silent fire (2h cadence; fire-79 @ 18:32 silent, regular 2h gap)",
+      "Track B: pending -> Ingo-hold continues (11d 8h since 2026-05-13T12:37 8500bc08 attempt-9 declines)",
+      "Track C: merged 2026-05-09T16:28:27+02:00 (FF bf364b24) -- 15d 4h stable",
+      "Track G: merged 2026-05-09T12:59:49+02:00 -- 15d 7h stable",
       "Tracks E+F: cascade-blocked on B mergedAt (per s6 phase-3+4 gates)",
-      "failover-watcher (a738b0f8) healthy: last fire 16.9min ago @ 18:15:10, next ~18:30 (just-fired window), lastRunStatus=ok consecutiveErrors=0 consecutiveSkipped=0; no capacity-failed tracks needing dispatch",
-      "sprint-14-pm fire-2 @ 12:23 PM-OK matches disk truth + Inanna bus PM-OK @ 12:24 (last cross-confirmation; no divergence since)",
+      "failover-watcher (a738b0f8) healthy: no capacity-failed tracks needing dispatch",
       "no bus traffic since fire-69; no phase transitions; no dependency violations; no sprint-completion candidates (G1 blocked by B mergedAt=null)",
-      "K-43 ensure_ascii=True invariant preserved 12 fires consecutive (67/68/69/71/72/73/74/75/76/77/78/79; fire-70 memory-only day-roll)"
+      "K-43 ensure_ascii=True invariant preserved 13 fires consecutive (67-80 excl fire-70 memory-only day-roll)"
     ]
   },
-  "updatedAt": "2026-05-24T18:32:00+02:00"
+  "updatedAt": "2026-05-24T20:31:45+02:00"
 }
