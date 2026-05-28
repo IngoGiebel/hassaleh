@@ -622,19 +622,18 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-25T16:47:04+02:00",
+    "at": "2026-05-28T05:36:00+02:00",
     "cronId": "5d854f3b-8dea-4e5c-a680-9ba5eee1c64b",
     "verdict": "silent-no-action",
-    "fireNumber": 90,
+    "fireNumber": 119,
     "observations": [
-      "90th consecutive silent fire (2h cadence from fire-89 @ 14:40)",
-      "Track B: pending -> Ingo-hold continues (12d 4h since 2026-05-13T12:37 8500bc08 attempt-9 decline)",
-      "Track C: merged 2026-05-09T16:28:27+02:00 (FF bf364b24) -- 16d 0h stable",
-      "Track G: merged 2026-05-09T12:59:49+02:00 -- 16d 4h stable",
-      "Tracks E+F: cascade-blocked on B mergedAt (per s6 phase-3+4 gates)",
-      "failover-watcher (a738b0f8) healthy: no capacity-failed tracks needing dispatch",
-      "no bus traffic since fire-69; no phase transitions; no dependency violations; no sprint-completion candidates (G1 blocked by B mergedAt=null)"
+      "119th fire (2h cadence from fire-118 @ 03:36)",
+      "Track B: pending \u2014 Ingo-hold continues (15d since 2026-05-13T12:37 8500bc08 attempt-9 decline)",
+      "Track C: merged 2026-05-09T16:28:27+02:00 (FF bf364b24) \u2014 19d stable",
+      "Track G: merged 2026-05-09T12:59:49+02:00 \u2014 19d stable",
+      "Tracks E+F: cascade-blocked on B mergedAt (per \u00a76 phase-3+4 gates)",
+      "no phase transitions; no dependency violations; no sprint-completion candidates (G1 blocked by B mergedAt=null)"
     ]
   },
-  "updatedAt": "2026-05-25T16:47:04+02:00"
+  "updatedAt": "2026-05-28T05:36:00+02:00"
 }
