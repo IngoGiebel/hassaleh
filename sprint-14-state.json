@@ -622,19 +622,19 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-28T07:36:00+02:00",
+    "at": "2026-05-28T09:40:00+02:00",
     "cronId": "5d854f3b-8dea-4e5c-a680-9ba5eee1c64b",
     "verdict": "silent-no-action",
-    "fireNumber": 120,
+    "fireNumber": 121,
     "observations": [
-      "120th fire (2h cadence from fire-119 @ 05:36)",
-      "Track B: pending — Ingo-hold continues (15d since 2026-05-13T12:37 8500bc08 attempt-9 decline)",
+      "121st fire (2h cadence from fire-120 @ 07:36)",
+      "Track B: pending — Ingo-hold day-15 (since 2026-05-13T12:37 8500bc08 attempt-9 decline)",
       "Track C: merged 2026-05-09T16:28:27+02:00 (FF bf364b24) — 19d stable",
       "Track G: merged 2026-05-09T12:59:49+02:00 — 19d stable",
       "Tracks E+F: cascade-blocked on B mergedAt (per §6 phase-3+4 gates)",
-      "failover-watcher healthy: last fire 05:43 (skip-no-impl-phase, expected); no stuck-state escalation",
+      "failover-watcher healthy: last memory-logged fire 08:11 (skip-no-impl-phase, expected)",
       "no phase transitions; no dependency violations; no sprint-completion candidates (G1 blocked by B mergedAt=null)"
     ]
   },
-  "updatedAt": "2026-05-28T07:36:00+02:00"
+  "updatedAt": "2026-05-28T09:40:00+02:00"
 }
