@@ -622,19 +622,19 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-28T09:40:00+02:00",
+    "at": "2026-05-30T08:19:00+02:00",
     "cronId": "5d854f3b-8dea-4e5c-a680-9ba5eee1c64b",
     "verdict": "silent-no-action",
-    "fireNumber": 121,
+    "fireNumber": 140,
     "observations": [
-      "121st fire (2h cadence from fire-120 @ 07:36)",
-      "Track B: pending — Ingo-hold day-15 (since 2026-05-13T12:37 8500bc08 attempt-9 decline)",
-      "Track C: merged 2026-05-09T16:28:27+02:00 (FF bf364b24) — 19d stable",
-      "Track G: merged 2026-05-09T12:59:49+02:00 — 19d stable",
-      "Tracks E+F: cascade-blocked on B mergedAt (per §6 phase-3+4 gates)",
-      "failover-watcher healthy: last memory-logged fire 08:11 (skip-no-impl-phase, expected)",
-      "no phase transitions; no dependency violations; no sprint-completion candidates (G1 blocked by B mergedAt=null)"
+      "fire #140 (2h cadence; prev fire #139 @ 2026-05-30T04:19:00+02:00; 4h gap — scheduler skipped 06:19 slot)",
+      "Track B: pending — Ingo-hold day-18 (17d since 2026-05-13T12:37 attempt-9 decline 8500bc08); main-session author-lift required",
+      "Track C: merged 2026-05-09T16:28:27+02:00 — 21d stable, no trunk reversion",
+      "Track G: merged 2026-05-09T12:59:49+02:00 — 21d stable, no trunk reversion",
+      "Tracks E+F: cascade-blocked on B mergedAt (§6 phase-3+4 gates)",
+      "failover-watcher: healthy — last confirmed fires 04:00/05:13/05:34/05:49/06:04 all exit 0 (within 15-min cadence); dormant pattern (no implement-phase tracks → >30min escalation gate not armed)",
+      "no phase transitions; no dependency violations; no sprint-completion candidates (G1 blocked by B mergedAt=null); 14+ consecutive silent orch fires honor Inanna-PM DIONE_STALLED authority on A1–A6"
     ]
   },
-  "updatedAt": "2026-05-28T09:40:00+02:00"
+  "updatedAt": "2026-05-30T08:19:00+02:00"
 }
