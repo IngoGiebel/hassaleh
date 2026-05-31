@@ -622,12 +622,12 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-31T06:28:00+02:00",
-    "fireNumber": 151,
+    "at": "2026-05-31T10:29:00+02:00",
+    "fireNumber": 153,
     "verdict": "silent",
-    "noteSummary": "No state changes. B Ingo-hold day-18, C+G merged 21d stable, E+F cascade-blocked on B, failover-watcher healthy (a738b0f8 last fire 06:14 rc=0).",
-    "consecutiveSilentFires": 25,
+    "noteSummary": "No state changes. B Ingo-hold day-19, C+G merged 22d stable, E+F cascade-blocked on B. No capacity-error tracks needing failover-watcher.",
+    "consecutiveSilentFires": 27,
     "writtenBy": "orchestrator-cron-5d854f3b"
   },
-  "updatedAt": "2026-05-31T04:28:00+02:00"
+  "updatedAt": "2026-05-31T10:29:00+02:00"
 }
