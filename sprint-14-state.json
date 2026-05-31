@@ -622,19 +622,12 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-05-30T08:19:00+02:00",
-    "cronId": "5d854f3b-8dea-4e5c-a680-9ba5eee1c64b",
-    "verdict": "silent-no-action",
-    "fireNumber": 140,
-    "observations": [
-      "fire #140 (2h cadence; prev fire #139 @ 2026-05-30T04:19:00+02:00; 4h gap — scheduler skipped 06:19 slot)",
-      "Track B: pending — Ingo-hold day-18 (17d since 2026-05-13T12:37 attempt-9 decline 8500bc08); main-session author-lift required",
-      "Track C: merged 2026-05-09T16:28:27+02:00 — 21d stable, no trunk reversion",
-      "Track G: merged 2026-05-09T12:59:49+02:00 — 21d stable, no trunk reversion",
-      "Tracks E+F: cascade-blocked on B mergedAt (§6 phase-3+4 gates)",
-      "failover-watcher: healthy — last confirmed fires 04:00/05:13/05:34/05:49/06:04 all exit 0 (within 15-min cadence); dormant pattern (no implement-phase tracks → >30min escalation gate not armed)",
-      "no phase transitions; no dependency violations; no sprint-completion candidates (G1 blocked by B mergedAt=null); 14+ consecutive silent orch fires honor Inanna-PM DIONE_STALLED authority on A1–A6"
-    ]
+    "at": "2026-05-31T06:28:00+02:00",
+    "fireNumber": 151,
+    "verdict": "silent",
+    "noteSummary": "No state changes. B Ingo-hold day-18, C+G merged 21d stable, E+F cascade-blocked on B, failover-watcher healthy (a738b0f8 last fire 06:14 rc=0).",
+    "consecutiveSilentFires": 25,
+    "writtenBy": "orchestrator-cron-5d854f3b"
   },
-  "updatedAt": "2026-05-30T08:19:00+02:00"
+  "updatedAt": "2026-05-31T04:28:00+02:00"
 }
