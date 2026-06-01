@@ -622,12 +622,12 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-06-01T12:44:00+02:00",
-    "fireNumber": 166,
+    "at": "2026-06-01T14:42:00+02:00",
+    "fireNumber": 167,
     "verdict": "silent",
-    "noteSummary": "No state changes. B Ingo-hold day-20 (since 2026-05-13 attempt-9 decline 8500bc08), C+G merged 23d stable, E+F cascade-blocked on B. failover-watcher healthy (last fire 8min ago, next in 7min, rc=0 'no tracks in implement phase needing watch'). Inanna PM fire-2 12:23 corroborates state. 40 consecutive silent fires.",
-    "consecutiveSilentFires": 40,
+    "noteSummary": "No state changes. B Ingo-hold day-20 (since 2026-05-13 attempt-9 decline 8500bc08), C+G merged 23d stable, E+F cascade-blocked on B. failover-watcher domain clean (direct invocation rc=0 'no tracks in implement phase needing watch'). Inanna PM fire-2 12:23 corroborates {B:pending, C:merged, E:pending, F:pending, G:merged} no stuck. 41 consecutive silent fires.",
+    "consecutiveSilentFires": 41,
     "writtenBy": "orchestrator-cron-5d854f3b"
   },
-  "updatedAt": "2026-06-01T12:44:00+02:00"
+  "updatedAt": "2026-06-01T14:42:00+02:00"
 }
