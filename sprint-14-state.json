@@ -622,12 +622,12 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-06-01T00:34:00+02:00",
-    "fireNumber": 160,
+    "at": "2026-06-01T02:34:00+02:00",
+    "fireNumber": 161,
     "verdict": "silent",
-    "noteSummary": "No state changes. B Ingo-hold day-19 (19d since 2026-05-13 attempt-9 decline 8500bc08), C+G merged 23d stable, E+F cascade-blocked on B. failover-watcher domain clean (script verified rc=0 \"no tracks in implement phase needing watch\"). Inanna-PM fire-4 23:17 corroborates {B:pending, C:merged, E:pending, F:pending, G:merged} no stuck.",
-    "consecutiveSilentFires": 34,
+    "noteSummary": "No state changes. B Ingo-hold day-19 (19d since 2026-05-13 attempt-9 decline 8500bc08), C+G merged 23d stable, E+F cascade-blocked on B. failover-watcher domain clean (script verified rc=0 'no tracks in implement phase needing watch'). 35 consecutive silent fires.",
+    "consecutiveSilentFires": 35,
     "writtenBy": "orchestrator-cron-5d854f3b"
   },
-  "updatedAt": "2026-06-01T00:34:00+02:00"
+  "updatedAt": "2026-06-01T02:34:00+02:00"
 }
