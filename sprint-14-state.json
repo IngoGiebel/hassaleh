@@ -622,12 +622,12 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-06-01T16:42:00+02:00",
-    "fireNumber": 168,
+    "at": "2026-06-01T18:48:00+02:00",
+    "fireNumber": 169,
     "verdict": "silent",
-    "noteSummary": "No state changes since fire #167 (14:42). B Ingo-hold day-20 (no transition since 2026-05-13 attempt-9 decline 8500bc08), C+G merged 23d stable, E+F cascade-blocked on B. failover-watcher domain clean (no tracks in implement phase needing watch; no log activity last 120min). No git activity on trunk since fire #167 commit 6eb2952. 42 consecutive silent fires.",
-    "consecutiveSilentFires": 42,
+    "noteSummary": "No state changes since fire #168 (16:42). B Ingo-hold day-20 (no transition since 2026-05-13 attempt-9 decline 8500bc08), C+G merged 23d stable, E+F cascade-blocked on B. failover-watcher domain clean (no tracks in implement phase requiring watch). No trunk git activity since fire #168 commit 8be340c. 43 consecutive silent fires.",
+    "consecutiveSilentFires": 43,
     "writtenBy": "orchestrator-cron-5d854f3b"
   },
-  "updatedAt": "2026-06-01T14:42:00+02:00"
+  "updatedAt": "2026-06-01T18:48:00+02:00"
 }
