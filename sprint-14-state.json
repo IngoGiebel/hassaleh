@@ -622,12 +622,12 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-06-01T20:48:00+02:00",
-    "fireNumber": 170,
+    "at": "2026-06-01T22:49:00+02:00",
+    "fireNumber": 171,
     "verdict": "silent",
-    "noteSummary": "No state changes since fire #169 (18:48). B Ingo-hold day-20 (no transition since 2026-05-13 attempt-9 decline 8500bc08), C+G merged 23d stable, E+F cascade-blocked on B. failover-watcher domain clean (no tracks in implement phase requiring watch). 44 consecutive silent fires.",
-    "consecutiveSilentFires": 44,
+    "noteSummary": "No state changes since fire #170 (20:48). B Ingo-hold day-20 (no transition since 2026-05-13 attempt-9 decline 8500bc08), C+G merged 23d stable, E+F cascade-blocked on B. failover-watcher domain clean (direct script invocation rc=0 'no tracks in implement phase needing watch'). 45 consecutive silent fires (Ingo-decision-pressure pattern framed at fire #161, no escalation per memory cron rule).",
+    "consecutiveSilentFires": 45,
     "writtenBy": "orchestrator-cron-5d854f3b"
   },
-  "updatedAt": "2026-06-01T20:48:00+02:00"
+  "updatedAt": "2026-06-01T22:49:30+02:00"
 }
