@@ -622,12 +622,12 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-06-02T13:35:00+02:00",
-    "fireNumber": 177,
+    "at": "2026-06-02T15:48:00+02:00",
+    "fireNumber": 178,
     "verdict": "silent",
-    "noteSummary": "No state changes since fire #176 (11:29 CEST). Track B Ingo-hold day-21 sustained (no transition since 2026-05-13 attempt-9 decline 8500bc08). C+G merged 24d stable, E+F cascade-blocked on B. failover-watcher last fire ~11:24 UTC rc=0 (no implement-phase tracks → no capacity surface). 51 consecutive silent fires — Ingo-decision-pressure pattern; no escalation per [[feedback_cron_skill_read_memory_first]].",
-    "consecutiveSilentFires": 51,
+    "noteSummary": "No state changes since fire #177 (13:35 CEST). Track B Ingo-hold day-21 sustained (no transition since 2026-05-13 attempt-9 decline 8500bc08). C+G merged 24d stable, E+F cascade-blocked on B. failover-watcher last run 2026-06-02T15:40 CEST status=ok consecutiveErrors=0 (no implement-phase tracks → no capacity surface). 52 consecutive silent fires — Ingo-decision-pressure pattern; no escalation per [[feedback_cron_skill_read_memory_first]].",
+    "consecutiveSilentFires": 52,
     "writtenBy": "orchestrator-cron-5d854f3b"
   },
-  "updatedAt": "2026-06-02T11:35:00Z"
+  "updatedAt": "2026-06-02T15:48:00+02:00"
 }
