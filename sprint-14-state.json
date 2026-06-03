@@ -622,11 +622,11 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-06-03T12:25:00+02:00",
-    "fireNumber": 188,
+    "at": "2026-06-03T14:25:00+02:00",
+    "fireNumber": 189,
     "verdict": "silent-no-transition",
-    "noteSummary": "Tracks unchanged from #187: C+G merged 25d (mergedAt 2026-05-09), B pending/Ingo-hold attempt-9-decline 8500bc08, E+F cascade-blocked on B. Failover-watcher healthy (recent clean fires 03:02/03:32/04:47 UTC today, well within 30min watchdog). 62 consecutive silent fires.",
-    "consecutiveSilentFires": 62,
+    "noteSummary": "Tracks unchanged from #188: C+G merged 25d (2026-05-09), B pending/Ingo-hold attempt-9-decline 8500bc08, E+F cascade-blocked on B. Failover-watcher healthy (14:09 clean ~16min before fire, within 30min watchdog; consecutive clean fires today 03:02→04:09→04:47→05:16→12:17→12:57→14:09). 63 consecutive silent fires.",
+    "consecutiveSilentFires": 63,
     "writtenBy": "orchestrator-cron-5d854f3b"
   },
   "updatedAt": "2026-06-03T06:09:00+02:00"
