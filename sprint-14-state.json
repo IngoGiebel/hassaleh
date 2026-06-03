@@ -622,11 +622,11 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-06-03T08:13:00+02:00",
-    "fireNumber": 186,
+    "at": "2026-06-03T10:24:00+02:00",
+    "fireNumber": 187,
     "verdict": "silent-no-transition",
-    "noteSummary": "Tracks unchanged from fire #185: C+G merged 25d, B Ingo-hold (no transition since 2026-05-13 attempt-9 decline 8500bc08), E+F cascade-blocked on B. Failover-watcher a738b0f8 healthy per 05:49 memory probe. 60 consecutive silent fires.",
-    "consecutiveSilentFires": 60,
+    "noteSummary": "Tracks unchanged from #186: C+G merged 25d, B Ingo-hold attempt-9-decline 8500bc08, E+F cascade-blocked on B. Failover-watcher healthy (last clean 09:59 cron, within 30min watchdog window). 61 consecutive silent fires.",
+    "consecutiveSilentFires": 61,
     "writtenBy": "orchestrator-cron-5d854f3b"
   },
   "updatedAt": "2026-06-03T06:09:00+02:00"
