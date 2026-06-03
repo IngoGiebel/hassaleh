@@ -622,12 +622,12 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-06-03T18:29:27+02:00",
-    "fireNumber": 191,
+    "at": "2026-06-03T20:28:42+02:00",
+    "fireNumber": 192,
     "verdict": "silent-no-transition",
-    "noteSummary": "Tracks unchanged from #190: C+G merged 25d (2026-05-09), B pending/Ingo-hold attempt-9-decline 8500bc08 d31, E+F cascade-blocked on B. No new phase transitions, no capacity failures observed, no dependency violations. Sprint-completion gates (G1+G2+G3) unmet — B/E/F still pending. Failover-watcher idle-by-design (no tracks in implement phase needing watch). 65 consecutive silent fires.",
-    "consecutiveSilentFires": 65,
+    "noteSummary": "Tracks unchanged from #191: C+G merged 25d (2026-05-09), B pending/Ingo-hold attempt-9-decline 8500bc08 d31, E+F cascade-blocked on B. No new phase transitions, no capacity failures observed, no dependency violations. Sprint-completion gates (G1+G2+G3) unmet — B/E/F still pending. Failover-watcher healthy (last fire ~9m ago per `openclaw cron list`, idle-by-design — no implement-phase tracks). 66 consecutive silent fires.",
+    "consecutiveSilentFires": 66,
     "writtenBy": "orchestrator-cron-5d854f3b"
   },
-  "updatedAt": "2026-06-03T18:29:27+02:00"
+  "updatedAt": "2026-06-03T20:28:42+02:00"
 }
