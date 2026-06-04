@@ -622,12 +622,12 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-06-04T10:54:30+02:00",
-    "fireNumber": 199,
+    "at": "2026-06-04T12:57:00+02:00",
+    "fireNumber": 200,
     "verdict": "silent-no-transition",
-    "noteSummary": "Tracks unchanged from #198: C+G merged 26d, B pending Ingo-hold d32, E+F cascade-blocked on B. Failover-watcher healthy (15m cadence, silent-by-design when no cap-errors). 73 consecutive silent fires. No phase transitions, no capacity errors, no dependency violations.",
-    "consecutiveSilentFires": 73,
+    "noteSummary": "Tracks unchanged from #199: C+G merged 26d, B pending Ingo-hold d32 (attempt-9-decline), E+F cascade-blocked on B. Failover-watcher healthy 15m cadence (idle-by-design, no implement-phase tracks). 2 Inanna→Dione bus heartbeats today (07:53 PM-OK, 12:25 PM-OK) — no escalations. 74 consecutive silent fires. No phase transitions, no capacity errors, no dependency violations.",
+    "consecutiveSilentFires": 74,
     "writtenBy": "orchestrator-cron-5d854f3b"
   },
-  "updatedAt": "2026-06-04T06:48:00+02:00"
+  "updatedAt": "2026-06-04T12:57:00+02:00"
 }
