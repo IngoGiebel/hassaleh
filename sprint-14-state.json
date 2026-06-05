@@ -622,12 +622,12 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-06-05T15:40:04+02:00",
-    "fireNumber": 212,
+    "at": "2026-06-05T17:45:00+02:00",
+    "fireNumber": 213,
     "verdict": "silent-no-transition",
-    "noteSummary": "Tracks unchanged from #211: C+G merged 27d, B Ingo-hold d33 (attempt-9-decline 2026-05-13, policy-block not capacity), E+F cascade-blocked on B. trunk@c8b29ed unchanged since #210. No sprint-14 bus traffic to Dione since #211. Failover-watcher idle-by-design. 86 consec silent fires. Cadence 13:31->15:40 = 2h09m (on-spec).",
-    "consecutiveSilentFires": 86,
+    "noteSummary": "Tracks unchanged from #212: C+G merged 27d, B Ingo-hold d33 (attempt-9-decline 2026-05-13, policy-block not capacity), E+F cascade-blocked on B. trunk@f11917b (= #212 heartbeat commit) unchanged since #212. No sprint-14 bus traffic to Dione since #211. Failover-watcher idle-by-design. 87 consec silent fires. Cadence 15:40->17:45 = 2h05m (on-spec).",
+    "consecutiveSilentFires": 87,
     "writtenBy": "orchestrator-cron-5d854f3b"
   },
-  "updatedAt": "2026-06-05T15:40:04+02:00"
+  "updatedAt": "2026-06-05T17:45:00+02:00"
 }
