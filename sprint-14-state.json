@@ -622,11 +622,11 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-06-05T09:26:00+02:00",
-    "fireNumber": 209,
+    "at": "2026-06-05T11:31:00+02:00",
+    "fireNumber": 210,
     "verdict": "silent-no-transition",
-    "noteSummary": "Tracks unchanged from #208: C+G merged 27d, B pending Ingo-hold d33 (attempt-9-decline 2026-05-13), E+F cascade-blocked on B. trunk@577f825 unchanged since #208 (state.json hb commit). No new bus traffic to Dione (inbox empty since 07:28). Failover-watcher last observed fire 07:08 silent (no-implement-phase tracks); 2h18m since, within 15-min cadence + idle-by-design = healthy. 83 consec silent fires. No phase transitions, no capacity errors, no dependency violations. Cadence 07:26→09:26 = 2h00m (on-spec).",
-    "consecutiveSilentFires": 83,
+    "noteSummary": "Tracks unchanged from #209: C+G merged 27d, B Ingo-hold d33 (attempt-9-decline 2026-05-13), E+F cascade-blocked on B. trunk@4e6c9a6 unchanged since #209 (state.json hb commit). No new bus traffic to Dione. Failover-watcher last fire 09:19Z=11:19 CEST (12min ago, within 15-min cadence, exit ok). 84 consec silent fires. No phase transitions, no capacity errors, no dependency violations. Cadence 09:26→11:31 = 2h05m (on-spec).",
+    "consecutiveSilentFires": 84,
     "writtenBy": "orchestrator-cron-5d854f3b"
   },
   "updatedAt": "2026-06-05T07:26:00+02:00"
