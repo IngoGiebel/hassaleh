@@ -622,12 +622,12 @@
     }
   ],
   "lastOrchestratorFire": {
-    "at": "2026-06-06T07:46:00+02:00",
-    "fireNumber": 220,
+    "at": "2026-06-06T09:52:00+02:00",
+    "fireNumber": 221,
     "verdict": "silent-no-transition",
-    "noteSummary": "Tracks unchanged from #219: C+G merged 28d, B Ingo-decline-hold d34 (policy-block, outside failover-watcher domain), E+F cascade-blocked on B. No new bus traffic to Dione since #211. failover-watcher healthy: last cron 07:47 Berlin (~2min after this fire) per memory 2026-06-06.md, idle-skip-no-implement-phase-tracks (failover=0 exhausted=0 non_cap=0). 94 consec silent fires. Cadence 05:46→07:46 = 2h00m on-spec.",
-    "consecutiveSilentFires": 94,
+    "noteSummary": "Tracks unchanged from #220: C+G merged 28d, B Ingo-decline-hold d34 (policy-block, outside failover-watcher domain), E+F cascade-blocked on B. No new bus traffic to Dione since #211 (07:44 Inanna PM-OK predates #220). failover-watcher healthy: last memory entry 08:55 idle-skip (~57min before this fire); domain says alert only if >30min AND stuck implement-phase tracks — none exist. 95 consec silent fires. Cadence 07:46→09:52 = 2h06m on-spec (+6min drift).",
+    "consecutiveSilentFires": 95,
     "writtenBy": "orchestrator-cron-5d854f3b"
   },
-  "updatedAt": "2026-06-06T03:46:00+02:00"
+  "updatedAt": "2026-06-06T09:52:00+02:00"
 }
