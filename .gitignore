@@ -45,3 +45,20 @@ logs/
 
 # State-file cross-process locks (failover-watcher flock sentinels)
 *.json.lock
+
+# Sprint-state rolling backups (orchestrator crash-recovery snapshots)
+# Pattern: sprint-14-state.json.bak.<orch-NN-MM|fire<N>|cron-NN-NN|<timestamp>>
+# These are intra-orchestrator rolling backups, not migration artifacts.
+*.bak
+*.bak.*
+*.bak-*
+.bak/
+.bak.*
+.sprint-14-state.*.bak.json
+retrigger_msg.txt
+
+# Throw-away PM/ID check scripts (per-investigation one-offs)
+check_id*.py
+pm-check*.py
+pm-ok*.py
+pm_check*.py
